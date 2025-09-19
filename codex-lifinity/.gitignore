@@ -1,0 +1,25 @@
+# Virtual environments
+.venv/
+
+# Environment configuration
+.env
+
+# Large data dumps
+artifacts/*.so
+artifacts/*.disasm
+artifacts/*.tar.gz
+artifacts/*.zip
+
+data/raw/
+!data/raw/.gitkeep
+
+data/processed/
+!data/processed/.gitkeep
+
+data/cache/
+
+# Notebook checkpoints
+notebooks/.ipynb_checkpoints/
+
+# Mermaid render outputs
+diagrams/*.svg

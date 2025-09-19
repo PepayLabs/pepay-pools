@@ -1,0 +1,10 @@
+# Placeholder mapping for Lifinity v2 instruction discriminators.
+# Populate once transaction parsing identifies the 8-byte prefixes.
+# Example:
+#  "0x1234567890abcdef":
+#    name: swap
+#    accounts:
+#      - { index: 0, name: "config", is_signer: false, is_writable: false }
+#    data_schema:
+#      fee_bps: u16
+#      amount_in: u64

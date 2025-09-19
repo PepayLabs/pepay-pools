@@ -39,6 +39,11 @@ This workspace supports an end-to-end technical and empirical study of Lifinity'
 5. **Algorithm Derivation & Backtesting** – Fit oracle-anchored curve parameters, inventory adjustments, and threshold rebalancing using datasets in `data/processed/`; validate swaps within ≤2 bps median error.
 6. **EVM Porting Analysis** – Translate findings into contract design, keeper/oracle requirements, and parameter guidance documented in `docs/evm_porting_report.md`.
 
+### Automation Aids
+- `Makefile` shortcuts: `make install`, `make inventory`, `make sample`, `make empirics`.
+- `scripts/pipeline.py` orchestrates multi-step pulls (`inventory`, `sample`, `empirics`) with shared configuration from `scripts/config.py`.
+- `scripts/discriminators.yaml` tracks recovered 8-byte instruction keys once identified.
+
 ## Environment Setup
 ```bash
 python3 -m venv .venv

@@ -1,0 +1,343 @@
+Market Evaluation: Deploying a Lifinity-Style AMM on BNB Chain
+Introduction
+
+Launching a Lifinity-style proactive market maker on BNB Chain requires assessing the current DeFi landscape, especially competitors employing concentrated liquidity, oracle-based pricing, active rebalancing, or protocol-owned liquidity (POL). Lifinity (on Solana) is known for combining concentrated liquidity, oracle-driven pricing, and proactive rebalancing to reduce impermanent loss
+anvikakumar.medium.com
+. Adapting such a model to BNB Chain calls for understanding the existing DEX models, liquidity metrics on key pairs, oracle infrastructure, fee economics, and any gaps in the market. Below is a comprehensive evaluation focused on BNB Chain.
+
+1. Competitive Landscape on BNB Chain
+
+Several decentralized exchanges on BNB Chain already implement advanced AMM features similar to a Lifinity approach:
+
+PancakeSwap v3: The dominant DEX on BNB Chain, PancakeSwap launched its v3 (a Uniswap v3 fork) in 2023
+thedefiant.io
+. It introduced concentrated liquidity allowing LPs to provide liquidity within custom price ranges for higher capital efficiency
+thedefiant.io
+. PancakeSwap v3 overhauled its fee structure to multiple tiers: 0.01%, 0.05%, 0.25%, and 1% (versus a flat 0.25% on v2)
+thedefiant.io
+. These tiers let LPs choose lower fees for stable pairs and higher fees for volatile/exotic pairs. A portion of fees is allocated to PancakeSwap’s treasury and CAKE buy-backs/burns
+thedefiant.io
+. PancakeSwap v3 has achieved significant traction on BNB Chain, with ~$341M TVL on BNB Chain alone (out of ~$508M total multichain)
+defillama.com
+. It remains the largest DEX by volume on BNB Chain (e.g. ~$62.5B in trades over the last 30 days across all pairs)
+defillama.com
+. PancakeSwap does not use external oracles for pricing (it relies on arbitrage and LP ranges), but its scale and capital efficiency set a high bar for any new AMM.
+
+iZiSwap (iZUMi Finance): iZUMi launched the first concentrated liquidity DEX on BNB Chain with a “discretized liquidity AMM (DL-AMM)” model
+izumi-finance.medium.com
+. This is effectively a Uniswap v3-style DEX that allows liquidity provision at discrete price ticks, enabling limit-order-like liquidity placement and 5000x capital efficiency according to iZUMi
+docs.izumi.finance
+. iZiSwap on BNB Chain aimed to attract liquidity via incentive mining and was an early mover in concentrated liquidity (pre-dating Pancake v3). While iZiSwap’s current market share is modest, it represents a direct competitor in the concentrated liquidity AMM segment.
+
+Biswap v3: Biswap is a popular BNB Chain DEX that historically differentiated itself with low fees (0.1%) and a referral rewards program. In 2023, Biswap introduced its own v3 AMM upgrade with concentrated liquidity and multi-tier fees
+blog.biswap.org
+docs.biswap.org
+. Biswap v3 offers fee tiers of 0.015% (stable-stable pairs), 0.08% (stable-volatile pairs), 0.28% (volatile pairs), and 1% (exotic)
+docs.biswap.org
+ – similar in concept to Pancake v3’s tiers. In Biswap v2, by contrast, volatile pairs had a 0.2% fee (with 0.15% to LPs) and stable-stable pairs a 0.1% fee
+docs.biswap.org
+docs.biswap.org
+. Biswap’s focus on low fees and incentives helped it gain users; its v3 now combines that with concentrated liquidity. Any new AMM must consider Biswap’s competitive fee structure and its protocol fee split (which includes BSW token burns) when positioning a fee model.
+
+DODO (BSC): DODO exchange uses a Proactive Market Maker (PMM) algorithm that does incorporate price oracles and active price adjustment – aligning closely with “Lifinity-style” principles. DODO’s PMM uses external price feeds (e.g. Chainlink) to concentrate liquidity near the market price, reducing impermanent loss and improving depth with less capital
+anvikakumar.medium.com
+blog.dodoex.io
+. DODO deployed on BSC during the DeFi boom; at one point BSC was its second-largest chain by TVL (~$47M)
+messari.io
+. Currently DODO’s total TVL is smaller (~$22M across chains)
+defillama.com
+, but it pioneered oracle-based pricing on BNB Chain. Its BSC pools charge ~0.05% swap fees by default
+blog.dodoex.io
+. A Lifinity-style AMM on BNB Chain would face DODO as the closest existing analog (PMM model), though DODO’s traction on BNB Chain has waned. This suggests an opportunity if oracle-based AMMs can be executed with more compelling economics or reliability.
+
+Wombat Exchange: Wombat is a native BNB Chain stableswap 2.0 protocol (backed by Binance Labs) focusing on stablecoin liquidity
+iq.wiki
+. It is not concentrated liquidity per se but uses a custom curve invariant to provide single-sided liquidity and minimal slippage for pegged assets. Wombat’s stablecoin pools (USDT, BUSD, USDC, etc.) amassed over $6M TVL on BSC
+defillama.com
+. However, Wombat’s volumes are moderate (e.g. ~$0.85M in 7d volume on BSC)
+defillama.com
+. With BUSD being phased out, Wombat has added new stablecoins (like partnering to onboard TUSD, FRAX, and likely FDUSD)
+iq.wiki
+iq.wiki
+. A Lifinity-style AMM could complement or compete with such stable-swap protocols by offering oracle-informed pricing for stables. For example, if it owned liquidity for a USDC/FDUSD pool, it could proactively arbitrage any peg deviations. Wombat’s experience shows stablecoin-focused liquidity is in demand on BNB Chain, though yielding relatively low fee revenue given tight spreads.
+
+Thena (ve(3,3) DEX): Thena launched in 2023 as a Solidly/Velodrome-inspired AMM on BNB Chain, aiming to be a “liquidity layer” for other projects
+thena.fi
+. It does not use oracle pricing or Uniswap v3 ranges; instead it uses a dual AMM model (stable vs volatile pools like Curve/Sushi) and a vote-escrow (veTHE) incentive model. Thena encourages other protocols to acquire veTHE and vote incentives, effectively a “protocol for protocols” approach
+medium.com
+. While not oracle-based, Thena emphasizes protocol-owned voting power: projects themselves commit to Thena to secure lasting liquidity, akin to owning liquidity influence if not the liquidity outright. Thena rapidly gained TVL early on and introduced POL-like elements (e.g. its team seeded some initial liquidity and the protocol earns trading fees on vested tokens). For a Lifinity-style AMM, Thena demonstrates an alternate route to deep liquidity: aligning with protocols via governance/bribes rather than the AMM alone owning liquidity. A new AMM could consider integrating with such veToken models or alternatively position against them by directly controlling liquidity to reduce reliance on mercenary LPs.
+
+Summary of Key Competitors: Table 1 outlines major BNB Chain AMMs relevant to a Lifinity-style project:
+
+Protocol (BNB Chain)	Model & Features	TVL (BNB Chain)	Daily Volumes	Fee Tiers / Structure
+PancakeSwap v3	Concentrated liquidity (Uniswap v3 fork);
+No oracle pricing (arbitrage-based);
+Protocol fee + burn (CAKE)	~$341M TVL on BSC
+defillama.com
+defillama.com
+	Multi-chain vol ~$2.6B/24h
+defillama.com
+ (BNB Chain largest share)	0.01%, 0.05%, 0.25%, 1% fee tiers
+thedefiant.io
+ (e.g. stable pairs at 0.01%)
+~0.05% of most swaps goes to treasury/burn
+defillama.com
+.
+iZiSwap (iZUMi)	Concentrated “discretized” liquidity;
+Limit-order like tick ranges; Incentivized mining	modest (launched 2022, < $10M est.)	N/A (small share, niche pools)	Similar tiers to v3 (discrete ticks); Liquidity-as-a-Service model for projects
+web3.bitget.com
+.
+Biswap v3	Concentrated liquidity;
+Focused on lowest fees & referrals	TVL not public (~few $M)	Moderate (Biswap total DEX vol ~$10–20M/day historically)	0.015%, 0.08%, 0.28%, 1% tiers
+docs.biswap.org
+; (v2 was 0.1% base, with 50% of fees to BSW burn
+bingx.com
+coinmarketcap.com
+).
+DODO (BSC)	Oracle-based PMM (proactive pricing);
+Reduces IL by mirroring external price
+alchemy.com
+	~$5–10M on BSC (est., part of $22M total)	Low currently (7d vol ~$1M on BSC)	~0.3% default on Ethereum; on BSC pools often 0.05%–0.3%
+blog.dodoex.io
+; adjustable by pool. Uses Chainlink oracles for pricing.
+Wombat Exchange	Stablecoin stableswap (non-U v3);
+Single-sided liquidity, peg-focused invariant	~$6.4M on BSC
+defillama.com
+	~$0.14M/day on BSC
+defillama.com
+ (stables)	~0.01%–0.04% effective fees on stable swaps (low slippage); $WOM rewards for LPs.
+Thena (ve3,3 model)	Dual AMM (v2-style pools: stable & volatile);
+veToken governance, bribe incentives; POL via partner protocols	~$10–20M (variable, incentive-driven)	Varied (dependent on incentives; dozens of smaller pools)	0.01% stable pools, 0.2–0.3% volatile (typical); fee revenue shared with veTHE voters (protocol earns if it holds veTHE).
+
+Implications: PancakeSwap v3 is by far the heavyweight, especially for blue-chip pairs. Biswap and iZiSwap show that concentrated liquidity is a proven trend on BNB Chain, so a new AMM must offer more than just Uniswap v3 functionality – perhaps the oracle-based approach (like Lifinity) could be that differentiator. DODO’s limited adoption on BNB Chain suggests that while PMM/oracle AMMs have potential, they haven’t yet dominated – possibly due to earlier network effects of Pancake or user trust issues. This leaves room for a well-executed Lifinity-style AMM to carve a niche, provided it can demonstrate superior capital efficiency or IL reduction.
+
+2. Liquidity Depth and Volume of Major Pairs
+
+To gauge market opportunity, consider the TVL and trading volume on key trading pairs on BNB Chain. Major pairs include BNB with stablecoins, top crypto with stablecoins, and major stablecoin swaps. Below are observations on a few pairs:
+
+BNB/USDT: As BNB Chain’s native token, BNB paired with Tether is highly liquid. On PancakeSwap v2, the BNB/USDT pool holds ~$32 million liquidity, facilitating roughly $16–17 million in daily volume
+dexscreener.com
+dexscreener.com
+. This ~50% daily turnover highlights active arbitrage and usage. (On Pancake v3, liquidity is split into concentrated positions, so v2 remains a reference for total depth.) The standard 0.25% fee means BNB/USDT LPs earn on the order of $40k in fees per day, or ~45% APR on that capital – though impermanent loss can offset some gains when BNB’s price moves significantly. Liquidity depth: ~$30M+ ensures slippage on large trades is low; however, much of this liquidity may be passive. A Lifinity-style AMM could deploy protocol-owned BNB/Stable liquidity that dynamically rebalances with an oracle price feed. By updating pool price proactively (instead of waiting for arbitrage), it could capture more of that $40k/day in revenue for the protocol (reducing outside arb profits) and perhaps sustain lower IL. Risk: It would be directly competing with PancakeSwap’s deep pool unless it can offer better prices (e.g., via lower fee or tighter spreads through rebalancing).
+
+ETH/USDT and BTCB/USDT: Ethereum (ETH) and Bitcoin (BTCB – Binance-pegged BTC) also trade on BNB Chain, primarily as ERC-20 representations. Liquidity and volume are slightly lower than BNB’s. For example, PancakeSwap’s ETH/USDT pair shows ~$1–1.2M daily volume (combined across v2 and v3) on a few million liquidity
+geckoterminal.com
+. BTCB/USDT is similar order of magnitude. These volumes are decent but not huge, reflecting that many traders still use ETH/BTC on their native chains or Binance CEX. Still, a proactive AMM could provide very tight spreads on ETH/USDT by pegging to the oracle price (Chainlink ETH price feed is available on BNB Chain) – essentially acting as an on-chain market maker for ETH. If it owns the liquidity, it could draw volume by offering better prices than existing pools during fast moves (since it adjusts price faster). Opportunity: capture the arbitrage between BNB Chain ETH price and external markets without relying on external arbers. Volume potential: Several hundred thousand dollars daily per pair is realistic initially, with more if pricing is competitive.
+
+USDT/USDC (Stablecoin ⇄ Stablecoin): Stablecoin swap volume on BNB Chain is massive. BNB Chain frequently handles large stablecoin flows; in mid-2025 it was #1 among blockchains in stablecoin transaction volume
+dlnews.com
+. PancakeSwap’s USDT/USDC pool (now essentially replacing BUSD pools) often has $30–40M TVL and multi-million daily volume. For instance, one PancakeSwap info report shows ~$34M liquidity and about $4.6M 24h volume on USDT/USDC
+pancakeswap.finance
+. That implies very high utilization and low slippage. Notably, Pancake v3’s concentrated 0.01% fee pool for USDT/USDC saw even higher turnover – on some days over 100% of pool liquidity in daily volume (e.g. a spike to ~$50M volume on ~$40M liquidity) as arb traders swap stablecoins
+coinmarketcap.com
+. Fee earnings: At 0.01%, $5M volume yields ~$500 in fees daily on that pool – a modest ~0.5% APR for LPs given the low risk. A Lifinity-style AMM that owns a stablecoin pool could potentially set a slightly higher fee (say 0.02% or dynamically adjust fees) to capture more revenue while still undercutting typical 0.04% stable-swap fees. More importantly, by using an oracle (which for stables might simply be $1 parity) it can automatically arbitrage peg deviations. For example, if FDUSD trades at $0.998 vs USDT, the AMM could rebalance inventory to profit from the spread (earning what arbitrageurs normally would). Key stable pairs on BNB Chain now include USDT, USDC, and the newer FDUSD: a Lifinity-style protocol could target owning liquidity in USDC/FDUSD or USDT/FDUSD where current depth is smaller. In fact, PancakeSwap v3’s USDT/FDUSD pool (0.01% fee) has only ~$173k liquidity but saw ~$254k daily volume
+geckoterminal.com
+ – over 1.4x turnover – as traders exchange into the newly promoted FDUSD stablecoin. This underscores a market gap: FDUSD liquidity is underserved (Binance is phasing out BUSD for FDUSD). A proactive AMM could seize this by providing deep liquidity for FDUSD pairs (USDT, USDC, BNB/FDUSD) and using oracle pricing (e.g. maintaining 1:1 peg) to minimize IL. The volume-to-liquidity ratio shows strong demand (e.g. $254k volume on $173k liquidity
+geckoterminal.com
+), so more liquidity there could scale volume significantly.
+
+Other Pairs (LSDs, Alts): BNB Chain hosts many BEP20 assets (e.g. CAKE, etc.) and liquid staking derivatives like AnkrBNB, stkBNB, etc. These often suffer from shallow liquidity or high IL for LPs. A Lifinity-style AMM could identify such underserved mid-cap pairs where it can provide a better market. For instance, an LSD/BNB pool: the AMM could keep the price tracking BNB via oracle, essentially functioning like a quasi-stable pair (since an LSD’s price is BNB plus a small yield discount). By proactively market-making, the protocol could facilitate large swaps between BNB and its staking derivatives with minimal slippage – a service currently lacking on BNB Chain. This could attract DeFi users who want to trade in/out of LSDs without going to a CEX. However, this strategy requires very reliable oracle pricing and careful risk management as the protocol would bear IL if the oracle is wrong or if there’s a depeg event.
+
+Takeaway: Major pairs on BNB Chain have substantial volume (BNB/stable, stable/stable) but are dominated by PancakeSwap. Any new AMM must either (a) offer significantly better trade execution (tighter spreads, lower fees) to siphon volume, or (b) target niches where current liquidity is insufficient (e.g. new stablecoins, long-tail assets, cross-chain assets). The data suggests stablecoin exchanges are a high-volume, low-margin corner where a proactive market maker could shine by capturing arbitrage profits for itself. In contrast, blue-chip volatile pairs have higher fees and revenue but come with higher IL risk – a proactive AMM would need strong treasury backing (POL) to weather IL in those pools.
+
+3. Oracle Availability and Reliability on BNB Chain
+
+A Lifinity-style AMM relies on robust price oracles to update pool prices. On BNB Chain, the oracle ecosystem is mature:
+
+Chainlink: Chainlink’s decentralized price feeds are widely integrated into BNB Chain DeFi (used by lending platforms like Venus, etc.). As of late 2022, Chainlink provided price feeds for over 100 trading pairs on BNB Chain
+bnbchain.org
+, covering all major assets (BTC, ETH, BNB, stablecoins, etc.). Chainlink oracles are highly reliable, with a network of independent nodes pulling data from many exchanges. Updates are push-based on threshold changes or heartbeat intervals. Latency on Chainlink BNB feeds is typically a few minutes or less, which is sufficient for most DeFi uses, though high-frequency trading might find it slow during extreme volatility. Notably, Chainlink introduced a low-latency “pull” oracle mode in late 2022
+bnbchain.org
+, but in practice most BNB Chain dApps use the regular feeds. For a proactive AMM, Chainlink feeds can serve as a primary price source; they have a strong security track record (no major failures specific to BNB Chain reported). Still, cost can be a factor: each feed update consumes gas and Chainlink nodes charge for their service (usually this is abstracted via sponsor contracts). A new AMM might use Chainlink for high-liquidity assets and complement it with a TWAP or secondary oracle as fallback.
+
+Pyth Network: Pyth, known for high-frequency off-chain prices on Solana, went live on BNB Chain in 2022
+bnbchain.org
+bnbchain.org
+. Through a partnership with Binance, Pyth offers 80+ first-party price feeds on BNB Chain
+bnbchain.org
+, covering crypto (and even some equities/forex) with updates as fast as 2-3 times per second off-chain
+bnbchain.org
+. Pyth uses a “pull oracle” design: prices are published to Pythnet (their Solana-based network) continuously, and any BNB Chain user contract can request an update via the Wormhole bridge to get the latest price on-chain
+bnbchain.org
+bnbchain.org
+. This means ultra-low latency is achievable, but the AMM must call the Pyth update (paying BNB gas) whenever it wants to refresh the price. The reliability of Pyth is bolstered by 70+ data providers (including major exchanges and market makers)
+bnbchain.org
+. Pyth’s design ensures it remains operational even if the BNB Chain is congested or Oracle nodes have issues, since the prices live on Pythnet and are relayed. For a Lifinity-style AMM, Pyth is attractive because it can provide nearly real-time pricing, which is ideal for proactive rebalancing. The trade-off is complexity and cost: the AMM would need a mechanism (or keeper bots) to trigger Pyth updates at needed intervals, and handle scenarios where an update isn’t fetched (to avoid stale pricing). Nonetheless, Pyth was specifically mentioned by Lifinity as its oracle of choice on Solana
+alchemy.com
+, so porting a similar design to BNB Chain via Pyth is feasible. Venus Protocol on BNB Chain has already integrated Pyth feeds, indicating growing trust in this oracle
+bnbchain.org
+.
+
+Band Protocol: Band, a Cosmos-based oracle, was an early provider on BNB Smart Chain. Band offers aggregated price feeds as well, and BSC integration is supported
+bnbchain.org
+. However, Band’s adoption on BNB Chain appears smaller compared to Chainlink. Some projects used Band in 2020–21 when Chainlink’s access was more limited; today, Chainlink has overshadowed it. Reliability: Band is decentralized but had fewer nodes and occasionally slower update times historically. It is a viable fallback oracle – a Lifinity-style AMM could use Band as a secondary source if Chainlink/Pyth fail, or to cross-verify prices. But depending solely on Band might raise concerns, as the ecosystem confidence leans toward Chainlink and Pyth.
+
+Binance Oracle: In late 2022, BNB Chain introduced Binance Oracle, an official price feed service by Binance
+bnbchain.org
+. This service presumably sources prices from Binance’s exchange and other venues, publishing to BNB Chain for use by dApps. Binance Oracle is relatively new, but given it’s backed by Binance, one can expect high uptime and accurate data (though it might be somewhat centralized in trust). For a proactive AMM, Binance Oracle could be another price source, especially for BNB or BUSD (previously) where Binance has direct market data. Using multiple oracles (Chainlink + Pyth + Binance Oracle) in a redundant or aggregate way could greatly enhance reliability – if one lags or deviates, the AMM could fall back or sanity-check with another. In fact, industry best practice is to use a primary and secondary oracle to mitigate risks
+bnbchain.org
+.
+
+Reliability Considerations: Generally, oracle failures on BNB Chain have been rare, but they’re not impossible. The AMM design must handle scenarios like: price feed freezing (as happened on some chains during extreme moves), sudden price glitches, or latency during network congestion. One mitigation is using a Time-Weighted Average Price (TWAP) from on-chain DEXs as an emergency backup. Uniswap v2-style TWAP or PancakeSwap’s price accumulators can provide a last-resort price if external feeds are unavailable
+bnbchain.org
+. However, TWAPs on BNB Chain can be manipulated if trading is shallow, so this is only a safeguard for major assets with deep liquidity.
+
+In summary, BNB Chain offers all the needed oracle infrastructure for a Lifinity-like AMM. Chainlink can cover most assets with a proven solution, Pyth can offer cutting-edge low-latency pricing (especially useful for rapid rebalancing to reduce IL), and Binance Oracle/Band can be supplementary. The AMM should plan for costs (e.g. Pyth updates each time the pool price deviates by a threshold will incur gas) and ensure it doesn’t update so frequently that fees outweigh trading profits. But given BNB Chain’s low gas fees and high volume, this is a solvable problem.
+
+4. Fee Structures & Revenue Potential on BNB Chain AMMs
+
+Understanding fee structures on existing AMMs is key to projecting revenue for a new entrant. BNB Chain DEXes have evolved fee models to balance volume and LP returns:
+
+Volatile vs Stable Pair Fees: It’s standard for BNB Chain DEXes to charge higher fees on volatile pairs and minimal fees on stablecoin pairs. PancakeSwap v3, for example, explicitly sets 0.01% for stablecoin-to-stablecoin trades and 0.05–0.25% for most crypto-to-stable trades, versus 1% for exotic low-liquidity tokens
+thedefiant.io
+. Biswap similarly uses 0.015% for stable pairs and 0.08% for a stable vs non-stable pair
+docs.biswap.org
+. The rationale is clear: stablecoin pools can support huge volumes at tiny fees (since arbitrage keeps their price tight), whereas volatile asset pools require higher fees to compensate LPs for greater impermanent loss risk.
+
+Stablecoin Pairs: On BNB Chain, stablecoin swaps (USDT↔USDC, USDT↔BUSD/FDUSD, etc.) often have the lowest fees on any platform – 0.01% on Pancake v3, 0.015% on Biswap, or ~0.04% on stable-swap pools like Curve/Wombat. Despite the low fee %, the sheer volume makes these pools significant revenue generators in aggregate. For instance, if USDT/USDC trades $4M per day at 0.01%, that’s $400 in daily fees. PancakeSwap’s actual USDT/USDC 24h volume was $4.6M, yielding ~$2.3K fees in a day
+pancakeswap.finance
+ (half to LPs, half to treasury in v3’s case). Over a year, that pool could generate ~$150k fees, which for a ~$34M pool is a low ~0.44% APR to LPs. This explains why additional liquidity doesn’t flood in without incentives – the base yield is low (though essentially risk-free). From a protocol perspective, however, if the protocol itself owns such liquidity, any positive yield on tens of millions is meaningful. Additionally, a proactive AMM could perhaps charge a slightly higher fee (say 0.02%) if it offers a superior fill or if it monopolizes a niche stable pair like FDUSD/USDC. This could double the revenue without significantly deterring traders (0.02% is still negligible slippage). The key is striking balance: too high a fee and arbitrage might move to other platforms. Stable pair revenue potential: modest per dollar of liquidity (~0.5–5% APR), but very steady and scalable with volume. These pools also face minimal IL, so protocol-owned stable liquidity is relatively low risk – ideal for a POL approach.
+
+Volatile/Stable Pairs: Pairs like BNB/USDT, ETH/USDC, etc., usually have fees around 0.2–0.3% on v2 AMMs or 0.05–0.25% on v3 (depending on the chosen fee tier by LPs). PancakeSwap v2 charged 0.25% (with 0.17% to LP, 0.03% to CAKE burn, etc.), Biswap v2 charged 0.2% (0.15% LP, 0.05% team/treasury)
+docs.biswap.org
+. These higher fees mean LPs can earn decent gross returns when volume is high. For example, earlier we noted BNB/USDT ~$16M daily at 0.25% generates ~$40k fees per day – relative to ~$32M liquidity, that’s ~45% APR if volume stayed constant (which of course fluctuates). In practice, during volatile markets, volumes and fees spike (LPs earn more), but IL also spikes (often wiping out those gains). Revenue for the protocol: Many BNB Chain DEXs take a cut of these fees. Pancake v3’s model is to take a portion of swap fees (the exact cut varies by pool but ~1/5 of fees goes to the protocol for most pools
+defillama.com
+). That has yielded Pancake ~$5.2M in revenue in the last 30 days across all pairs
+defillama.com
+. A new AMM that is protocol-owned liquidity could theoretically keep 100% of the trading fees (since the protocol is the LP). This is a huge advantage – effectively combining “LP revenue” and “protocol fee” into one because the protocol is the sole liquidity provider. Thus, a Lifinity-style AMM on BNB Chain could capture the full ~0.20–0.25% on each volatile pair trade. The potential returns are high: even a single mid-sized pool like BNB/USDT could earn tens of thousands daily as we saw. However, the protocol must be prepared to absorb impermanent loss – essentially functioning like a professional market maker who sometimes loses on inventory when price trends. Lifinity’s design on Solana addressed this by adjusting price proactively (reducing arbitrage losses). If executed well, the AMM’s active strategy plus fee income can outperform passive LPing. But if executed poorly or if oracles lag, the protocol could accrue IL quickly (for example, if BNB pumps 20% before the AMM updates its price, it would have sold a lot of BNB cheaply to arbitragers and lose value relative to just holding BNB).
+
+Protocol Fee and Token Economics: It’s worth noting how competitors utilize fees for token value accrual. PancakeSwap uses a portion of fees to burn CAKE (deflationary mechanism)
+thedefiant.io
+. Biswap similarly burns BSW with part of the fees
+coinmarketcap.com
+. Thena shares fees with veTHE lockers (projects and users who hold veNFTs get trading fees, aligning incentives). These models mean that for an outsider launching an AMM, one could either introduce a token and use fees to reward holders (to bootstrap adoption), or avoid a token and focus on organic profitability. A Lifinity-style AMM might not need a high-emission token (Lifinity itself had a token with POL mechanics). It could use the Protocol-Owned Liquidity (POL) concept to generate revenue and only introduce a token for governance or to raise initial capital (ideally avoiding mercenary farming). Given BNB Chain users are accustomed to yield farming, a nuanced approach may be needed: perhaps the protocol offers bonding (sell its token at a discount for LP assets, à la Olympus) to build POL, rather than high APR liquidity mining which would conflict with the POL model.
+
+Stable vs Volatile Focus: The fee structure also influences which segment is more lucrative. Stablecoin pools have huge volume but razor-thin fees; volatile pools have lower volume but fatter fees per trade. On BNB Chain, stablecoin volumes (especially after BUSD’s decline) are still robust – e.g., multiple millions daily on USDT/USDC as noted. Volatile pairs like BNB/USDT, however, can also see multi-million daily volumes (especially during market moves) and charge 10–25x the fee of stable swaps. Thus, in terms of fee revenue, a volatile pair can actually rival a stable pair if volume is at least ~1/10th of the stable volume. For example: $5M at 0.2% yields $10k, versus $50M at 0.01% yields $5k. This suggests a strategy: the protocol could deploy POL for both categories – but perhaps initially focus on a few high-volume volatile pairs (BNB/stables) to generate significant fees, and a few critical stablecoin pairs to establish itself as an essential liquidity source (even if low margin). The stablecoin pools bring users (everyone wants good stable swap rates) and serve as a low-risk revenue base, whereas the volatile pools bring in higher profits if managed well. Over time, the protocol might find an optimal fee tier via experimentation – e.g., maybe charging 0.05% on a stablecoin pool if it’s the sole deep pool for a newer stable, or 0.3% on a volatile pair that still yields traders better overall execution if slippage is minimal.
+
+In summary, revenue potential on BNB Chain AMMs is significant, but competitive. A Lifinity-style AMM could capture more value per trade by owning the liquidity (no need to split with external LPs or token incentives). The flip side is it bears all IL and inventory risk. The fee structures on BNB Chain are well-established; a new AMM must either align with them (to meet trader expectations on cost) or justify any divergence with better performance. The most promising avenue is likely stablecoin pairs (for volume) and top volatile pairs (for fee %), using an oracle strategy to minimize losses. With protocol-owned funds, even a few percent annual ROI from stable pools plus double-digit ROI from volatile pools can make the venture profitable, given sufficient scale of liquidity.
+
+5. Adoption and Impact of Protocol-Owned Liquidity (POL) on BNB Chain
+
+Protocol-Owned Liquidity refers to DeFi protocols accumulating and owning liquidity (LP positions) rather than renting it from users via high emissions. This concept gained fame with OlympusDAO and has been adopted in various forms. On BNB Chain, POL is not yet widespread among DEXes, but there are notable instances and trends:
+
+Olympus-style Bonds on BNB Chain: Some platforms have tried Olympus’s bonding model to acquire POL. For example, ApeSwap introduced “Treasure Bills”, which are essentially bonds where users give LP tokens to the treasury in exchange for discounted BANANA tokens vesting over time. This allowed ApeSwap to build a treasury of its own LP positions (POL)
+dappradar.com
+. DappRadar noted this as a move towards sustainable liquidity
+dappradar.com
+. The scale of these efforts on BNB Chain has been limited – ApeSwap’s overall liquidity and volume have declined since the 2021 peak, suggesting that POL alone didn’t guarantee success without a competitive product. Nonetheless, it shows BNB projects experimenting with POL to reduce liquidity mining costs.
+
+DEX Treasuries and POL: PancakeSwap historically had such large TVL from community LPs that it didn’t need POL; however, Pancake’s team has at times provided initial liquidity for new features (and they have a hefty treasury from fees). Biswap’s documentation of POL concept
+blog.biswap.org
+ indicates an understanding that owning liquidity can secure long-term stability. There isn’t public data on Biswap or Pancake’s percentage of POL, but it’s likely low – they still rely on user LPs predominantly, topped with incentives when needed. A Lifinity-style AMM launching on BNB Chain with a pure POL model would actually be relatively novel. It could differentiate by saying: our liquidity is more reliable because it’s protocol-controlled and not yield-farm capital that can exit. This reliability can attract traders, and also partner protocols who want assurance that, say, an asset pair’s liquidity won’t vanish after rewards end.
+
+ve(3,3) Model (Thena) and POL: Thena’s approach encourages other protocols to own veTHE (governance power) to direct liquidity to their pools – effectively those protocols are “owning liquidity incentives” if not the liquidity itself. The result is some projects have taken major stakes in Thena, ensuring their token pairs have deep liquidity without directly owning all of it. This is a twist on POL: instead of owning LP tokens, a project owns enough of the DEX’s governance to keep liquidity for itself. The impact on BNB Chain is that newer DEXes like Thena, or Balancer fork Equilibre (if any on BNB Chain), shift away from simple rent-anyone’s-liquidity schemes. They aim for more committed, partnership-driven liquidity. A Lifinity-style AMM with POL could actually complement this: it could integrate with such ecosystems by, for instance, locking some of its token in Thena to get emissions for a pool it cares about (increasing its yield), or conversely, inviting protocols to invest in its platform for guaranteed liquidity.
+
+Impact of POL: The main benefits of POL observed in DeFi are:
+
+Consistency – Liquidity isn’t subject to mercenary flight when rewards drop. This leads to tighter spreads and better user experience. For BNB Chain users who saw many farm tokens come and go, a POL-based AMM could earn trust by demonstrating stable liquidity over time.
+
+Revenue capture – The protocol earns trading fees directly, building treasury. This can create a virtuous cycle to grow protocol funds or buy/burn its token (if any). For instance, if a Lifinity-style AMM had $50M of its own liquidity spread across pools and averaged a modest 5% annual return from fees/arbitrage, that’s $2.5M revenue to the treasury – which could be used to further grow liquidity or distribute to token holders.
+
+Impermanent loss management – With POL, the protocol can take a long-term view on IL, even subsidizing it if needed (through trading gains or other revenue). Lifinity on Solana used mechanisms like an impermanent loss protection fund and only pairing assets it was willing to hold long-term. On BNB Chain, a POL approach could likewise avoid extremely volatile or one-way assets unless the protocol is comfortable holding them. This means initially focusing on assets like BNB and major stablecoins (which the protocol might consider core treasury assets). The impact is a more resilient liquidity platform less prone to collapse when markets swing.
+
+On the downside, POL requires significant upfront capital or effective bonding programs to acquire that capital. BNB Chain’s largest DEXes did not start with big treasuries – they grew it from fees and token raises. For a new entrant, raising or allocating funds to seed liquidity is necessary. The environment in 2025 expects more sustainable models, so investors might favor a POL approach if it promises eventual profitability without endless emissions.
+
+Precedents of POL in BNB Chain Projects: Outside of DEXes, BNB Chain has seen POL ideas in yield aggregators or launchpads (e.g., some projects create protocol-owned LP to support their token price). One example is Venus’s plan to bootstrap a stablecoin market with protocol-owned liquidity
+community.venus.io
+. These instances underscore the growing acceptance that protocols owning liquidity aligns incentives better. A Lifinity-style AMM could become a liquidity provider for others as a service: it could offer to manage POL for partner projects using its tech (for a fee or partial ownership). This Liquidity-as-a-Service angle has been tried by iZUMi (LiquidBox) and others on Ethereum
+web3.bitget.com
+. On BNB Chain, a new AMM could fill that niche – essentially acting as the market maker for new tokens or stablecoins, using its proactive model to maintain good markets while charging projects for the service (or taking protocol tokens as reward, thereby owning more assets).
+
+In conclusion, POL on BNB Chain is an emerging but not yet dominant trend. The introduction of a proactive market maker that is entirely POL could set a new standard if successful. It would remove the need for yield farming to retain TVL, and instead rely on the protocol’s own bankroll and algorithmic market-making to attract volume. If it succeeds in generating consistent fees, it validates the POL model and could inspire more protocols to do similar (further shifting BNB Chain DeFi from the inflationary liquidity mining era to a more sustainable one). The risk is that if the AMM’s strategies fail, the protocol’s capital is on the line – unlike traditional DEXes where LPs take the hit. So the stakes are higher for the protocol, making reliability of oracles and strategy paramount.
+
+6. Market Gaps & Strategic Opportunities
+
+Analyzing the above, there are clear market gaps on BNB Chain that a Lifinity-style proactive AMM could fill:
+
+Oracle-Based Pricing Advantage: No major BNB Chain DEX today dynamically adjusts pool prices via oracles – except DODO to an extent, which currently has a small presence. This means most AMMs rely on arbitragers to correct mispricing, which costs the LPs (or protocol) money in IL. A proactive AMM that updates its pricing to match global markets (via Pyth or Chainlink) can retain much of that arbitrage profit internally. This could allow tighter spreads or higher net returns. Opportunity: market this as “low-slippage trading with less arbitrage” – potentially offering better prices for traders during volatile swings (because the AMM has moved the price already). For example, during a sudden BNB price jump, PancakeSwap liquidity may lag until arbers trade; a Lifinity-style pool could move its BNB price up immediately via oracle, so traders get quotes closer to the true price and the protocol doesn’t lose as much to arbers. This could attract volume from arbitrage bots themselves, who might route through the AMM since it effectively internalized the order book.
+
+Underserved Stablecoin Liquidity: With BUSD’s decline, stablecoin liquidity on BNB Chain is in flux. Binance is pushing FDUSD, which currently has far lower on-chain liquidity than BUSD did. The evaluation shows PancakeSwap’s FDUSD pools are still small (sub-million TVL) but handling significant volume
+geckoterminal.com
+. Gap: A proactive AMM could become the liquidity hub for FDUSD by allocating POL to FDUSD pairs and keeping them at parity via oracle. This is strategically aligned with Binance’s interests, which could mean potential support or at least easy integration (Binance might route some swaps through the deepest pool). Achieving a first-mover advantage here could secure a long-term position if FDUSD becomes a top stablecoin. Similarly, other new stablecoins or fiat tokens (e.g. decentralized stablecoins, or tokens like EUR stable, etc.) have room on BNB Chain for deeper liquidity. Wombat and Ellipsis have not capitalized fully on these (Ellipsis’s new FDUSD pool was tiny at ~$2k TVL as seen
+geckoterminal.com
+). A Lifinity-style AMM could fill that vacuum.
+
+Long-Tail Assets and New Projects: Many smaller-cap BNB Chain tokens suffer high slippage on trades due to shallow pools. Traditional AMMs require heavy incentives to thicken those order books. A proactive AMM could selectively provide liquidity for promising projects (perhaps ones vetted or in partnership) and maintain tighter spreads using price feeds (which could be derived from price impact on Pancake or a centralized exchange listing). By doing so, it becomes the go-to venue for trading those tokens. This is essentially acting as an on-chain market maker for hire. If structured properly, the AMM could take a fee or token allocation from the project in exchange for providing liquidity. This leverages the POL + oracle model to serve a niche that’s currently met off-chain (market makers on CEXs) or poorly met on-chain. The risk here is higher (small-cap prices can be very volatile and oracles might be less reliable), so the AMM should be selective and perhaps charge higher fees accordingly. But it’s a segment with less competition, as PancakeSwap generally doesn’t actively manage long-tail markets, it just opens farms and hopes liquidity comes.
+
+Reduced Impermanent Loss = Attractive to LP Capital: While the Lifinity model doesn’t rely on external LPs, proving reduced IL and higher efficiency is important for narrative. It means the protocol can operate with less capital to achieve the same depth. It could also eventually offer a vault for users to deposit funds into the POL (effectively becoming passive LPs in the managed strategy). If many BNB Chain users are tired of suffering IL in Uni v3 or Pancake, they might prefer to deposit in a smart pool where the AMM algorithm does the work and mitigates IL. This resembles projects like Visor/Arrakis on Ethereum but here the protocol could charge a performance fee. While this blurs pure POL (since user funds join), it could accelerate growth and still be aligned (users accept the AMM’s proactive strategy). Highlighting IL reduction (e.g. via backtests or live data compared to normal LPing) would be a strong selling point in documentation and could draw capital away from competitors.
+
+Strategic Alignment with BNB Chain Initiatives: Binance/BNB Chain often support projects that boost the ecosystem (via grants or incubation). A Lifinity-style AMM targeting FDUSD and improved liquidity aligns with their goals (improving DeFi user experience, volume, and stablecoin adoption on BNB Chain). This could open doors to collaborations – for example, getting the AMM integrated into Binance’s DeFi interfaces or receiving liquidity support from Binance labs. Being on BNB Chain also means large retail user base; if the AMM can integrate with popular wallets (TrustWallet etc.) and offer a smooth UI, it can quickly gain usage. The proactive market maker could even integrate Chainlink’s upcoming CCIP or Binance’s bridging to access liquidity from other chains (though that adds complexity beyond scope here).
+
+Risks and Challenges: Of course, there are risks to consider:
+
+Oracle Failure or Latency: If an oracle update lags (network issues or extreme market moves), the AMM could be caught with the wrong price and suffer IL as arbitrage pours in. Mitigation via multiple oracles and circuit breakers (pause trading if oracle price diverges too much from on-chain price) will be needed. Any single severe failure could deplete protocol funds, so this is a critical point.
+
+Competition Response: PancakeSwap is a formidable incumbent. If the new AMM starts to take volume, Pancake could respond – e.g. by lowering fees (they could introduce 0% fee promos subsidized by their treasury) or by launching similar oracle-twap hybrid pools. Pancake has the advantage of user base and capital; however, large platforms are sometimes slow to innovate. The new AMM should move quickly to establish moats (maybe exclusive partnerships or unique tech).
+
+Liquidity Requirements: POL means the team needs significant capital. If undercapitalized, the AMM won’t provide meaningful depth and users won’t switch for marginally better pricing. Proper fundraising or gradual roll-out is necessary (perhaps start with stablecoin pools which need less capital for impact due to high volume-to-liquidity usage, then use generated fees + raised funds to expand to volatile pools).
+
+Regulatory/Custodial Considerations: Owning liquidity means the protocol is effectively a market maker. This might attract regulatory looks if not fully decentralized. It should be structured with governance and transparency to remain a DeFi protocol (for instance, clear rules for how the AMM operates, community oversight if there’s a token, etc., to avoid being seen as a single entity “trading against users” – even though in truth that’s what market makers do). Education will be key to show users that a proactive AMM is beneficial, not predatory.
+
+Conclusion
+
+In the BNB Chain ecosystem, a Lifinity-style proactive AMM could leverage oracle-driven pricing and protocol-owned liquidity to carve out a unique position. Current competitors validate the demand for concentrated liquidity (Pancake v3, iZiSwap, Biswap) and hint at the power of active strategies (DODO’s PMM), but none combine these elements in the exact way Lifinity does. The evaluation shows strong opportunities in stablecoin markets (especially new stablecoins like FDUSD) and in capturing trading fees on major pairs by reducing arbitrage leakage. The available oracle infrastructure (Pyth for speed, Chainlink for reliability) can support such an endeavor, and the fee economics suggest that a POL-based AMM could be financially sustainable if it achieves sufficient volume.
+
+By targeting gaps (e.g. improving stablecoin swap efficiency, offering liquidity-as-a-service to new tokens, reducing IL for LP capital), the protocol can attract both traders and liquidity collaborators. Strategically, aligning with BNB Chain’s growth (perhaps via grants or co-marketing, given BNB Chain’s interest in DeFi innovation) could accelerate adoption. The main risks revolve around execution: it must maintain oracle accuracy and risk management to avoid self-inflicted losses. If successful, this proactive market maker could not only generate solid revenue, but also set a new paradigm on BNB Chain – one where deep liquidity is maintained by protocols themselves in a sustainable, low-inflation manner, ultimately improving the trading experience and stability of the ecosystem.
+
+Sources:
+
+Kumar, Anvika. “Lifinity Deep Dive: The Proactive Market Maker.” Medium, Feb 2022. 
+anvikakumar.medium.com
+alchemy.com
+
+iZUMi Finance Docs. “iZiSwap – Discretized Liquidity AMM (DL-AMM).” developer.izumi.finance 
+izumi-finance.medium.com
+docs.izumi.finance
+
+BNB Chain Blog. “BNB Chain Tops Stablecoin Activity and Users...” dlnews.com, July 2025. 
+dlnews.com
+
+IQ.wiki. “Wombat Exchange – Overview.” iq.wiki, 2025. 
+iq.wiki
+
+IQ.wiki. “Wombat Exchange – Partnerships.” iq.wiki, 2025. 
+iq.wiki
+iq.wiki
+
+BNB Chain Blog. “BNB Chain Welcomes Pyth Feeds Live on Mainnet.” Oct 2022. 
+bnbchain.org
+bnbchain.org
+
+BNB Chain Blog. “The State of Oracles (BNB Chain Report).” Nov 2022. 
+bnbchain.org
+bnbchain.org
+
+BNB Chain Blog. “The State of Oracles (Case Studies).” Nov 2022. 
+bnbchain.org
+
+The Defiant. “PancakeSwap V3 Launches on BNB Chain – Forks Uniswap V3.” Apr 2023. 
+thedefiant.io
+thedefiant.io
+
+PancakeSwap Docs/DefiLlama. “PancakeSwap V3 – Fee Tiers and Metrics.” 2025. 
+thedefiant.io
+defillama.com
+
+Biswap Documentation. “Biswap V3 Fees and V2 Comparison.” 2023. 
+docs.biswap.org
+docs.biswap.org
+
+GeckoTerminal (CoinGecko). “USDT/FDUSD PancakeSwap v3 Pool Stats.” Sep 2025. 
+geckoterminal.com
+
+CoinMarketCap. “PancakeSwap v3 – Exchange Markets.” Sep 2025. 
+pancakeswap.finance
+ (USDT/USDC pool: ~$34M TVL, $4.6M 24h volume)
+
+DefiLlama. “Wombat Exchange – TVL and Volume.” Sep 2025. 
+defillama.com
+defillama.com
+
+Biswap Blog. “What is Protocol Owned Liquidity?” Aug 2022. 
+blog.biswap.org
+ (Definition of POL model)

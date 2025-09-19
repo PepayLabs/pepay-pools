@@ -1,0 +1,25 @@
+{
+  "metadata": {
+    "analysis_time": "2025-09-19T14:52:30.735906",
+    "processing_time": 15.853724241256714,
+    "coverage_stats": {
+      "processed_transactions": 30,
+      "errors": 28,
+      "instructions_found": 0,
+      "swaps_found": 0,
+      "processing_time_seconds": 15.85,
+      "status": "Analysis completed"
+    }
+  },
+  "instructions": {},
+  "state_patterns": {
+    "total_unique_instructions": 0,
+    "total_instruction_calls": 0,
+    "swap_instructions": 0,
+    "admin_instructions": 0,
+    "oracle_accounts_detected": 0,
+    "total_swaps_detected": 0
+  },
+  "oracle_accounts": [],
+  "swap_count": 0
+}

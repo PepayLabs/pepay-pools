@@ -40,8 +40,9 @@ This workspace supports an end-to-end technical and empirical study of Lifinity'
 6. **EVM Porting Analysis** – Translate findings into contract design, keeper/oracle requirements, and parameter guidance documented in `docs/evm_porting_report.md`.
 
 ### Automation Aids
-- `Makefile` shortcuts: `make install`, `make inventory`, `make sample`, `make empirics`.
+- `Makefile` shortcuts: `make install`, `make inventory`, `make sample`, `make enrich`, `make empirics`.
 - `scripts/pipeline.py` orchestrates multi-step pulls (`inventory`, `sample`, `empirics`) with shared configuration from `scripts/config.py`.
+- `scripts/enrich_swaps.py` converts decoded transactions into a Lifinity-focused instruction ledger.
 - `scripts/discriminators.yaml` tracks recovered 8-byte instruction keys once identified.
 
 ## Environment Setup

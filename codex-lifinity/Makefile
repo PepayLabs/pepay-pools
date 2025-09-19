@@ -12,6 +12,9 @@ inventory:
 sample:
 	@$(ACTIVATE) && $(PYTHON) scripts/pipeline.py sample --limit 500 --decode-limit 250
 
+enrich:
+	@$(ACTIVATE) && $(PYTHON) scripts/enrich_swaps.py --input data/raw/tx_samples.json --output data/processed/lifinity_instructions.csv
+
 empirics:
 	@$(ACTIVATE) && $(PYTHON) scripts/pipeline.py empirics data/processed/tx_samples_enriched.csv
 
@@ -21,4 +24,4 @@ format:
 lint:
 	@$(ACTIVATE) && ruff check scripts
 
-.PHONY: install inventory sample empirics format lint
+.PHONY: install inventory sample enrich empirics format lint

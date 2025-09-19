@@ -11,6 +11,7 @@
 | raw/pool_states/*.json | Pool PDA snapshots keyed by slot | `scripts/state_diff.py` |
 | raw/oracle_accounts/*.json | Oracle account data at swap slot | `scripts/oracle_snapshot.py` |
 | processed/program_inventory.json | Registry of pools, vaults, oracle accounts | `scripts/program_inventory.py` |
+| processed/lifinity_instructions.csv | Instruction ledger with discriminators and account metas | `scripts/enrich_swaps.py` |
 | processed/pool_state_timeseries.csv | Derived reserves, inventory ratios, parameters | `scripts/state_diff.py` |
 | processed/slippage_curve.csv | Trade size vs realized slippage | `scripts/slippage_analysis.py` |
 | processed/fees_timeseries.csv | Fees per period | `scripts/fees_tracker.py` |

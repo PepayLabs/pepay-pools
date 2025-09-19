@@ -1,0 +1,25 @@
+%% Mermaid diagram placeholder for state relationships
+classDiagram
+    class PoolState {
+        +Pubkey pool_pda
+        +Pubkey vault_a
+        +Pubkey vault_b
+        +Pubkey oracle_price_account
+        +u64 fee_bps
+        +f64 c_parameter
+        +f64 z_exponent
+        +f64 p_star
+        +f64 theta_threshold
+    }
+    class FeeAccumulator {
+        +u128 fees_token_a
+        +u128 fees_token_b
+    }
+    class AuthorityRecord {
+        +Pubkey admin
+        +bool can_pause
+        +bool can_upgrade
+    }
+
+    PoolState --> FeeAccumulator : references
+    PoolState --> AuthorityRecord : governed by

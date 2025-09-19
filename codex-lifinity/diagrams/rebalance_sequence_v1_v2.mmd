@@ -1,0 +1,9 @@
+%% Mermaid diagram placeholder comparing v1 vs v2 rebalance
+stateDiagram-v2
+    [*] --> Monitoring
+    Monitoring --> DriftAdjust: v1 drift threshold met
+    DriftAdjust --> Monitoring: Virtual reserves updated
+    Monitoring --> ThresholdCheck: v2 |p/p* - 1| >= θ
+    ThresholdCheck --> Recenter: Keeper executes recenter
+    Recenter --> Cooldown: Apply cooldown / guards
+    Cooldown --> Monitoring: Ready for next evaluation

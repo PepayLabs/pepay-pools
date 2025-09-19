@@ -1,0 +1,9 @@
+aiohttp
+solana
+solders
+base58
+pandas
+numpy
+python-dotenv
+pyyaml
+matplotlib

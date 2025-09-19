@@ -1,0 +1,15 @@
+%% Mermaid sequence diagram placeholder for swap flow
+sequenceDiagram
+    participant Agg as Aggregator/User
+    participant Prog as Lifinity v2 Program
+    participant VaultA as Vault Token A
+    participant VaultB as Vault Token B
+    participant Oracle as Oracle Feed
+
+    Agg->>Prog: Submit swap instruction
+    Prog->>Oracle: Read price data / confidence
+    Oracle-->>Prog: Latest price + confidence
+    Prog->>Prog: Compute quote, fees, slippage
+    Prog->>VaultA: Debit input token
+    Prog->>VaultB: Credit output token
+    Prog-->>Agg: Return swap result

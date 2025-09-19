@@ -43,6 +43,7 @@ This workspace supports an end-to-end technical and empirical study of Lifinity'
 - `Makefile` shortcuts: `make install`, `make inventory`, `make sample`, `make enrich`, `make empirics`.
 - `scripts/pipeline.py` orchestrates multi-step pulls (`inventory`, `sample`, `empirics`) with shared configuration from `scripts/config.py`.
 - `scripts/enrich_swaps.py` converts decoded transactions into a Lifinity-focused instruction ledger.
+- `scripts/swap_enricher.py` blends instruction metadata with discriminator notes to form `tx_samples_enriched.csv`.
 - `scripts/discriminators.yaml` tracks recovered 8-byte instruction keys once identified.
 
 ## Environment Setup

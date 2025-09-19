@@ -12,10 +12,11 @@ This document explains how raw Solana transactions flow into the processed datas
 - Output: `data/processed/lifinity_instructions.csv` with discriminator + account map per invocation.
 - Next Actions: Populate `scripts/discriminators.yaml` with decoded schemas, then join into D2 Instruction Catalog.
 
-## Stage 3 – Swap Enrichment (Planned)
-- TODO: Implement parser to transform Lifinity instructions plus account metadata into trade-level rows (`tx_samples_enriched.csv`).
-- Inputs: `lifinity_instructions.csv`, pool state snapshots, oracle data.
-- Outputs: Enriched swap table powering slippage/fee analyses.
+## Stage 3 – Swap Enrichment
+- Command: `make enrich` (second step) or `python scripts/swap_enricher.py`.
+- Inputs: `data/processed/lifinity_instructions.csv`, optional discriminator metadata (`scripts/discriminators.yaml`).
+- Output: `data/processed/tx_samples_enriched.csv` with preliminary instruction names and account counts.
+- Notes: Rows remain high-level until state/amount decoding is completed; add columns incrementally as schemas are recovered.
 
 ## Stage 4 – KPI Aggregations
 - Commands: `scripts/slippage_analysis.py`, `scripts/fees_tracker.py` (invoked via `make empirics`).

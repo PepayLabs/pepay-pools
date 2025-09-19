@@ -61,6 +61,25 @@ def cmd_empirics(args: argparse.Namespace) -> None:
     ])
 
 
+def cmd_enrich(args: argparse.Namespace) -> None:
+    run_step([
+        "python3",
+        str(SCRIPTS_DIR / "enrich_swaps.py"),
+        "--input",
+        str(PROJECT_ROOT / "data" / "raw" / "tx_samples.json"),
+        "--output",
+        str(PROJECT_ROOT / "data" / "processed" / "lifinity_instructions.csv"),
+    ])
+    run_step([
+        "python3",
+        str(SCRIPTS_DIR / "swap_enricher.py"),
+        "--instructions",
+        str(PROJECT_ROOT / "data" / "processed" / "lifinity_instructions.csv"),
+        "--output",
+        str(PROJECT_ROOT / "data" / "processed" / "tx_samples_enriched.csv"),
+    ])
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Codex Lifinity research pipeline")
     parser.add_argument("--rpc", default=config.RPC_ENDPOINTS[0], help="RPC endpoint to use")
@@ -78,6 +97,9 @@ def build_parser() -> argparse.ArgumentParser:
     empirics = sub.add_parser("empirics", help="Recompute slippage and fee aggregates")
     empirics.add_argument("swap_csv", type=Path, help="Path to enriched swap dataset")
     empirics.set_defaults(func=cmd_empirics)
+
+    enrich = sub.add_parser("enrich", help="Generate instruction and enriched swap ledgers")
+    enrich.set_defaults(func=cmd_enrich)
 
     return parser
 

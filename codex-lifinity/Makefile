@@ -14,6 +14,7 @@ sample:
 
 enrich:
 	@$(ACTIVATE) && $(PYTHON) scripts/enrich_swaps.py --input data/raw/tx_samples.json --output data/processed/lifinity_instructions.csv
+	@$(ACTIVATE) && $(PYTHON) scripts/swap_enricher.py --instructions data/processed/lifinity_instructions.csv --output data/processed/tx_samples_enriched.csv
 
 empirics:
 	@$(ACTIVATE) && $(PYTHON) scripts/pipeline.py empirics data/processed/tx_samples_enriched.csv

@@ -63,6 +63,7 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
         assertGt(poolOut * 4 / 3, dexOut, "pool leg dominates");
 
         rollBlocks(20);
+        updateBidAsk(10998e14, 11002e14, 4, true);
         DnmPool.QuoteResult memory calmQuote = quote(orderSize, true, IDnmPool.OracleMode.Spot);
         assertLt(calmQuote.feeBpsUsed, poolQuote.feeBpsUsed, "fee decays");
         assertGt(calmQuote.amountOut, dex.quoteBaseIn(orderSize), "still competitive");

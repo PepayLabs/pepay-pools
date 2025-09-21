@@ -40,6 +40,8 @@ abstract contract BaseTest is MathAsserts {
     }
 
     function setUpBase() public virtual {
+        vm.warp(1_000_000);
+        vm.roll(1_000);
         hype = new MockERC20("HYPE", "HYPE", 18, 2_000_000 ether, address(this));
         usdc = new MockERC20("USDC", "USDC", 6, 2_000_000_000000, address(this));
 
@@ -158,6 +160,18 @@ abstract contract BaseTest is MathAsserts {
         hype.transfer(address(pool), cfg.baseLiquidity);
         usdc.transfer(address(pool), cfg.quoteLiquidity);
         pool.sync();
+
+        vm.prank(gov);
+        pool.updateParams(
+            DnmPool.ParamKind.Inventory,
+            abi.encode(
+                DnmPool.InventoryConfig({
+                    targetBaseXstar: uint128(cfg.baseLiquidity),
+                    floorBps: cfg.floorBps,
+                    recenterThresholdPct: cfg.recenterPct
+                })
+            )
+        );
     }
 
     function approveAll(address user) internal {

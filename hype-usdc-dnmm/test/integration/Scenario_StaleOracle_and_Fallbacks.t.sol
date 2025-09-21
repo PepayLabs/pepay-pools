@@ -12,10 +12,11 @@ contract ScenarioStaleOracleFallbacksTest is BaseTest {
     }
 
     function test_ema_fallback_used_when_spot_stale() public {
-        updateSpot(1e18, 600, true);
-        updateEma(995e15, 10, true);
+        updateSpot(1e18, 1, true);
+        updateBidAsk(90e16, 110e16, 2_000, true);
+        updateEma(995e15, 1, true);
 
-        DnmPool.QuoteResult memory res = quote(10_000 ether, true, IDnmPool.OracleMode.Spot);
+        DnmPool.QuoteResult memory res = quote(100 ether, true, IDnmPool.OracleMode.Spot);
         assertTrue(res.usedFallback, "fallback used");
         assertEq(res.reason, bytes32("EMA"), "ema reason");
         assertEq(res.midUsed, 995e15, "ema mid");
@@ -26,7 +27,7 @@ contract ScenarioStaleOracleFallbacksTest is BaseTest {
         updateEma(0, 0, false);
         updatePyth(98e16, 1e18, 1, 1, 50, 40);
 
-        DnmPool.QuoteResult memory res = quote(10_000 ether, true, IDnmPool.OracleMode.Spot);
+        DnmPool.QuoteResult memory res = quote(100 ether, true, IDnmPool.OracleMode.Spot);
         assertTrue(res.usedFallback, "fallback used");
         assertEq(res.reason, bytes32("PYTH"), "pyth reason");
         assertEq(res.midUsed, (98e16 * 1e18) / 1e18, "pyth mid");

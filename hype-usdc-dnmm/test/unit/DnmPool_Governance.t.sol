@@ -67,15 +67,23 @@ contract DnmPoolGovernanceTest is BaseTest {
         vm.prank(alice);
         pool.swapExactIn(100 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
 
+        (uint128 targetBase,, uint16 thresholdBps) = pool.inventoryConfig();
+
         vm.prank(alice);
         vm.expectRevert(bytes(Errors.NOT_GOVERNANCE));
-        pool.setTargetBaseXstar(40_000 ether);
+        pool.setTargetBaseXstar(targetBase - 1 ether);
+
+        uint128 thresholdDelta = uint128((uint256(targetBase) * thresholdBps) / 10_000);
+        uint128 nearTarget = targetBase - (thresholdDelta > 0 ? thresholdDelta - 1 : 0);
 
         vm.prank(gov);
         vm.expectRevert("THRESHOLD");
-        pool.setTargetBaseXstar(49_000 ether);
+        pool.setTargetBaseXstar(nearTarget);
+
+        uint128 farDelta = uint128((uint256(targetBase) * (thresholdBps + 100)) / 10_000);
+        uint128 farTarget = targetBase > farDelta ? targetBase - farDelta : targetBase / 2;
 
         vm.prank(gov);
-        pool.setTargetBaseXstar(40_000 ether);
+        pool.setTargetBaseXstar(farTarget);
     }
 }

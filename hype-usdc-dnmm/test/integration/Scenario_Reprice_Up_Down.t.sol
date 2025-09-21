@@ -14,6 +14,7 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         setUpBase();
         approveAll(alice);
         approveAll(bob);
+        approveAll(carol);
 
         dex = new MockCurveDEX(address(hype), address(usdc));
         hype.approve(address(dex), type(uint256).max);
@@ -27,6 +28,7 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         // Upward jump
         updateSpot(11e17, 0, true);
         updateBidAsk(108e16, 112e16, 400, true);
+        updatePyth(11e17, 1e18, 0, 0, 20, 20);
 
         DnmPool.QuoteResult memory dnmmQuote = quote(tradeSize, true, IDnmPool.OracleMode.Spot);
         uint256 cpammQuote = dex.quoteBaseIn(tradeSize);
@@ -41,12 +43,18 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         assertTrue(swaps[0].feeBps > baseFee, "event fee high");
 
         rollBlocks(15);
+        updateBidAsk(10998e14, 11002e14, 4, true);
+        deal(address(usdc), carol, dnmmQuote.amountOut * 2);
+        vm.prank(carol);
+        pool.swapExactIn(dnmmQuote.amountOut, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        updateBidAsk(10998e14, 11002e14, 4, true);
         DnmPool.QuoteResult memory cooled = quote(tradeSize, true, IDnmPool.OracleMode.Spot);
         assertLt(cooled.feeBpsUsed, dnmmQuote.feeBpsUsed, "fee decayed");
 
         // Downward jump
         updateSpot(9e17, 0, true);
         updateBidAsk(88e16, 92e16, 400, true);
+        updatePyth(9e17, 1e18, 0, 0, 20, 20);
 
         uint256 quoteTrade = 5_000_000000;
         DnmPool.QuoteResult memory dnmmQuoteDown = quote(quoteTrade, false, IDnmPool.OracleMode.Spot);
@@ -59,5 +67,10 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         pool.swapExactIn(tradeSize / 2, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
         swaps = drainLogsToSwapEvents();
         assertTrue(swaps[0].feeBps > baseFee, "fee high on drop");
+
+        rollBlocks(15);
+        updateBidAsk(8998e14, 9002e14, 4, true);
+        DnmPool.QuoteResult memory cooledDown = quote(quoteTrade, false, IDnmPool.OracleMode.Spot);
+        assertLt(cooledDown.feeBpsUsed, dnmmQuoteDown.feeBpsUsed, "fee decayed after drop");
     }
 }

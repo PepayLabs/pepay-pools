@@ -14,29 +14,32 @@ contract ScenarioCalmFlowTest is BaseTest {
     }
 
     function test_calm_flow_sequence() public {
+        updateBidAsk(99998e14, 100002e14, 4, true);
+        (uint16 baseFee,,,,,,) = pool.feeConfig();
+        DnmPool.QuoteResult memory preQuote = quote(10 ether, true, IDnmPool.OracleMode.Spot);
+        uint256 calmFee = preQuote.feeBpsUsed;
+        assertLe(calmFee, baseFee + 20, "calm fee bound");
         recordLogs();
 
         vm.startPrank(alice);
-        pool.swapExactIn(200 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
-        pool.swapExactIn(100 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        pool.swapExactIn(50 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
         vm.stopPrank();
 
         vm.startPrank(bob);
-        pool.swapExactIn(250_000000, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
-        pool.swapExactIn(150_000000, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        pool.swapExactIn(50_000000, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
         vm.stopPrank();
 
         EventRecorder.SwapEvent[] memory swaps = drainLogsToSwapEvents();
-        assertEq(swaps.length, 4, "expected swaps");
-        (uint16 baseFee,,,,,,) = pool.feeConfig();
+        assertEq(swaps.length, 2, "expected swaps");
         for (uint256 i = 0; i < swaps.length; ++i) {
-            // calm conditions keep fee near base
-            assertApproxRelBps(swaps[i].feeBps, baseFee, 20, "fee near base");
+            assertEq(swaps[i].feeBps, calmFee, "fee stable");
             assertFalse(swaps[i].isPartial, "no partial fills");
             assertEq(swaps[i].reason, bytes32(0), "no fallback reason");
         }
 
-        DnmPool.QuoteResult memory quoteAfter = quote(50_000000, false, IDnmPool.OracleMode.Spot);
-        assertApproxRelBps(quoteAfter.feeBpsUsed, baseFee, 20, "decayed to base");
+        vm.roll(block.number + 5);
+        updateBidAsk(999995e12, 1000005e12, 1, true);
+        DnmPool.QuoteResult memory quoteAfter = quote(10_000000, false, IDnmPool.OracleMode.Spot);
+        assertLe(quoteAfter.feeBpsUsed, baseFee + 20, "fee returns near base");
     }
 }

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "forge-std/Test.sol";
 
 import {DnmPool} from "../../contracts/DnmPool.sol";
+import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {FeePolicy} from "../../contracts/lib/FeePolicy.sol";
 import {Inventory} from "../../contracts/lib/Inventory.sol";
 import {MockERC20} from "../../contracts/mocks/MockERC20.sol";
@@ -89,10 +90,7 @@ contract TupleSweepTest is Test {
             decayPctPerBlock: 20
         });
         DnmPool.MakerConfig memory makerCfg = DnmPool.MakerConfig({s0Notional: uint128(1_000 * baseScale), ttlMs: 200});
-        DnmPool.Guardians memory guardians = DnmPool.Guardians({
-            governance: address(this),
-            pauser: address(this)
-        });
+        DnmPool.Guardians memory guardians = DnmPool.Guardians({governance: address(this), pauser: address(this)});
 
         DnmPool pool = new DnmPool(
             address(baseToken),
@@ -118,7 +116,7 @@ contract TupleSweepTest is Test {
         vm.recordLogs();
         uint256 cumulativeFee;
         uint256 swaps;
-        bool partial;
+        bool sawPartial;
         uint256 floorBps;
 
         for (uint256 step = 1; step <= 5; ++step) {
@@ -133,7 +131,7 @@ contract TupleSweepTest is Test {
         swaps = events.length;
         for (uint256 i = 0; i < events.length; ++i) {
             cumulativeFee += events[i].feeBps;
-            if (events[i].isPartial) partial = true;
+            if (events[i].isPartial) sawPartial = true;
             if (events[i].reason == FLOOR) {
                 floorBps = 1;
             }
@@ -164,7 +162,7 @@ contract TupleSweepTest is Test {
             ",",
             EventRecorder.uintToString(avgFee),
             ",",
-            partial ? "true" : "false",
+            sawPartial ? "true" : "false",
             ",",
             EventRecorder.uintToString(floorBps)
         );

@@ -7,7 +7,10 @@ import "forge-std/Test.sol";
 abstract contract MathAsserts is Test {
     uint256 internal constant BPS = 10_000;
 
-    function assertApproxRelBps(uint256 actual, uint256 expected, uint256 toleranceBps, string memory err) internal {
+    function assertApproxRelBps(uint256 actual, uint256 expected, uint256 toleranceBps, string memory err)
+        internal
+        pure
+    {
         if (expected == 0) {
             assertEq(actual, 0, err);
             return;
@@ -17,15 +20,15 @@ abstract contract MathAsserts is Test {
         super.assertLe(relBps, toleranceBps, err);
     }
 
-    function assertApproxWad(uint256 actual, uint256 expected, uint256 toleranceBps, string memory err) internal {
+    function assertApproxWad(uint256 actual, uint256 expected, uint256 toleranceBps, string memory err) internal pure {
         assertApproxRelBps(actual, expected, toleranceBps, err);
     }
 
-    function assertLte(uint256 actual, uint256 expected, string memory err) internal {
+    function assertLte(uint256 actual, uint256 expected, string memory err) internal pure {
         super.assertLe(actual, expected, err);
     }
 
-    function assertGte(uint256 actual, uint256 expected, string memory err) internal {
+    function assertGte(uint256 actual, uint256 expected, string memory err) internal pure {
         super.assertGe(actual, expected, err);
     }
 }

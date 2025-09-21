@@ -1,0 +1,7 @@
+operation,gas_used
+quote_hc,68312
+quote_ema,70501
+quote_pyth,65267
+swap_base_hc,164367
+swap_quote_hc,164390
+rfq_verify_swap,318529

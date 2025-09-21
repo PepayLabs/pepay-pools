@@ -9,8 +9,6 @@ import {BaseTest} from "../utils/BaseTest.sol";
 import {EventRecorder} from "../utils/EventRecorder.sol";
 
 contract LoadBurstPerfTest is BaseTest {
-    uint256 internal constant BPS = 10_000;
-
     function setUp() public {
         setUpBase();
         approveAll(alice);

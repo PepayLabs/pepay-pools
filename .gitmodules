@@ -1,0 +1,3 @@
+[submodule "hype-usdc-dnmm/lib/forge-std"]
+	path = hype-usdc-dnmm/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std

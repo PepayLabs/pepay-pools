@@ -5,6 +5,7 @@ out = 'out'
 libs = ['lib']
 solc_version = '0.8.24'
 evma = 'cancun'
+via_ir = true
 fs_permissions = [
   { access = 'read', path = './' }
 ]

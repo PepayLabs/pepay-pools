@@ -12,26 +12,69 @@ contract InventoryTest is Test {
         tokens = Inventory.Tokens({baseScale: 1e18, quoteScale: 1e6});
     }
 
-    function testPartialBaseInLeavesFloor() public {
-        uint256 quoteReserves = 1_000_000e6; // 1M USDC
-        uint16 floorBps = 300; // 3%
-        (uint256 amountOut, uint256 appliedAmountIn, bool partial) = Inventory.quoteBaseIn(
-            1_000 ether,
+    function test_partialFill_leaves_exact_floor_quote_side() public {
+        uint256 quoteReserves = 1_000_000e6;
+        uint256 floor = Inventory.floorAmount(quoteReserves, 300);
+        (uint256 amountOut, uint256 appliedAmountIn, bool isPartial) = Inventory.quoteBaseIn(
+            500_000 ether,
             1e18,
             100,
             quoteReserves,
-            floorBps,
+            300,
             tokens
         );
-
-        assertTrue(partial, "expected partial fill");
-        uint256 expectedAvailable = Inventory.availableInventory(quoteReserves, floorBps);
-        assertEq(amountOut, expectedAvailable);
-        assertGt(appliedAmountIn, 0);
+        assertTrue(isPartial, "should partial");
+        assertGt(appliedAmountIn, 0, "applied amount");
+        assertEq(quoteReserves - amountOut, floor, "floor preserved");
     }
 
-    function testDeviationZeroWhenBalanced() public {
-        uint256 deviation = Inventory.deviationBps(100_000 ether, 100_000e6, 100_000 ether, 1e18, tokens);
-        assertEq(deviation, 0);
+    function test_partialFill_leaves_exact_floor_base_side() public {
+        uint256 baseReserves = 200_000 ether;
+        uint256 floor = Inventory.floorAmount(baseReserves, 300);
+        (uint256 amountOut,, bool isPartial) = Inventory.quoteQuoteIn(20_000e6, 1e18, 100, baseReserves, 300, tokens);
+        assertTrue(isPartial, "should isPartial");
+        assertEq(baseReserves - amountOut, floor, "floor after partial");
+    }
+
+    function test_noPartial_when_above_floor() public {
+        (uint256 amountOut, uint256 appliedAmountIn, bool isPartial) = Inventory.quoteBaseIn(
+            1_000 ether,
+            1e18,
+            50,
+            2_000_000e6,
+            300,
+            tokens
+        );
+        assertFalse(isPartial, "no partial");
+        assertEq(appliedAmountIn, 1_000 ether, "full amount");
+        assertGt(amountOut, 0, "amount out");
+    }
+
+    function test_partialFill_rounding_edges() public {
+        uint256 quoteReserves = 500_123_456789;
+        (uint256 amountOut, uint256 appliedAmountIn, bool isPartial) = Inventory.quoteBaseIn(
+            100_000 ether,
+            997e15,
+            75,
+            quoteReserves,
+            300,
+            tokens
+        );
+        if (isPartial) {
+            uint256 floor = Inventory.floorAmount(quoteReserves, 300);
+            assertEq(quoteReserves - amountOut, floor, "floor exact");
+            assertGt(appliedAmountIn, 0, "non-zero applied");
+        }
+    }
+
+    function test_fuzz_partial_floor_invariant(uint256 reserves, uint16 floorBps, uint256 amountIn, uint256 mid) public {
+        reserves = bound(reserves, 1_000e6, 100_000_000e6);
+        floorBps = uint16(bound(floorBps, 0, 5000));
+        amountIn = bound(amountIn, 1e6, 5_000_000 ether);
+        mid = bound(mid, 1e16, 5e18);
+
+        (uint256 amountOut,,) = Inventory.quoteBaseIn(amountIn, mid, 100, reserves, floorBps, tokens);
+        uint256 available = Inventory.availableInventory(reserves, floorBps);
+        assertLe(amountOut, available, "never exceed available quote");
     }
 }

@@ -13,7 +13,7 @@ End-to-end research and engineering drop for a Lifinity v2–style dynamic no-ma
 
 ## Quick Start
 
-1. Install Foundry (`curl -L https://foundry.paradigm.xyz | bash`) and run `foundryup`.
+1. Run `./setup.sh` from the repo root to provision Node.js 20 and Foundry.
 2. From this folder run `terragon-forge.sh install` commands as needed (wrapper passes `--root hype-usdc-dnmm`).
 3. Configure HyperCore + Pyth identifiers under `config/oracle.ids.json` and token metadata under `config/tokens.hyper.json`.
 4. Execute `terragon-forge.sh test` for the default suite or `terragon-forge.sh test --match-test testFeeDecay` to focus on a component.

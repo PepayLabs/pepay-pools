@@ -1,0 +1,17 @@
+[profile.default]
+src = 'contracts'
+test = 'test'
+out = 'out'
+libs = ['lib']
+solc_version = '0.8.24'
+evma = 'cancun'
+fs_permissions = [
+  { access = 'read', path = './' }
+]
+
+[profile.ci]
+verbosity = 3
+
+[fuzz]
+max_tests = 256
+runs = 256

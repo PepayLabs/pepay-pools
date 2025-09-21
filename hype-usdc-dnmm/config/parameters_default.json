@@ -1,0 +1,34 @@
+{
+  "oracle": {
+    "hypercore": {
+      "confCapBpsSpot": 100,
+      "confCapBpsStrict": 100,
+      "maxAgeSec": 48,
+      "stallWindowSec": 10,
+      "allowEmaFallback": true,
+      "divergenceBps": 50
+    },
+    "pyth": {
+      "maxAgeSec": 40000,
+      "confCapBps": 100
+    }
+  },
+  "fee": {
+    "baseBps": 15,
+    "alphaConfNumerator": 60,
+    "alphaConfDenominator": 100,
+    "betaInvDevNumerator": 10,
+    "betaInvDevDenominator": 100,
+    "capBps": 150,
+    "decayPctPerBlock": 20
+  },
+  "inventory": {
+    "floorBps": 300,
+    "recenterThresholdPct": 750,
+    "initialTargetBaseXstar": "auto"
+  },
+  "maker": {
+    "S0Notional": 5000,
+    "ttlMs": 200
+  }
+}

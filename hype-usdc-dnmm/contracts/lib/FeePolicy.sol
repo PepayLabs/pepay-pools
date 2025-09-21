@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {MathUtils} from "./MathUtils.sol";
+import {FixedPointMath} from "./FixedPointMath.sol";
 
-library FeeMath {
-    using MathUtils for uint256;
+library FeePolicy {
+    using FixedPointMath for uint256;
 
     uint256 private constant HUNDRED = 100;
     uint256 private constant DECAY_SCALE = 1e9;
@@ -44,7 +44,7 @@ library FeeMath {
                 uint256 delta = newState.lastFeeBps - cfg.baseBps;
                 uint256 factorNumerator = (DECAY_SCALE * (HUNDRED - cfg.decayPctPerBlock)) / HUNDRED;
                 uint256 scaledMultiplier = _powScaled(factorNumerator, blocksElapsed, DECAY_SCALE);
-                uint256 decayedDelta = MathUtils.mulDivDown(delta, scaledMultiplier, DECAY_SCALE);
+                uint256 decayedDelta = FixedPointMath.mulDivDown(delta, scaledMultiplier, DECAY_SCALE);
                 newState.lastFeeBps = uint16(cfg.baseBps + decayedDelta);
             } else {
                 newState.lastFeeBps = cfg.baseBps;
@@ -55,10 +55,10 @@ library FeeMath {
 
         uint256 confComponent = cfg.alphaConfDenominator == 0
             ? 0
-            : MathUtils.mulDivDown(confBps, cfg.alphaConfNumerator, cfg.alphaConfDenominator);
+            : FixedPointMath.mulDivDown(confBps, cfg.alphaConfNumerator, cfg.alphaConfDenominator);
         uint256 invComponent = cfg.betaInvDevDenominator == 0
             ? 0
-            : MathUtils.mulDivDown(inventoryDeviationBps, cfg.betaInvDevNumerator, cfg.betaInvDevDenominator);
+            : FixedPointMath.mulDivDown(inventoryDeviationBps, cfg.betaInvDevNumerator, cfg.betaInvDevDenominator);
 
         uint256 fee = cfg.baseBps + confComponent + invComponent;
         if (fee > cfg.capBps) {
@@ -85,9 +85,9 @@ library FeeMath {
         result = scale;
         while (exponent > 0) {
             if (exponent & 1 == 1) {
-                result = MathUtils.mulDivDown(result, factor, scale);
+                result = FixedPointMath.mulDivDown(result, factor, scale);
             }
-            factor = MathUtils.mulDivDown(factor, factor, scale);
+            factor = FixedPointMath.mulDivDown(factor, factor, scale);
             exponent >>= 1;
         }
     }

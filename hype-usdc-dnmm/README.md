@@ -9,14 +9,15 @@ End-to-end research and engineering drop for a Lifinity v2–style dynamic no-ma
 - Deployment and operations scaffolding (scripts, checklists, telemetry hooks)
 - Research docs summarising math, oracle wiring, and runbooks (`docs/`)
 - Foundry-based test harness (`test/`) covering fee dynamics, partial fills, divergence gates, and RFQ verification flows
+- Canonical parameter packs under `config/` derived from Lifinity SOL/USDC settings
 
 ## Quick Start
 
 1. Install Foundry (`curl -L https://foundry.paradigm.xyz | bash`) and run `foundryup`.
-2. From this folder run `forge install foundry-rs/forge-std` and `forge install OpenZeppelin/openzeppelin-contracts@v5.0.2`.
-3. Configure the HyperEVM+Pyth endpoints in `script/Deploy.s.sol` before dry runs.
-4. Execute `forge test` for the default suite or `forge test --match-test testFeeDecay` to focus on a component.
-5. Review `docs/OPERATIONS.md` ahead of any deployment for guardian/telemetry requirements.
+2. From this folder run `terragon-forge.sh install` commands as needed (wrapper passes `--root hype-usdc-dnmm`).
+3. Configure HyperCore + Pyth identifiers under `config/oracle.ids.json` and token metadata under `config/tokens.hyper.json`.
+4. Execute `terragon-forge.sh test` for the default suite or `terragon-forge.sh test --match-test testFeeDecay` to focus on a component.
+5. Review `RUNBOOK.md` and `SECURITY.md` ahead of any deployment for operational expectations.
 
 > ℹ️  HyperCore precompile addresses and asset identifiers are placeholders; confirm before stage deployments.
 

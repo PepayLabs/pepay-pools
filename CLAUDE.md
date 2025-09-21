@@ -35,3 +35,4 @@
 
 ## Change Log
 - 2024-05-24: Initialized template and root guide.
+- 2024-05-25: Synced subfolder guides and DNMM implementation docs.

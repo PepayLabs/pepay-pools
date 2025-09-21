@@ -3,9 +3,9 @@ pragma solidity ^0.8.24;
 
 import "forge-std/Script.sol";
 import {DnmPool} from "../contracts/DnmPool.sol";
-import {OracleAdapterHC} from "../contracts/OracleAdapterHC.sol";
-import {OracleAdapterPyth} from "../contracts/OracleAdapterPyth.sol";
-import {FeeMath} from "../contracts/libraries/FeeMath.sol";
+import {OracleAdapterHC} from "../contracts/oracle/OracleAdapterHC.sol";
+import {OracleAdapterPyth} from "../contracts/oracle/OracleAdapterPyth.sol";
+import {FeePolicy} from "../contracts/lib/FeePolicy.sol";
 
 contract Deploy is Script {
     function run() external {
@@ -31,15 +31,15 @@ contract Deploy is Script {
         });
 
         DnmPool.OracleConfig memory oracleCfg = DnmPool.OracleConfig({
-            maxAgeSec: 5,
-            stallWindowSec: 2,
-            confCapBpsSpot: 75,
-            confCapBpsStrict: 50,
+            maxAgeSec: 48,
+            stallWindowSec: 10,
+            confCapBpsSpot: 100,
+            confCapBpsStrict: 100,
             divergenceBps: 50,
             allowEmaFallback: true
         });
 
-        FeeMath.FeeConfig memory feeCfg = FeeMath.FeeConfig({
+        FeePolicy.FeeConfig memory feeCfg = FeePolicy.FeeConfig({
             baseBps: 15,
             alphaConfNumerator: 60,
             alphaConfDenominator: 100,

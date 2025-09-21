@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IOracleAdapterHC} from "./interfaces/IOracleAdapterHC.sol";
-import {OracleUtils} from "./libraries/OracleUtils.sol";
+import {IOracleAdapterHC} from "../interfaces/IOracleAdapterHC.sol";
+import {OracleUtils} from "../lib/OracleUtils.sol";
 
 /// @notice Adapter for HyperCore order-book/oracle read precompiles.
 contract OracleAdapterHC is IOracleAdapterHC {

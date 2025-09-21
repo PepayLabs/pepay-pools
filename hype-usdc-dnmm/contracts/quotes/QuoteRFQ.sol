@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IQuoteRFQ} from "./interfaces/IQuoteRFQ.sol";
-import {IDnmPool} from "./interfaces/IDnmPool.sol";
-import {IERC20} from "./interfaces/IERC20.sol";
-import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
-import {ReentrancyGuard} from "./libraries/ReentrancyGuard.sol";
+import {IQuoteRFQ} from "../interfaces/IQuoteRFQ.sol";
+import {IDnmPool} from "../interfaces/IDnmPool.sol";
+import {IERC20} from "../interfaces/IERC20.sol";
+import {SafeTransferLib} from "../lib/SafeTransferLib.sol";
+import {ReentrancyGuard} from "../lib/ReentrancyGuard.sol";
 
 contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
     using SafeTransferLib for address;

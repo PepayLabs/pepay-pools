@@ -1,8 +1,8 @@
-# HYPE/USDC DNMM Implementation Guide
+# Research Notes Implementation Guide
 
-**Path**: `hype-usdc-dnmm`
+**Path**: `research`
 
-**Description**: Lifinity v2–style dynamic market maker stack for the HYPE/USDC pair on HyperEVM, including contracts, tests, and operational docs.
+**Description**: Market analysis, pricing research, and design notes supporting the HYPE/USDC DNMM rollout.
 
 ## Purpose
 - Capture the intent of this module/folder and its relationship to the broader HYPE/HyperEVM initiative.
@@ -34,5 +34,4 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2024-05-24: Folder initialized with contracts, docs, and Foundry harness.
-- 2024-05-25: Synced fee/oracle config, added Inventory/Fee libraries, extended tests and tooling.
+- 2024-05-24: Template applied to research corpus.

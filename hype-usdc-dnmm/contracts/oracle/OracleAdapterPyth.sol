@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IOracleAdapterPyth} from "./interfaces/IOracleAdapterPyth.sol";
-import {MathUtils} from "./libraries/MathUtils.sol";
+import {IOracleAdapterPyth} from "../interfaces/IOracleAdapterPyth.sol";
+import {FixedPointMath} from "../lib/FixedPointMath.sol";
 
 interface IPyth {
     struct Price {
@@ -57,7 +57,7 @@ contract OracleAdapterPyth is IOracleAdapterPyth {
             return (0, type(uint256).max, type(uint256).max);
         }
 
-        mid = MathUtils.mulDivDown(result.hypeUsd, ONE, result.usdcUsd);
+        mid = FixedPointMath.mulDivDown(result.hypeUsd, ONE, result.usdcUsd);
         ageSec = result.ageSecHype > result.ageSecUsdc ? result.ageSecHype : result.ageSecUsdc;
         confBps = result.confBpsHype > result.confBpsUsdc ? result.confBpsHype : result.confBpsUsdc;
     }
@@ -80,6 +80,6 @@ contract OracleAdapterPyth is IOracleAdapterPyth {
         uint256 confValue = _scaleToWad(int64(uint64(price.conf)), price.expo);
         uint256 priceValue = _scaleToWad(price.price, price.expo);
         if (priceValue == 0) return type(uint256).max;
-        return MathUtils.toBps(confValue, priceValue);
+        return FixedPointMath.toBps(confValue, priceValue);
     }
 }

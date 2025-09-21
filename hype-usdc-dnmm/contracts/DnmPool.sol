@@ -5,12 +5,13 @@ import {IDnmPool} from "./interfaces/IDnmPool.sol";
 import {IOracleAdapterHC} from "./interfaces/IOracleAdapterHC.sol";
 import {IOracleAdapterPyth} from "./interfaces/IOracleAdapterPyth.sol";
 import {IERC20} from "./interfaces/IERC20.sol";
-import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
-import {ReentrancyGuard} from "./libraries/ReentrancyGuard.sol";
-import {MathUtils} from "./libraries/MathUtils.sol";
-import {FeeMath} from "./libraries/FeeMath.sol";
-import {OracleUtils} from "./libraries/OracleUtils.sol";
-import {Errors} from "./libraries/Errors.sol";
+import {SafeTransferLib} from "./lib/SafeTransferLib.sol";
+import {ReentrancyGuard} from "./lib/ReentrancyGuard.sol";
+import {FixedPointMath} from "./lib/FixedPointMath.sol";
+import {FeePolicy} from "./lib/FeePolicy.sol";
+import {OracleUtils} from "./lib/OracleUtils.sol";
+import {Errors} from "./lib/Errors.sol";
+import {Inventory} from "./lib/Inventory.sol";
 
 contract DnmPool is IDnmPool, ReentrancyGuard {
     using SafeTransferLib for address;
@@ -25,7 +26,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         Maker
     }
 
-    struct Tokens {
+    struct TokenConfig {
         address baseToken;
         address quoteToken;
         uint8 baseDecimals;
@@ -75,18 +76,18 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         bytes32 reason;
     }
 
-    Tokens public tokens;
+    TokenConfig public tokenConfig;
     Reserves public reserves;
     InventoryConfig public inventoryConfig;
     OracleConfig public oracleConfig;
-    FeeMath.FeeConfig public feeConfig;
+    FeePolicy.FeeConfig public feeConfig;
     MakerConfig public makerConfig;
     Guardians public guardians;
 
     IOracleAdapterHC public oracleHC;
     IOracleAdapterPyth public oraclePyth;
 
-    FeeMath.FeeState private feeState;
+    FeePolicy.FeeState private feeState;
     bool public paused;
 
     uint256 public lastMid;
@@ -139,7 +140,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         address oraclePyth_,
         InventoryConfig memory inventoryConfig_,
         OracleConfig memory oracleConfig_,
-        FeeMath.FeeConfig memory feeConfig_,
+        FeePolicy.FeeConfig memory feeConfig_,
         MakerConfig memory makerConfig_,
         Guardians memory guardians_
     ) {
@@ -149,7 +150,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         require(feeConfig_.capBps >= feeConfig_.baseBps, Errors.INVALID_CONFIG);
         require(oracleConfig_.confCapBpsStrict <= oracleConfig_.confCapBpsSpot, Errors.INVALID_CONFIG);
 
-        tokens = Tokens({
+        tokenConfig = TokenConfig({
             baseToken: baseToken_,
             quoteToken: quoteToken_,
             baseDecimals: baseDecimals_,
@@ -201,15 +202,15 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         require(amountOut >= minAmountOut, "SLIPPAGE");
 
         if (isBaseIn) {
-            tokens.baseToken.safeTransferFrom(msg.sender, address(this), actualAmountIn);
-            tokens.quoteToken.safeTransfer(msg.sender, amountOut);
+            tokenConfig.baseToken.safeTransferFrom(msg.sender, address(this), actualAmountIn);
+            tokenConfig.quoteToken.safeTransfer(msg.sender, amountOut);
             require(uint256(reserves.baseReserves) + actualAmountIn <= type(uint128).max, "BASE_OOB");
             require(uint256(reserves.quoteReserves) >= amountOut, "INSUFFICIENT_QUOTE");
             reserves.baseReserves = uint128(uint256(reserves.baseReserves) + actualAmountIn);
             reserves.quoteReserves = uint128(uint256(reserves.quoteReserves) - amountOut);
         } else {
-            tokens.quoteToken.safeTransferFrom(msg.sender, address(this), actualAmountIn);
-            tokens.baseToken.safeTransfer(msg.sender, amountOut);
+            tokenConfig.quoteToken.safeTransferFrom(msg.sender, address(this), actualAmountIn);
+            tokenConfig.baseToken.safeTransfer(msg.sender, amountOut);
             require(uint256(reserves.quoteReserves) + actualAmountIn <= type(uint128).max, "QUOTE_OOB");
             require(uint256(reserves.baseReserves) >= amountOut, "INSUFFICIENT_BASE");
             reserves.quoteReserves = uint128(uint256(reserves.quoteReserves) + actualAmountIn);
@@ -243,13 +244,40 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
         uint256 confBps = _capConfidence(baRes.spreadBps, 0, OracleMode.Spot);
         uint256 invDev = _computeInventoryDeviationBps(midRes.mid);
-        FeeMath.FeeState memory state = feeState;
-        (uint16 feeBps, ) = FeeMath.preview(state, feeConfig, confBps, invDev, block.number);
+        FeePolicy.FeeState memory state = FeePolicy.FeeState({
+            lastBlock: feeState.lastBlock,
+            lastFeeBps: feeState.lastFeeBps
+        });
+        (uint16 feeBps, ) = FeePolicy.preview(state, feeConfig, confBps, invDev, block.number);
 
-        bidPx = MathUtils.mulDivDown(midRes.mid, BPS - feeBps, BPS);
-        askPx = MathUtils.mulDivUp(midRes.mid, BPS + feeBps, BPS);
-        ttlMs = s0Notional > 0 ? makerConfig.ttlMs : makerConfig.ttlMs;
+        bidPx = FixedPointMath.mulDivDown(midRes.mid, BPS - feeBps, BPS);
+        askPx = FixedPointMath.mulDivUp(midRes.mid, BPS + feeBps, BPS);
+        ttlMs = makerConfig.ttlMs;
         quoteId = keccak256(abi.encodePacked(block.number, midRes.mid, feeBps, s0Notional));
+    }
+
+    function tokens()
+        external
+        view
+        override
+        returns (
+            address baseToken,
+            address quoteToken,
+            uint8 baseDecimals,
+            uint8 quoteDecimals,
+            uint256 baseScale,
+            uint256 quoteScale
+        )
+    {
+        TokenConfig memory cfg = tokenConfig;
+        return (
+            cfg.baseToken,
+            cfg.quoteToken,
+            cfg.baseDecimals,
+            cfg.quoteDecimals,
+            cfg.baseScale,
+            cfg.quoteScale
+        );
     }
 
     // --- Governance ---
@@ -262,8 +290,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             oracleConfig = newCfg;
             emit ParamsUpdated("ORACLE", abi.encode(oldCfg), data);
         } else if (kind == ParamKind.Fee) {
-            FeeMath.FeeConfig memory oldCfg = feeConfig;
-            FeeMath.FeeConfig memory newCfg = abi.decode(data, (FeeMath.FeeConfig));
+            FeePolicy.FeeConfig memory oldCfg = feeConfig;
+            FeePolicy.FeeConfig memory newCfg = abi.decode(data, (FeePolicy.FeeConfig));
             require(newCfg.capBps >= newCfg.baseBps, Errors.INVALID_CONFIG);
             feeConfig = newCfg;
             emit ParamsUpdated("FEE", abi.encode(oldCfg), data);
@@ -285,7 +313,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
     function setTargetBaseXstar(uint128 newTarget) external onlyGovernance {
         require(lastMid > 0, "MID_UNSET");
-        uint256 deviationBps = MathUtils.toBps(MathUtils.absDiff(uint256(newTarget), uint256(inventoryConfig.targetBaseXstar)), inventoryConfig.targetBaseXstar == 0 ? 1 : inventoryConfig.targetBaseXstar);
+        uint256 deviationBps = FixedPointMath.toBps(FixedPointMath.absDiff(uint256(newTarget), uint256(inventoryConfig.targetBaseXstar)), inventoryConfig.targetBaseXstar == 0 ? 1 : inventoryConfig.targetBaseXstar);
         require(deviationBps >= inventoryConfig.recenterThresholdPct, "THRESHOLD");
         uint128 oldTarget = inventoryConfig.targetBaseXstar;
         inventoryConfig.targetBaseXstar = newTarget;
@@ -303,8 +331,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     }
 
     function sync() external {
-        uint256 baseBal = IERC20(tokens.baseToken).balanceOf(address(this));
-        uint256 quoteBal = IERC20(tokens.quoteToken).balanceOf(address(this));
+        uint256 baseBal = IERC20(tokenConfig.baseToken).balanceOf(address(this));
+        uint256 quoteBal = IERC20(tokenConfig.quoteToken).balanceOf(address(this));
         reserves.baseReserves = uint128(baseBal);
         reserves.quoteReserves = uint128(quoteBal);
     }
@@ -325,10 +353,13 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 invDevBps = _computeInventoryDeviationBps(outcome.mid);
         uint16 feeBps;
         if (shouldSettleFee) {
-            feeBps = FeeMath.settle(feeState, feeConfig, outcome.confBps, invDevBps);
+            feeBps = FeePolicy.settle(feeState, feeConfig, outcome.confBps, invDevBps);
         } else {
-            FeeMath.FeeState memory state = feeState;
-            (feeBps, ) = FeeMath.preview(state, feeConfig, outcome.confBps, invDevBps, block.number);
+            FeePolicy.FeeState memory state = FeePolicy.FeeState({
+                lastBlock: feeState.lastBlock,
+                lastFeeBps: feeState.lastFeeBps
+            });
+            (feeBps, ) = FeePolicy.preview(state, feeConfig, outcome.confBps, invDevBps, block.number);
         }
 
         uint256 amountOut;
@@ -353,62 +384,53 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 feeBps
     ) internal view returns (uint256 amountOut, uint256 appliedAmountIn, bytes32 reason) {
         require(feeBps < BPS, "FEE_CAP");
+        Inventory.Tokens memory invTokens = Inventory.Tokens({
+            baseScale: tokenConfig.baseScale,
+            quoteScale: tokenConfig.quoteScale
+        });
+
+        bool partial;
         if (isBaseIn) {
-            uint256 amountInWad = MathUtils.mulDivDown(amountIn, ONE, tokens.baseScale);
-            uint256 grossQuoteWad = MathUtils.mulDivDown(amountInWad, mid, ONE);
-            uint256 feeWad = MathUtils.mulDivDown(grossQuoteWad, feeBps, BPS);
-            uint256 netQuoteWad = grossQuoteWad - feeWad;
-            amountOut = MathUtils.mulDivDown(netQuoteWad, tokens.quoteScale, ONE);
-
-            uint256 floorQuote = MathUtils.mulDivDown(uint256(reserves.quoteReserves), inventoryConfig.floorBps, BPS);
-            uint256 availableQuote = uint256(reserves.quoteReserves) > floorQuote ? uint256(reserves.quoteReserves) - floorQuote : 0;
-
-            if (amountOut > availableQuote) {
-                require(availableQuote > 0, Errors.FLOOR_BREACH);
-                amountOut = availableQuote;
-                uint256 netQuoteWadPartial = MathUtils.mulDivDown(amountOut, ONE, tokens.quoteScale);
-                uint256 grossQuoteWadPartial = MathUtils.mulDivUp(netQuoteWadPartial, BPS, BPS - feeBps);
-                uint256 amountInWadPartial = MathUtils.mulDivUp(grossQuoteWadPartial, ONE, mid);
-                appliedAmountIn = MathUtils.mulDivUp(amountInWadPartial, tokens.baseScale, ONE);
-                reason = REASON_FLOOR;
-            } else {
+            (amountOut, appliedAmountIn, partial) = Inventory.quoteBaseIn(
+                amountIn,
+                mid,
+                feeBps,
+                uint256(reserves.quoteReserves),
+                inventoryConfig.floorBps,
+                invTokens
+            );
+            if (appliedAmountIn > amountIn) {
                 appliedAmountIn = amountIn;
-                reason = REASON_NONE;
             }
+            reason = partial ? REASON_FLOOR : REASON_NONE;
         } else {
-            uint256 amountInWad = MathUtils.mulDivDown(amountIn, ONE, tokens.quoteScale);
-            uint256 grossBaseWad = MathUtils.mulDivDown(amountInWad, ONE, mid);
-            uint256 feeWad = MathUtils.mulDivDown(grossBaseWad, feeBps, BPS);
-            uint256 netBaseWad = grossBaseWad - feeWad;
-            amountOut = MathUtils.mulDivDown(netBaseWad, tokens.baseScale, ONE);
-
-            uint256 floorBase = MathUtils.mulDivDown(uint256(reserves.baseReserves), inventoryConfig.floorBps, BPS);
-            uint256 availableBase = uint256(reserves.baseReserves) > floorBase ? uint256(reserves.baseReserves) - floorBase : 0;
-
-            if (amountOut > availableBase) {
-                require(availableBase > 0, Errors.FLOOR_BREACH);
-                amountOut = availableBase;
-                uint256 netBaseWadPartial = MathUtils.mulDivDown(amountOut, ONE, tokens.baseScale);
-                uint256 grossBaseWadPartial = MathUtils.mulDivUp(netBaseWadPartial, BPS, BPS - feeBps);
-                uint256 amountInWadPartial = MathUtils.mulDivUp(grossBaseWadPartial, mid, ONE);
-                appliedAmountIn = MathUtils.mulDivUp(amountInWadPartial, tokens.quoteScale, ONE);
-                reason = REASON_FLOOR;
-            } else {
+            (amountOut, appliedAmountIn, partial) = Inventory.quoteQuoteIn(
+                amountIn,
+                mid,
+                feeBps,
+                uint256(reserves.baseReserves),
+                inventoryConfig.floorBps,
+                invTokens
+            );
+            if (appliedAmountIn > amountIn) {
                 appliedAmountIn = amountIn;
-                reason = REASON_NONE;
             }
+            reason = partial ? REASON_FLOOR : REASON_NONE;
         }
     }
 
     function _computeInventoryDeviationBps(uint256 mid) internal view returns (uint256) {
-        uint256 baseWad = MathUtils.mulDivDown(uint256(reserves.baseReserves), ONE, tokens.baseScale);
-        uint256 quoteWad = MathUtils.mulDivDown(uint256(reserves.quoteReserves), ONE, tokens.quoteScale);
-        uint256 targetWad = MathUtils.mulDivDown(uint256(inventoryConfig.targetBaseXstar), ONE, tokens.baseScale);
-        uint256 baseNotionalWad = MathUtils.mulDivDown(baseWad, mid, ONE);
-        uint256 totalNotionalWad = quoteWad + baseNotionalWad;
-        if (totalNotionalWad == 0) return 0;
-        uint256 deviation = MathUtils.absDiff(baseWad, targetWad);
-        return MathUtils.toBps(deviation, totalNotionalWad);
+        Inventory.Tokens memory invTokens = Inventory.Tokens({
+            baseScale: tokenConfig.baseScale,
+            quoteScale: tokenConfig.quoteScale
+        });
+        return Inventory.deviationBps(
+            uint256(reserves.baseReserves),
+            uint256(reserves.quoteReserves),
+            inventoryConfig.targetBaseXstar,
+            mid,
+            invTokens
+        );
     }
 
     function _readOracle(OracleMode mode, bytes calldata oracleData) internal returns (OracleOutcome memory outcome) {

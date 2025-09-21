@@ -9,7 +9,7 @@ import {MockOracleHC} from "../contracts/mocks/MockOracleHC.sol";
 import {MockOraclePyth} from "../contracts/mocks/MockOraclePyth.sol";
 import {IDnmPool} from "../contracts/interfaces/IDnmPool.sol";
 import {IOracleAdapterPyth} from "../contracts/interfaces/IOracleAdapterPyth.sol";
-import {FeeMath} from "../contracts/libraries/FeeMath.sol";
+import {FeePolicy} from "../contracts/lib/FeePolicy.sol";
 
 contract DnmPoolTest is Test {
     MockERC20 public base;
@@ -62,7 +62,7 @@ contract DnmPoolTest is Test {
             allowEmaFallback: true
         });
 
-        FeeMath.FeeConfig memory feeCfg = FeeMath.FeeConfig({
+        FeePolicy.FeeConfig memory feeCfg = FeePolicy.FeeConfig({
             baseBps: 15,
             alphaConfNumerator: 60,
             alphaConfDenominator: 100,

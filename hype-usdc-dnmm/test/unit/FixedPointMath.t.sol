@@ -6,6 +6,14 @@ import "forge-std/Test.sol";
 import {FixedPointMath} from "../../contracts/lib/FixedPointMath.sol";
 
 contract FixedPointMathTest is Test {
+    function callMulDivDown(uint256 x, uint256 y, uint256 denominator) external pure returns (uint256) {
+        return FixedPointMath.mulDivDown(x, y, denominator);
+    }
+
+    function callMulDivUp(uint256 x, uint256 y, uint256 denominator) external pure returns (uint256) {
+        return FixedPointMath.mulDivUp(x, y, denominator);
+    }
+
     function testMulDivDownMatchesExpectations() public {
         uint256 result = FixedPointMath.mulDivDown(25, 4, 3);
         assertEq(result, 33, "mulDivDown floors");
@@ -18,12 +26,12 @@ contract FixedPointMathTest is Test {
 
     function testMulDivZeroDenominatorReverts() public {
         vm.expectRevert(FixedPointMath.MathZeroDivision.selector);
-        FixedPointMath.mulDivDown(1, 2, 0);
+        this.callMulDivDown(1, 2, 0);
     }
 
     function testMulDivOverflowReverts() public {
         vm.expectRevert(FixedPointMath.MathOverflow.selector);
-        FixedPointMath.mulDivDown(type(uint256).max, type(uint256).max, 1);
+        this.callMulDivDown(type(uint256).max, type(uint256).max, 1);
     }
 
     function testToBpsHandlesZeroDenominator() public {

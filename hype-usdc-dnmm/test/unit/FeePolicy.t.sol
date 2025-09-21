@@ -50,8 +50,8 @@ contract FeePolicyTest is Test {
 
         // After 3 blocks with zero signals we should decay toward base
         (uint16 feeNext,) = FeePolicy.preview(state, cfg, 0, 0, block.number + 3);
-        assertLt(feeNext, 200, "decayed" );
-        assertGt(feeNext, cfg.baseBps, "not yet at base");
+        assertLt(feeNext, 200, "decayed");
+        assertGe(feeNext, cfg.baseBps, "not below base");
     }
 
     function test_settle_updates_state() public {

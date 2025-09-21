@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {Errors} from "../../contracts/lib/Errors.sol";
+import {IOracleAdapterPyth} from "../../contracts/interfaces/IOracleAdapterPyth.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 
 contract DnmPoolGovernanceTest is BaseTest {
@@ -34,9 +35,14 @@ contract DnmPoolGovernanceTest is BaseTest {
     }
 
     function test_update_mode_strict_relaxed() public {
-        // make HyperCore stale to force fallback
-        updateSpot(1e18, 1_000, true);
-        updateEma(1e18, 5, true);
+        // make HyperCore spread unacceptable while still fresh so EMA path is required
+        updateSpot(1e18, 2, true);
+        updateBidAsk(90e16, 110e16, 2_000, true);
+        updateEma(1e18, 1, true);
+
+        IOracleAdapterPyth.PythResult memory pythFail;
+        pythFail.success = false;
+        oraclePyth.setResult(pythFail);
 
         DnmPool.OracleConfig memory strictCfg = strictOracleConfig();
         strictCfg.allowEmaFallback = false;

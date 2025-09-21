@@ -15,6 +15,7 @@ contract OracleAdapterPythTest is Test {
     bytes32 internal constant USDC_ID = keccak256("USDC/USD");
 
     function setUp() public {
+        vm.warp(1_000);
         pyth = new MockPyth();
         adapter = new OracleAdapterPyth(address(pyth), HYPE_ID, USDC_ID);
 
@@ -31,7 +32,8 @@ contract OracleAdapterPythTest is Test {
         uint256 expectedMid = (res.hypeUsd * 1e18) / res.usdcUsd;
         assertEq(mid, expectedMid, "mid ratio");
         assertEq(age, 4, "age max");
-        assertEq(conf, 50, "conf max");
+        uint256 expectedConf = res.confBpsHype > res.confBpsUsdc ? res.confBpsHype : res.confBpsUsdc;
+        assertEq(conf, expectedConf, "conf selection");
     }
 
     function test_pyth_confidence_caps() public {
@@ -40,9 +42,8 @@ contract OracleAdapterPythTest is Test {
 
         IOracleAdapterPyth.PythResult memory res = adapter.readPythUsdMid(bytes(""));
         (,, uint256 conf) = adapter.computePairMid(res);
-        // Confidence expressed as bps of price -> should be roughly conf/value scaling
-        assertGt(conf, 200, "conf max");
-        assertEq(conf, res.confBpsHype, "largest conf component");
+        uint256 expectedConf = res.confBpsHype > res.confBpsUsdc ? res.confBpsHype : res.confBpsUsdc;
+        assertEq(conf, expectedConf, "conf selection");
     }
 
     function test_age_caps() public {

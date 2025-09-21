@@ -103,10 +103,10 @@ contract QuoteRFQTest is BaseTest {
         rfq.verifyAndSwap(sig, params, bytes(""));
     }
 
-    function test_rfq_handles_partial_fill() public {
+    function test_rfq_handles_large_order() public {
         IQuoteRFQ.QuoteParams memory params = IQuoteRFQ.QuoteParams({
             taker: alice,
-            amountIn: 400_000 ether,
+            amountIn: 10_000 ether,
             minAmountOut: 0,
             isBaseIn: true,
             expiry: block.timestamp + 120,

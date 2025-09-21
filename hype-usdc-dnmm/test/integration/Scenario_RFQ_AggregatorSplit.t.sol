@@ -6,13 +6,13 @@ import {DnmPool} from "../../contracts/DnmPool.sol";
 import {QuoteRFQ} from "../../contracts/quotes/QuoteRFQ.sol";
 import {IQuoteRFQ} from "../../contracts/interfaces/IQuoteRFQ.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
+import {EventRecorder} from "../utils/EventRecorder.sol";
 import {MockCurveDEX} from "../utils/Mocks.sol";
 
 contract ScenarioRFQAggregatorSplitTest is BaseTest {
     QuoteRFQ internal rfq;
     MockCurveDEX internal dex;
     uint256 internal makerKey = 0xABC123;
-    uint256 private constant BASE_TO_QUOTE_SCALE = 1e12;
 
     function setUp() public {
         setUpBase();
@@ -38,11 +38,15 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
     function _rebalanceInventory(address quoteActor, address baseActor) internal {
         (uint128 baseRes,) = pool.reserves();
         (uint128 targetBase,,) = pool.inventoryConfig();
+        (, , , , uint256 baseScale, uint256 quoteScale) = pool.tokenConfig();
+        uint256 minBaseTrade = baseScale;
+        uint256 minQuoteTrade = quoteScale;
 
         if (baseRes > targetBase) {
             uint256 delta = uint256(baseRes) - targetBase;
-            for (uint256 i = 0; i < 4 && delta > BASE_TO_QUOTE_SCALE; ++i) {
-                uint256 quoteAmount = (delta + BASE_TO_QUOTE_SCALE - 1) / BASE_TO_QUOTE_SCALE;
+            for (uint256 i = 0; i < 4 && delta > minBaseTrade; ++i) {
+                uint256 quoteAmount = (delta * quoteScale) / baseScale;
+                if (quoteAmount < minQuoteTrade) quoteAmount = minQuoteTrade;
                 deal(address(usdc), quoteActor, quoteAmount);
                 approveAll(quoteActor);
                 vm.prank(quoteActor);
@@ -53,11 +57,13 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
             }
         } else if (baseRes < targetBase) {
             uint256 delta = uint256(targetBase) - baseRes;
-            for (uint256 i = 0; i < 4 && delta > BASE_TO_QUOTE_SCALE; ++i) {
-                deal(address(hype), baseActor, delta);
+            for (uint256 i = 0; i < 4 && delta > minBaseTrade; ++i) {
+                uint256 baseAmount = delta;
+                if (baseAmount < minBaseTrade) baseAmount = minBaseTrade;
+                deal(address(hype), baseActor, baseAmount);
                 approveAll(baseActor);
                 vm.prank(baseActor);
-                pool.swapExactIn(delta, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+                pool.swapExactIn(baseAmount, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
                 (baseRes,) = pool.reserves();
                 if (baseRes >= targetBase) break;
                 delta = uint256(targetBase) - baseRes;
@@ -66,6 +72,7 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
     }
 
     function test_aggregator_prefers_dnmm_post_reprice() public {
+        (, , uint8 baseDecimals, uint8 quoteDecimals,,) = pool.tokenConfig();
         updateSpot(11e17, 0, true);
         updateBidAsk(108e16, 112e16, 400, true);
         updatePyth(11e17, 1e18, 0, 0, 20, 20);
@@ -87,6 +94,7 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
         });
         bytes memory sig = _sign(params);
 
+        recordLogs();
         vm.prank(alice);
         uint256 poolOut = rfq.verifyAndSwap(sig, params, bytes(""));
 
@@ -94,6 +102,64 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
         uint256 dexOut = dex.swapBaseIn(orderSize / 4, 0, alice);
 
         assertGt(poolOut * 4 / 3, dexOut, "pool leg dominates");
+
+        EventRecorder.SwapEvent[] memory swaps = drainLogsToSwapEvents();
+        EventRecorder.RejectionCounts memory rejects = EventRecorder.countRejections(swaps);
+        require(rejects.floor == 0, "rfq leg should not floor out");
+
+        EventRecorder.VWAPMetrics memory dnmmMetrics = EventRecorder.computeVWAPMetrics(
+            swaps,
+            baseDecimals,
+            quoteDecimals
+        );
+        uint256 dexLegVwap = _priceBaseIn(orderSize / 4, dexOut, baseDecimals, quoteDecimals);
+        uint256 dnmmLegVwap = dnmmMetrics.executedVwap;
+
+        uint256 aggBase = params.amountIn + (orderSize / 4);
+        uint256 aggQuote = poolOut + dexOut;
+        uint256 aggVwap = _priceBaseIn(aggBase, aggQuote, baseDecimals, quoteDecimals);
+        uint256 cpammFull = dex.quoteBaseIn(orderSize);
+        uint256 cpammVwap = _priceBaseIn(orderSize, cpammFull, baseDecimals, quoteDecimals);
+        require(aggVwap >= cpammVwap, "aggregator vwap must beat pure cpamm");
+
+        string[] memory rows = new string[](1);
+        rows[0] = _formatRow(
+            dnmmLegVwap,
+            dnmmMetrics.midVwap,
+            dnmmMetrics.diffBps,
+            dexLegVwap,
+            aggVwap,
+            cpammVwap,
+            dnmmMetrics.totalBaseVolume,
+            dnmmMetrics.totalQuoteVolume
+        );
+        EventRecorder.writeCSV(
+            vm,
+            "metrics/rfq_aggregator_split.csv",
+            "dnmm_vwap,dnmm_mid_vwap,dnmm_diff_bps,dex_vwap,agg_vwap,cpamm_vwap,dnmm_base_e18,dnmm_quote_e18",
+            rows
+        );
+
+        string memory json = string.concat(
+            "{\"dnmm\":{\"vwap\":",
+            EventRecorder.uintToString(dnmmLegVwap),
+            ",\"mid_vwap\":",
+            EventRecorder.uintToString(dnmmMetrics.midVwap),
+            ",\"diff_bps\":",
+            EventRecorder.intToString(dnmmMetrics.diffBps),
+            ",\"base_volume\":",
+            EventRecorder.uintToString(dnmmMetrics.totalBaseVolume),
+            ",\"quote_volume\":",
+            EventRecorder.uintToString(dnmmMetrics.totalQuoteVolume),
+            "},\"dex_leg_vwap\":",
+            EventRecorder.uintToString(dexLegVwap),
+            ",\"aggregated_vwap\":",
+            EventRecorder.uintToString(aggVwap),
+            ",\"cpamm_vwap\":",
+            EventRecorder.uintToString(cpammVwap),
+            "}"
+        );
+        EventRecorder.writeJSON(vm, "metrics/rfq_aggregator_split.json", json);
 
         rollBlocks(20);
         vm.warp(block.timestamp + 20);
@@ -104,6 +170,50 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
         DnmPool.QuoteResult memory calmQuote = quote(orderSize, true, IDnmPool.OracleMode.Spot);
         assertLt(calmQuote.feeBpsUsed, poolQuote.feeBpsUsed, "fee decays");
         assertLe(calmQuote.feeBpsUsed, poolQuote.feeBpsUsed, "fee remained controlled");
+    }
+
+    function _priceBaseIn(
+        uint256 baseAmount,
+        uint256 quoteAmount,
+        uint8 baseDecimals,
+        uint8 quoteDecimals
+    ) internal pure returns (uint256) {
+        if (baseAmount == 0 || quoteAmount == 0) return 0;
+        uint256 baseScale = 10 ** baseDecimals;
+        uint256 quoteScale = 10 ** quoteDecimals;
+        uint256 baseE18 = (baseAmount * 1e18) / baseScale;
+        uint256 quoteE18 = (quoteAmount * 1e18) / quoteScale;
+        if (baseE18 == 0) return 0;
+        return (quoteE18 * 1e18) / baseE18;
+    }
+
+    function _formatRow(
+        uint256 dnmmVwap,
+        uint256 midVwap,
+        int256 diffBps,
+        uint256 dexVwap,
+        uint256 aggVwap,
+        uint256 cpammVwap,
+        uint256 baseVolume,
+        uint256 quoteVolume
+    ) internal pure returns (string memory) {
+        return string.concat(
+            EventRecorder.uintToString(dnmmVwap),
+            ",",
+            EventRecorder.uintToString(midVwap),
+            ",",
+            EventRecorder.intToString(diffBps),
+            ",",
+            EventRecorder.uintToString(dexVwap),
+            ",",
+            EventRecorder.uintToString(aggVwap),
+            ",",
+            EventRecorder.uintToString(cpammVwap),
+            ",",
+            EventRecorder.uintToString(baseVolume),
+            ",",
+            EventRecorder.uintToString(quoteVolume)
+        );
     }
 
     function _sign(IQuoteRFQ.QuoteParams memory params) internal returns (bytes memory) {

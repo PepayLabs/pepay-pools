@@ -16,7 +16,7 @@ End-to-end research and engineering drop for a Lifinity v2–style dynamic no-ma
 1. Run `./setup.sh` from the repo root to provision Node.js 20 and Foundry.
 2. From this folder run `terragon-forge.sh install` commands as needed (wrapper passes `--root hype-usdc-dnmm`).
 3. Configure HyperCore + Pyth identifiers under `config/oracle.ids.json` and token metadata under `config/tokens.hyper.json`.
-4. Execute `terragon-forge.sh test` for the default suite or `terragon-forge.sh test --match-test testFeeDecay` to focus on a component.
+4. Execute `terragon-forge.sh test` for the default suite or `terragon-forge.sh test --match-path test/perf` to capture gas/load artefacts in `metrics/` and `gas-snapshots.txt` alongside component-focused runs like `--match-test testFeeDecay`.
 5. Review `RUNBOOK.md`, `SECURITY.md`, and `docs/CONFIG.md` ahead of any deployment for operational expectations.
 
 > ℹ️  HyperCore precompile addresses and asset identifiers are placeholders; confirm before stage deployments.

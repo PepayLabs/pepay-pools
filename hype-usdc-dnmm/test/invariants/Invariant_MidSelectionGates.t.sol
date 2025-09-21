@@ -23,8 +23,8 @@ contract InvariantMidSelectionGates is StdInvariant, BaseTest {
     function invariant_mid_selection_obeys_gates() public {
         (DnmPool.OracleConfig memory cfg, DnmPool.QuoteResult memory result, bool lastErrored, bytes memory err) = handler.snapshot();
         if (lastErrored) {
-            bytes memory stale = bytes(Errors.ORACLE_STALE);
-            bytes memory div = bytes(Errors.ORACLE_DIVERGENCE);
+            bytes memory stale = abi.encodeWithSignature("Error(string)", Errors.ORACLE_STALE);
+            bytes memory div = abi.encodeWithSignature("Error(string)", Errors.ORACLE_DIVERGENCE);
             assertTrue(keccak256(err) == keccak256(stale) || keccak256(err) == keccak256(div), "unexpected error");
         } else {
             if (result.usedFallback) {

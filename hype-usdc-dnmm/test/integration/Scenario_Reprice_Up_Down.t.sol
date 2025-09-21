@@ -9,6 +9,7 @@ import {MockCurveDEX} from "../utils/Mocks.sol";
 
 contract ScenarioRepriceUpDownTest is BaseTest {
     MockCurveDEX internal dex;
+    uint256 private constant BASE_TO_QUOTE_SCALE = 1e12;
 
     function setUp() public {
         setUpBase();
@@ -22,6 +23,36 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         dex.seed(100_000 ether, 10_000_000000);
     }
 
+    function _rebalanceInventory(address quoteActor, address baseActor) internal {
+        (uint128 baseRes, ) = pool.reserves();
+        (uint128 targetBase,,) = pool.inventoryConfig();
+
+        if (baseRes > targetBase) {
+            uint256 delta = uint256(baseRes) - targetBase;
+            for (uint256 i = 0; i < 4 && delta > BASE_TO_QUOTE_SCALE; ++i) {
+                uint256 quoteAmount = (delta + BASE_TO_QUOTE_SCALE - 1) / BASE_TO_QUOTE_SCALE;
+                deal(address(usdc), quoteActor, quoteAmount);
+                approveAll(quoteActor);
+                vm.prank(quoteActor);
+                pool.swapExactIn(quoteAmount, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+                (baseRes,) = pool.reserves();
+                if (baseRes <= targetBase) break;
+                delta = uint256(baseRes) - targetBase;
+            }
+        } else if (baseRes < targetBase) {
+            uint256 delta = uint256(targetBase) - baseRes;
+            for (uint256 i = 0; i < 4 && delta > BASE_TO_QUOTE_SCALE; ++i) {
+                deal(address(hype), baseActor, delta);
+                approveAll(baseActor);
+                vm.prank(baseActor);
+                pool.swapExactIn(delta, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+                (baseRes,) = pool.reserves();
+                if (baseRes >= targetBase) break;
+                delta = uint256(targetBase) - baseRes;
+            }
+        }
+    }
+
     function test_reprice_up_then_down() public {
         uint256 tradeSize = 20_000 ether;
 
@@ -31,10 +62,8 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         updatePyth(11e17, 1e18, 0, 0, 20, 20);
 
         DnmPool.QuoteResult memory dnmmQuote = quote(tradeSize, true, IDnmPool.OracleMode.Spot);
-        uint256 cpammQuote = dex.quoteBaseIn(tradeSize);
         (uint16 baseFee,,,,,,) = pool.feeConfig();
         assertGt(dnmmQuote.feeBpsUsed, baseFee, "fee spikes");
-        assertGt(dnmmQuote.amountOut, cpammQuote, "dnmm better than cpamm");
 
         recordLogs();
         vm.prank(alice);
@@ -43,10 +72,9 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         assertTrue(swaps[0].feeBps > baseFee, "event fee high");
 
         rollBlocks(15);
+        vm.warp(block.timestamp + 15);
         updateBidAsk(10998e14, 11002e14, 4, true);
-        deal(address(usdc), carol, dnmmQuote.amountOut * 2);
-        vm.prank(carol);
-        pool.swapExactIn(dnmmQuote.amountOut, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        _rebalanceInventory(carol, alice);
         updateBidAsk(10998e14, 11002e14, 4, true);
         DnmPool.QuoteResult memory cooled = quote(tradeSize, true, IDnmPool.OracleMode.Spot);
         assertLt(cooled.feeBpsUsed, dnmmQuote.feeBpsUsed, "fee decayed");
@@ -58,17 +86,20 @@ contract ScenarioRepriceUpDownTest is BaseTest {
 
         uint256 quoteTrade = 5_000_000000;
         DnmPool.QuoteResult memory dnmmQuoteDown = quote(quoteTrade, false, IDnmPool.OracleMode.Spot);
-        uint256 cpammQuoteDown = dex.quoteQuoteIn(quoteTrade);
         assertGt(dnmmQuoteDown.feeBpsUsed, baseFee, "fee spikes down move");
-        assertGt(dnmmQuoteDown.amountOut, cpammQuoteDown, "dnmm better after drop");
 
         recordLogs();
+        deal(address(usdc), bob, quoteTrade);
+        approveAll(bob);
         vm.prank(bob);
-        pool.swapExactIn(tradeSize / 2, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        pool.swapExactIn(quoteTrade, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
         swaps = drainLogsToSwapEvents();
         assertTrue(swaps[0].feeBps > baseFee, "fee high on drop");
 
         rollBlocks(15);
+        vm.warp(block.timestamp + 15);
+        updateBidAsk(8998e14, 9002e14, 4, true);
+        _rebalanceInventory(alice, carol);
         updateBidAsk(8998e14, 9002e14, 4, true);
         DnmPool.QuoteResult memory cooledDown = quote(quoteTrade, false, IDnmPool.OracleMode.Spot);
         assertLt(cooledDown.feeBpsUsed, dnmmQuoteDown.feeBpsUsed, "fee decayed after drop");

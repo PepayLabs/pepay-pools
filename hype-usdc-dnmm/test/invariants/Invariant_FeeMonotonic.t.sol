@@ -13,7 +13,7 @@ contract InvariantFeeMonotonic is StdInvariant {
         targetContract(address(handler));
     }
 
-    function invariant_fee_within_bounds() public {
+    function invariant_fee_within_bounds() public view {
         (uint16 baseBps,,,,,) = handler.config();
         uint16 capBps = handler.cap();
         uint16 current = handler.lastFee();
@@ -49,7 +49,8 @@ contract FeeHandler {
     function increaseConf(uint256 step) external {
         step = _bound(step, 1, 500);
         uint256 newConf = lastConf + step;
-        (uint16 fee, FeePolicy.FeeState memory previewState) = FeePolicy.preview(state, cfg, newConf, lastInv, block.number);
+        (uint16 fee, FeePolicy.FeeState memory previewState) =
+            FeePolicy.preview(state, cfg, newConf, lastInv, block.number);
         require(fee >= lastFeeBps, "fee should grow with conf");
         state = previewState;
         lastConf = newConf;
@@ -59,7 +60,8 @@ contract FeeHandler {
     function increaseInv(uint256 step) external {
         step = _bound(step, 1, 1000);
         uint256 newInv = lastInv + step;
-        (uint16 fee, FeePolicy.FeeState memory previewState) = FeePolicy.preview(state, cfg, lastConf, newInv, block.number);
+        (uint16 fee, FeePolicy.FeeState memory previewState) =
+            FeePolicy.preview(state, cfg, lastConf, newInv, block.number);
         require(fee >= lastFeeBps, "fee should grow with inv");
         state = previewState;
         lastInv = newInv;
@@ -69,14 +71,22 @@ contract FeeHandler {
     function decay(uint256 blocksForward) external {
         blocksForward = _bound(blocksForward, 1, 20);
         uint256 targetBlock = block.number + blocksForward;
-        (uint16 fee, FeePolicy.FeeState memory previewState) = FeePolicy.preview(state, cfg, lastConf, lastInv, targetBlock);
+        (uint16 fee, FeePolicy.FeeState memory previewState) =
+            FeePolicy.preview(state, cfg, lastConf, lastInv, targetBlock);
         require(fee <= lastFeeBps, "decay should not increase fee");
         state = previewState;
         lastFeeBps = fee;
     }
 
     function config() external view returns (uint16 baseBps, uint16, uint16, uint16, uint16, uint16 capBps) {
-        return (cfg.baseBps, cfg.alphaConfNumerator, cfg.alphaConfDenominator, cfg.betaInvDevNumerator, cfg.betaInvDevDenominator, cfg.capBps);
+        return (
+            cfg.baseBps,
+            cfg.alphaConfNumerator,
+            cfg.alphaConfDenominator,
+            cfg.betaInvDevNumerator,
+            cfg.betaInvDevDenominator,
+            cfg.capBps
+        );
     }
 
     function cap() external view returns (uint16) {

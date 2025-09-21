@@ -7,15 +7,11 @@ import {FeePolicy} from "../../contracts/lib/FeePolicy.sol";
 
 /// @notice Utilities to decode DNMM events and derive reusable metrics inside tests.
 library EventRecorder {
-    bytes32 internal constant SWAP_EXECUTED_SIG = keccak256(
-        "SwapExecuted(address,bool,uint256,uint256,uint256,uint256,bool,bytes32)"
-    );
-    bytes32 internal constant QUOTE_SERVED_SIG = keccak256(
-        "QuoteServed(uint256,uint256,uint256,uint256,uint256,uint256)"
-    );
-    bytes32 internal constant TARGET_XSTAR_SIG = keccak256(
-        "TargetBaseXstarUpdated(uint128,uint128,uint256,uint64)"
-    );
+    bytes32 internal constant SWAP_EXECUTED_SIG =
+        keccak256("SwapExecuted(address,bool,uint256,uint256,uint256,uint256,bool,bytes32)");
+    bytes32 internal constant QUOTE_SERVED_SIG =
+        keccak256("QuoteServed(uint256,uint256,uint256,uint256,uint256,uint256)");
+    bytes32 internal constant TARGET_XSTAR_SIG = keccak256("TargetBaseXstarUpdated(uint128,uint128,uint256,uint64)");
 
     bytes32 internal constant REASON_NONE = bytes32(0);
     bytes32 internal constant REASON_FLOOR = bytes32("FLOOR");
@@ -41,14 +37,6 @@ library EventRecorder {
         uint256 ttlMs;
         uint256 mid;
         uint256 feeBps;
-    }
-
-    struct SwapStats {
-        uint256 totalAmountInBase;
-        uint256 totalAmountInQuote;
-        uint256 totalFeeBpsTimesAmount;
-        uint256 trades;
-        uint256 partialFills;
     }
 
     struct VWAPMetrics {
@@ -88,10 +76,15 @@ library EventRecorder {
         for (uint256 i = 0; i < entries.length; ++i) {
             Vm.Log memory logEntry = entries[i];
             if (logEntry.topics.length == 0 || logEntry.topics[0] != SWAP_EXECUTED_SIG) continue;
-            (bool isBaseIn, uint256 amountIn, uint256 amountOut, uint256 mid, uint256 feeBps, bool isPartial, bytes32 reason) = abi.decode(
-                logEntry.data,
-                (bool, uint256, uint256, uint256, uint256, bool, bytes32)
-            );
+            (
+                bool isBaseIn,
+                uint256 amountIn,
+                uint256 amountOut,
+                uint256 mid,
+                uint256 feeBps,
+                bool isPartial,
+                bytes32 reason
+            ) = abi.decode(logEntry.data, (bool, uint256, uint256, uint256, uint256, bool, bytes32));
             swaps[ptr++] = SwapEvent({
                 user: address(uint160(uint256(logEntry.topics[1]))),
                 isBaseIn: isBaseIn,
@@ -105,7 +98,11 @@ library EventRecorder {
         }
     }
 
-    function decodeQuoteServedEvents(Vm.Log[] memory entries) internal pure returns (QuoteServedEvent[] memory quotes) {
+    function decodeQuoteServedEvents(Vm.Log[] memory entries)
+        internal
+        pure
+        returns (QuoteServedEvent[] memory quotes)
+    {
         uint256 count;
         for (uint256 i = 0; i < entries.length; ++i) {
             if (entries[i].topics.length > 0 && entries[i].topics[0] == QUOTE_SERVED_SIG) {
@@ -117,10 +114,8 @@ library EventRecorder {
         for (uint256 i = 0; i < entries.length; ++i) {
             Vm.Log memory logEntry = entries[i];
             if (logEntry.topics.length == 0 || logEntry.topics[0] != QUOTE_SERVED_SIG) continue;
-            (uint256 bidPx, uint256 askPx, uint256 s0Notional, uint256 ttlMs, uint256 mid, uint256 feeBps) = abi.decode(
-                logEntry.data,
-                (uint256, uint256, uint256, uint256, uint256, uint256)
-            );
+            (uint256 bidPx, uint256 askPx, uint256 s0Notional, uint256 ttlMs, uint256 mid, uint256 feeBps) =
+                abi.decode(logEntry.data, (uint256, uint256, uint256, uint256, uint256, uint256));
             quotes[ptr++] = QuoteServedEvent({
                 bidPx: bidPx,
                 askPx: askPx,
@@ -132,31 +127,11 @@ library EventRecorder {
         }
     }
 
-    function computeStats(SwapEvent[] memory swaps, uint8 baseDecimals, uint8 quoteDecimals)
+    function computeVWAPMetrics(SwapEvent[] memory swaps, uint8 baseDecimals, uint8 quoteDecimals)
         internal
         pure
-        returns (SwapStats memory stats)
+        returns (VWAPMetrics memory metrics)
     {
-        for (uint256 i = 0; i < swaps.length; ++i) {
-            SwapEvent memory evt = swaps[i];
-            stats.trades += 1;
-            if (evt.isBaseIn) {
-                stats.totalAmountInBase += evt.amountIn;
-                stats.totalAmountInQuote += evt.amountOut;
-            } else {
-                stats.totalAmountInQuote += evt.amountIn;
-                stats.totalAmountInBase += evt.amountOut;
-            }
-            if (evt.isPartial) stats.partialFills += 1;
-            stats.totalFeeBpsTimesAmount += evt.feeBps * evt.amountIn;
-        }
-    }
-
-    function computeVWAPMetrics(
-        SwapEvent[] memory swaps,
-        uint8 baseDecimals,
-        uint8 quoteDecimals
-    ) internal pure returns (VWAPMetrics memory metrics) {
         if (swaps.length == 0) return metrics;
 
         uint256 baseScale = 10 ** baseDecimals;
@@ -164,11 +139,7 @@ library EventRecorder {
 
         for (uint256 i = 0; i < swaps.length; ++i) {
             SwapEvent memory evt = swaps[i];
-            (uint256 baseVol, uint256 quoteVol, uint256 price) = _tradeVolumesAndPrice(
-                evt,
-                baseScale,
-                quoteScale
-            );
+            (uint256 baseVol, uint256 quoteVol, uint256 price) = _tradeVolumesAndPrice(evt, baseScale, quoteScale);
             if (baseVol == 0) continue;
 
             metrics.totalBaseVolume += baseVol;
@@ -282,15 +253,8 @@ library EventRecorder {
 
     function _writeFile(Vm vm, string memory path, string memory data) private {
         string memory quotedPath = string.concat("'", path, "'");
-        string memory command = string.concat(
-            "mkdir -p $(dirname ",
-            quotedPath,
-            ") && cat <<'EOF' > ",
-            quotedPath,
-            "\n",
-            data,
-            "\nEOF\n"
-        );
+        string memory command =
+            string.concat("mkdir -p $(dirname ", quotedPath, ") && cat <<'EOF' > ", quotedPath, "\n", data, "\nEOF\n");
         string[] memory inputs = new string[](3);
         inputs[0] = "bash";
         inputs[1] = "-lc";
@@ -298,14 +262,13 @@ library EventRecorder {
         vm.ffi(inputs);
     }
 
-    function _tradeVolumesAndPrice(
-        SwapEvent memory evt,
-        uint256 baseScale,
-        uint256 quoteScale
-    ) private pure returns (uint256 baseVolumeE18, uint256 quoteVolumeE18, uint256 price) {
-        (uint256 baseRaw, uint256 quoteRaw) = evt.isBaseIn
-            ? (evt.amountIn, evt.amountOut)
-            : (evt.amountOut, evt.amountIn);
+    function _tradeVolumesAndPrice(SwapEvent memory evt, uint256 baseScale, uint256 quoteScale)
+        private
+        pure
+        returns (uint256 baseVolumeE18, uint256 quoteVolumeE18, uint256 price)
+    {
+        (uint256 baseRaw, uint256 quoteRaw) =
+            evt.isBaseIn ? (evt.amountIn, evt.amountOut) : (evt.amountOut, evt.amountIn);
 
         if (baseRaw == 0 || quoteRaw == 0) {
             return (0, 0, 0);

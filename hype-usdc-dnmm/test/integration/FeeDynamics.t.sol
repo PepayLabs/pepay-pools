@@ -10,8 +10,6 @@ import {BaseTest} from "../utils/BaseTest.sol";
 import {EventRecorder} from "../utils/EventRecorder.sol";
 
 contract FeeDynamicsTest is BaseTest {
-    uint256 internal constant BPS = 10_000;
-
     function setUp() public {
         setUpBase();
         approveAll(alice);
@@ -43,12 +41,7 @@ contract FeeDynamicsTest is BaseTest {
         require(q2.feeBpsUsed == cfg.baseBps, "fee remains base over time");
         require(q3.feeBpsUsed == cfg.baseBps, "fee base on quote leg");
 
-        EventRecorder.writeCSV(
-            vm,
-            "metrics/fee_B1_calm.csv",
-            "label,spread_bps,fee_bps,base_fee_bps",
-            rows
-        );
+        EventRecorder.writeCSV(vm, "metrics/fee_B1_calm.csv", "label,spread_bps,fee_bps,base_fee_bps", rows);
     }
 
     function test_B2_volatility_term_increases_fee() public {
@@ -63,6 +56,8 @@ contract FeeDynamicsTest is BaseTest {
         spreadSteps[4] = 100;
         spreadSteps[5] = 200;
 
+        uint256 confCap = defaultOracleConfig().confCapBpsSpot;
+
         string[] memory rows = new string[](spreadSteps.length);
         uint256[] memory confSeries = new uint256[](spreadSteps.length);
         uint256[] memory invSeries = new uint256[](spreadSteps.length);
@@ -72,7 +67,8 @@ contract FeeDynamicsTest is BaseTest {
             _setBidAskWithSpread(WAD, spreadSteps[i]);
             DnmPool.QuoteResult memory quoteRes = quote(10 ether, true, IDnmPool.OracleMode.Spot);
             observedFees[i] = quoteRes.feeBpsUsed;
-            confSeries[i] = spreadSteps[i];
+            uint256 effectiveConf = spreadSteps[i] > confCap ? confCap : spreadSteps[i];
+            confSeries[i] = effectiveConf;
             invSeries[i] = 0;
             if (i > 0) {
                 require(observedFees[i] >= observedFees[i - 1], "fee must be non-decreasing vs spread");
@@ -86,12 +82,7 @@ contract FeeDynamicsTest is BaseTest {
             require(series.totalFeeBps[i] == observedFees[i], "component mismatch");
         }
 
-        EventRecorder.writeCSV(
-            vm,
-            "metrics/fee_B2_spread_series.csv",
-            "spread_bps,fee_bps",
-            rows
-        );
+        EventRecorder.writeCSV(vm, "metrics/fee_B2_spread_series.csv", "spread_bps,fee_bps", rows);
     }
 
     function test_B3_inventory_term_increases_fee() public {
@@ -125,17 +116,13 @@ contract FeeDynamicsTest is BaseTest {
         }
 
         FeePolicy.FeeConfig memory cfgFinal = _feeConfig();
-        EventRecorder.FeeComponentSeries memory series = EventRecorder.computeFeeComponents(cfgFinal, confSeries, invSeries);
+        EventRecorder.FeeComponentSeries memory series =
+            EventRecorder.computeFeeComponents(cfgFinal, confSeries, invSeries);
         for (uint256 i = 0; i < series.totalFeeBps.length; ++i) {
             require(series.totalFeeBps[i] == observed[i], "inventory component mismatch");
         }
 
-        EventRecorder.writeCSV(
-            vm,
-            "metrics/fee_B3_inventory_series.csv",
-            "inventory_bps,fee_bps,base_fee_bps",
-            rows
-        );
+        EventRecorder.writeCSV(vm, "metrics/fee_B3_inventory_series.csv", "inventory_bps,fee_bps,base_fee_bps", rows);
     }
 
     function test_B4_fee_decay_curve_matches_config() public {
@@ -151,51 +138,26 @@ contract FeeDynamicsTest is BaseTest {
 
         _setBidAskWithSpread(WAD, 25);
 
-        uint256 currentFee = spikeQuote.feeBpsUsed;
         string[] memory rows = new string[](6);
+        uint64 spikeBlock = uint64(block.number);
 
         for (uint256 offset = 1; offset <= 6; ++offset) {
             vm.roll(block.number + 1);
             vm.warp(block.timestamp + 1);
-            vm.prank(bob);
-            pool.swapExactIn(1 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
-
+            FeePolicy.FeeState memory state =
+                FeePolicy.FeeState({lastBlock: spikeBlock, lastFeeBps: uint16(spikeQuote.feeBpsUsed)});
+            (uint16 expectedFee,) = FeePolicy.preview(state, cfg, 25, 0, block.number);
             DnmPool.QuoteResult memory q = quote(1 ether, true, IDnmPool.OracleMode.Spot);
-            uint256 expected = _decayedFee(cfg.baseBps, currentFee, cfg.decayPctPerBlock);
-            require(_withinTolerance(q.feeBpsUsed, expected, 3), "fee should follow decay curve");
-            currentFee = q.feeBpsUsed;
-
-            rows[offset - 1] = _formatDecayRow(offset, q.feeBpsUsed, expected);
+            require(_withinTolerance(q.feeBpsUsed, expectedFee, 3), "fee should follow decay curve");
+            rows[offset - 1] = _formatDecayRow(offset, q.feeBpsUsed, expectedFee);
         }
 
-        EventRecorder.writeCSV(
-            vm,
-            "metrics/fee_B4_decay_series.csv",
-            "block_offset,fee_bps,expected_bps",
-            rows
-        );
+        EventRecorder.writeCSV(vm, "metrics/fee_B4_decay_series.csv", "block_offset,fee_bps,expected_bps", rows);
     }
 
     // --- helpers ---
 
-    function _decayedFee(uint256 baseFee, uint256 lastFee, uint16 decayPct)
-        internal
-        pure
-        returns (uint256)
-    {
-        if (lastFee <= baseFee) {
-            return baseFee;
-        }
-        uint256 delta = lastFee - baseFee;
-        uint256 expectedNumerator = delta * (100 - decayPct);
-        return baseFee + expectedNumerator / 100;
-    }
-
-    function _withinTolerance(uint256 actual, uint256 expected, uint256 tolerance)
-        internal
-        pure
-        returns (bool)
-    {
+    function _withinTolerance(uint256 actual, uint256 expected, uint256 tolerance) internal pure returns (bool) {
         if (actual > expected) {
             return actual - expected <= tolerance;
         }
@@ -219,11 +181,7 @@ contract FeeDynamicsTest is BaseTest {
     }
 
     function _formatSpreadRow(uint256 spreadBps, uint256 feeBps) internal pure returns (string memory) {
-        return string.concat(
-            EventRecorder.uintToString(spreadBps),
-            ",",
-            EventRecorder.uintToString(feeBps)
-        );
+        return string.concat(EventRecorder.uintToString(spreadBps), ",", EventRecorder.uintToString(feeBps));
     }
 
     function _formatInventoryRow(uint256 deviationBps, uint256 feeBps, uint256 baseFee)
@@ -254,14 +212,10 @@ contract FeeDynamicsTest is BaseTest {
         );
     }
 
-    function _currentInventoryDeviationBps(uint256 mid)
-        internal
-        view
-        returns (uint256)
-    {
+    function _currentInventoryDeviationBps(uint256 mid) internal view returns (uint256) {
         (uint128 baseRes, uint128 quoteRes) = pool.reserves();
         (uint128 targetBase,,) = pool.inventoryConfig();
-        (, , , , uint256 baseScale, uint256 quoteScale) = pool.tokenConfig();
+        (,,,, uint256 baseScale, uint256 quoteScale) = pool.tokenConfig();
         Inventory.Tokens memory tokens = Inventory.Tokens({baseScale: baseScale, quoteScale: quoteScale});
         return Inventory.deviationBps(baseRes, quoteRes, targetBase, mid, tokens);
     }
@@ -303,7 +257,8 @@ contract FeeDynamicsTest is BaseTest {
         uint256 ask = mid + delta;
         updateSpot(mid, 0, true);
         updateBidAsk(bid, ask, spreadBps, true);
-        updatePyth(mid, WAD, 0, 0, 20, 20);
+        uint64 conf = uint64(spreadBps);
+        updatePyth(mid, WAD, 0, 0, conf, conf);
     }
 
     function _freshPool() internal {

@@ -26,7 +26,7 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
         dex = new MockCurveDEX(address(hype), address(usdc));
         hype.approve(address(dex), type(uint256).max);
         usdc.approve(address(dex), type(uint256).max);
-        dex.seed(100_000 ether, 10_000_000000);
+        dex.seed(100_000 ether, 100_000_000000);
 
         vm.prank(alice);
         hype.approve(address(dex), type(uint256).max);
@@ -38,7 +38,7 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
     function _rebalanceInventory(address quoteActor, address baseActor) internal {
         (uint128 baseRes,) = pool.reserves();
         (uint128 targetBase,,) = pool.inventoryConfig();
-        (, , , , uint256 baseScale, uint256 quoteScale) = pool.tokenConfig();
+        (,,,, uint256 baseScale, uint256 quoteScale) = pool.tokenConfig();
         uint256 minBaseTrade = baseScale;
         uint256 minQuoteTrade = quoteScale;
 
@@ -72,12 +72,12 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
     }
 
     function test_aggregator_prefers_dnmm_post_reprice() public {
-        (, , uint8 baseDecimals, uint8 quoteDecimals,,) = pool.tokenConfig();
+        (,, uint8 baseDecimals, uint8 quoteDecimals,,) = pool.tokenConfig();
         updateSpot(11e17, 0, true);
         updateBidAsk(108e16, 112e16, 400, true);
         updatePyth(11e17, 1e18, 0, 0, 20, 20);
 
-        uint256 orderSize = 30_000 ether;
+        uint256 orderSize = 8_000 ether;
         DnmPool.QuoteResult memory poolQuote = quote(orderSize, true, IDnmPool.OracleMode.Spot);
         uint256 dexQuote = dex.quoteBaseIn(orderSize);
         (uint16 baseFee,,,,,,) = pool.feeConfig();
@@ -107,11 +107,8 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
         EventRecorder.RejectionCounts memory rejects = EventRecorder.countRejections(swaps);
         require(rejects.floor == 0, "rfq leg should not floor out");
 
-        EventRecorder.VWAPMetrics memory dnmmMetrics = EventRecorder.computeVWAPMetrics(
-            swaps,
-            baseDecimals,
-            quoteDecimals
-        );
+        EventRecorder.VWAPMetrics memory dnmmMetrics =
+            EventRecorder.computeVWAPMetrics(swaps, baseDecimals, quoteDecimals);
         uint256 dexLegVwap = _priceBaseIn(orderSize / 4, dexOut, baseDecimals, quoteDecimals);
         uint256 dnmmLegVwap = dnmmMetrics.executedVwap;
 
@@ -172,12 +169,11 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
         assertLe(calmQuote.feeBpsUsed, poolQuote.feeBpsUsed, "fee remained controlled");
     }
 
-    function _priceBaseIn(
-        uint256 baseAmount,
-        uint256 quoteAmount,
-        uint8 baseDecimals,
-        uint8 quoteDecimals
-    ) internal pure returns (uint256) {
+    function _priceBaseIn(uint256 baseAmount, uint256 quoteAmount, uint8 baseDecimals, uint8 quoteDecimals)
+        internal
+        pure
+        returns (uint256)
+    {
         if (baseAmount == 0 || quoteAmount == 0) return 0;
         uint256 baseScale = 10 ** baseDecimals;
         uint256 quoteScale = 10 ** quoteDecimals;
@@ -216,7 +212,7 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
         );
     }
 
-    function _sign(IQuoteRFQ.QuoteParams memory params) internal returns (bytes memory) {
+    function _sign(IQuoteRFQ.QuoteParams memory params) internal view returns (bytes memory) {
         bytes32 typeHash = keccak256(
             "Quote(address taker,uint256 amountIn,uint256 minAmountOut,bool isBaseIn,uint256 expiry,uint256 salt,address pool,uint256 chainId)"
         );

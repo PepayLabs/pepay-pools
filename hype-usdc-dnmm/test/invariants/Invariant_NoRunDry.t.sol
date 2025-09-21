@@ -31,7 +31,7 @@ contract InvariantNoRunDry is StdInvariant, BaseTest {
         targetContract(address(handler));
     }
 
-    function invariant_never_runs_dry() public {
+    function invariant_never_runs_dry() public view {
         (uint128 baseRes, uint128 quoteRes) = pool.reserves();
         (, uint16 floorBps,) = pool.inventoryConfig();
         uint256 baseFloor = Inventory.floorAmount(uint256(baseRes), floorBps);
@@ -47,13 +47,8 @@ contract Handler {
     MockERC20 public quote;
     MockOracleHC public oracleHC;
     MockOraclePyth public oraclePyth;
-    constructor(
-        DnmPool pool_,
-        MockERC20 base_,
-        MockERC20 quote_,
-        MockOracleHC oracleHC_,
-        MockOraclePyth oraclePyth_
-    ) {
+
+    constructor(DnmPool pool_, MockERC20 base_, MockERC20 quote_, MockOracleHC oracleHC_, MockOraclePyth oraclePyth_) {
         pool = pool_;
         base = base_;
         quote = quote_;

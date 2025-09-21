@@ -154,7 +154,7 @@ contract GasSnapshotsTest is BaseTest {
         vm.stopPrank();
     }
 
-    function _sign(QuoteRFQ target, IQuoteRFQ.QuoteParams memory params) internal returns (bytes memory) {
+    function _sign(QuoteRFQ target, IQuoteRFQ.QuoteParams memory params) internal view returns (bytes memory) {
         bytes32 typeHash = keccak256(
             "Quote(address taker,uint256 amountIn,uint256 minAmountOut,bool isBaseIn,uint256 expiry,uint256 salt,address pool,uint256 chainId)"
         );

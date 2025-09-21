@@ -20,8 +20,9 @@ contract InvariantMidSelectionGates is StdInvariant, BaseTest {
         targetContract(address(handler));
     }
 
-    function invariant_mid_selection_obeys_gates() public {
-        (DnmPool.OracleConfig memory cfg, DnmPool.QuoteResult memory result, bool lastErrored, bytes memory err) = handler.snapshot();
+    function invariant_mid_selection_obeys_gates() public view {
+        (DnmPool.OracleConfig memory cfg, DnmPool.QuoteResult memory result, bool lastErrored, bytes memory err) =
+            handler.snapshot();
         if (lastErrored) {
             bytes memory stale = abi.encodeWithSignature("Error(string)", Errors.ORACLE_STALE);
             bytes memory div = abi.encodeWithSignature("Error(string)", Errors.ORACLE_DIVERGENCE);
@@ -115,7 +116,9 @@ contract GateHandler {
 
     function _quote() internal {
         lastErrored = false;
-        try pool.quoteSwapExactIn(1_000 ether, true, IDnmPool.OracleMode.Spot, bytes("")) returns (DnmPool.QuoteResult memory res) {
+        try pool.quoteSwapExactIn(1_000 ether, true, IDnmPool.OracleMode.Spot, bytes("")) returns (
+            DnmPool.QuoteResult memory res
+        ) {
             lastResult = res;
         } catch (bytes memory reason) {
             lastErrored = true;

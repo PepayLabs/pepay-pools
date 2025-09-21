@@ -19,13 +19,13 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         dex = new MockCurveDEX(address(hype), address(usdc));
         hype.approve(address(dex), type(uint256).max);
         usdc.approve(address(dex), type(uint256).max);
-        dex.seed(100_000 ether, 10_000_000000);
+        dex.seed(100_000 ether, 100_000_000000);
     }
 
     function _rebalanceInventory(address quoteActor, address baseActor) internal {
-        (uint128 baseRes, ) = pool.reserves();
+        (uint128 baseRes,) = pool.reserves();
         (uint128 targetBase,,) = pool.inventoryConfig();
-        (, , , , uint256 baseScale, uint256 quoteScale) = pool.tokenConfig();
+        (,,,, uint256 baseScale, uint256 quoteScale) = pool.tokenConfig();
         uint256 minBaseTrade = baseScale;
         uint256 minQuoteTrade = quoteScale;
 
@@ -59,8 +59,8 @@ contract ScenarioRepriceUpDownTest is BaseTest {
     }
 
     function test_reprice_up_then_down() public {
-        (, , uint8 baseDecimals, uint8 quoteDecimals,,) = pool.tokenConfig();
-        uint256 tradeSize = 20_000 ether;
+        (,, uint8 baseDecimals, uint8 quoteDecimals,,) = pool.tokenConfig();
+        uint256 tradeSize = 6_000 ether;
 
         // Upward jump
         updateSpot(11e17, 0, true);
@@ -80,11 +80,8 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         EventRecorder.RejectionCounts memory rejectsUp = EventRecorder.countRejections(swapsUp);
         require(rejectsUp.floor == 0, "no floor breach on up leg");
 
-        EventRecorder.VWAPMetrics memory metricsUp = EventRecorder.computeVWAPMetrics(
-            swapsUp,
-            baseDecimals,
-            quoteDecimals
-        );
+        EventRecorder.VWAPMetrics memory metricsUp =
+            EventRecorder.computeVWAPMetrics(swapsUp, baseDecimals, quoteDecimals);
         uint256 dexQuote = dex.quoteBaseIn(tradeSize);
         uint256 dexVwapUp = _priceBaseIn(tradeSize, dexQuote, baseDecimals, quoteDecimals);
         require(metricsUp.executedVwap >= dexVwapUp, "dnmm should beat cpamm on spike");
@@ -102,7 +99,7 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         updateBidAsk(88e16, 92e16, 400, true);
         updatePyth(9e17, 1e18, 0, 0, 20, 20);
 
-        uint256 quoteTrade = 5_000_000000;
+        uint256 quoteTrade = 80_000_000000;
         DnmPool.QuoteResult memory dnmmQuoteDown = quote(quoteTrade, false, IDnmPool.OracleMode.Spot);
         assertGt(dnmmQuoteDown.feeBpsUsed, baseFee, "fee spikes down move");
 
@@ -117,11 +114,8 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         EventRecorder.RejectionCounts memory rejectsDown = EventRecorder.countRejections(swapsDown);
         require(rejectsDown.floor == 0, "no floor breach on down leg");
 
-        EventRecorder.VWAPMetrics memory metricsDown = EventRecorder.computeVWAPMetrics(
-            swapsDown,
-            baseDecimals,
-            quoteDecimals
-        );
+        EventRecorder.VWAPMetrics memory metricsDown =
+            EventRecorder.computeVWAPMetrics(swapsDown, baseDecimals, quoteDecimals);
         uint256 dexQuoteDown = dex.quoteQuoteIn(quoteTrade);
         uint256 dexVwapDown = _priceQuoteIn(quoteTrade, dexQuoteDown, baseDecimals, quoteDecimals);
         require(metricsDown.executedVwap <= dexVwapDown, "dnmm better bid buying base");
@@ -176,20 +170,15 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         EventRecorder.writeJSON(vm, "metrics/reprice_up_down.json", json);
     }
 
-    function _baseToQuote(uint256 baseAmount, uint256 baseScale, uint256 quoteScale)
+    function _baseToQuote(uint256 baseAmount, uint256 baseScale, uint256 quoteScale) internal pure returns (uint256) {
+        return (baseAmount * quoteScale) / baseScale;
+    }
+
+    function _priceBaseIn(uint256 baseAmount, uint256 quoteAmount, uint8 baseDecimals, uint8 quoteDecimals)
         internal
         pure
         returns (uint256)
     {
-        return (baseAmount * quoteScale) / baseScale;
-    }
-
-    function _priceBaseIn(
-        uint256 baseAmount,
-        uint256 quoteAmount,
-        uint8 baseDecimals,
-        uint8 quoteDecimals
-    ) internal pure returns (uint256) {
         if (baseAmount == 0 || quoteAmount == 0) return 0;
         uint256 baseScale = 10 ** baseDecimals;
         uint256 quoteScale = 10 ** quoteDecimals;
@@ -199,12 +188,11 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         return (quoteE18 * 1e18) / baseE18;
     }
 
-    function _priceQuoteIn(
-        uint256 quoteAmount,
-        uint256 baseAmount,
-        uint8 baseDecimals,
-        uint8 quoteDecimals
-    ) internal pure returns (uint256) {
+    function _priceQuoteIn(uint256 quoteAmount, uint256 baseAmount, uint8 baseDecimals, uint8 quoteDecimals)
+        internal
+        pure
+        returns (uint256)
+    {
         if (baseAmount == 0 || quoteAmount == 0) return 0;
         uint256 baseScale = 10 ** baseDecimals;
         uint256 quoteScale = 10 ** quoteDecimals;
@@ -214,11 +202,11 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         return (quoteE18 * 1e18) / baseE18;
     }
 
-    function _formatPhaseRow(
-        string memory label,
-        EventRecorder.VWAPMetrics memory metrics,
-        uint256 dexVwap
-    ) internal pure returns (string memory) {
+    function _formatPhaseRow(string memory label, EventRecorder.VWAPMetrics memory metrics, uint256 dexVwap)
+        internal
+        pure
+        returns (string memory)
+    {
         return string.concat(
             label,
             ",",

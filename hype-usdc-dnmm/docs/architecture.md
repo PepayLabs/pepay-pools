@@ -1,28 +1,35 @@
 # HYPE/USDC DNMM Architecture
 
 ## Components
-- `DnmPool`: On-chain vault, fee logic, inventory management, governance controls.
-- `OracleAdapterHC`: Wraps HyperCore precompiles for spot, orderbook, EMA data.
-- `OracleAdapterPyth`: Pulls Pyth prices (HYPE/USD, USDC/USD) for fallback + divergence.
-- `Inventory` library: Floors + partial-fill solver ensuring reserves never breach target buffers.
-- `FeePolicy` library: Lifinity-style dynamic fee surface with α·confidence + β·inventory deviation and per-block decay.
-- `QuoteRFQ`: Optional RFQ verifier for maker-signed, TTL-bounded quotes.
+- **`DnmPool`** – Manages reserves, quotes, swaps, fee decay, inventory thresholds, and governance controls. It now consumes:
+  - `FeePolicy` for Lifinity-style α/β fee dynamics.
+  - `Inventory` for floors and partial fill solving.
+  - `FixedPointMath` for deterministic 512-bit mul/div arithmetic.
+- **`OracleAdapterHC`** – Wraps HyperCore precompiles (spot, top-of-book, EMA). Function selectors are placeholders until HyperEVM publishes the canonical ABI.
+- **`OracleAdapterPyth`** – Pulls HYPE/USD and USDC/USD feeds, returning a synthetic HYPE/USDC mid plus confidence data for divergence checks.
+- **`QuoteRFQ`** – Optional RFQ settlement path verifying maker signatures and relaying swaps to `DnmPool`.
+- **Libraries**
+  - `FixedPointMath`: WAD/BPS helpers with overflow checks.
+  - `FeePolicy`: Dynamic fee surface (base + α·conf + β·inventory deviation) with per-block decay.
+  - `Inventory`: Floor math and invariant-preserving partial fill solver.
+  - `OracleUtils`, `SafeTransferLib`, `ReentrancyGuard`, `Errors` supporting utilities.
 
 ## Data Flow
-1. Caller issues `quoteSwapExactIn` or `swapExactIn`.
-2. `_readOracle` fetches HyperCore mid/metadata, falling back to EMA or Pyth under configured gates.
-3. `FeePolicy` computes fee_bps using SOL/USDC coefficients (base, α, β, cap, decay).
-4. `Inventory` evaluates partial fills against floor bps and returns net amounts.
-5. Reserves update, events emitted, and `feeState` cached for decay on next block.
+1. Caller requests `quoteSwapExactIn` / `swapExactIn`.
+2. `_readOracle` gathers HyperCore spot + bid/ask. If spread/age fail gates, EMA or Pyth fallback is used.
+3. `FeePolicy` computes `fee_bps` using SOL/USDC-derived coefficients (see `config/parameters_default.json`).
+4. `Inventory` determines safe output size and whether a partial is required to preserve floors.
+5. `swapExactIn` handles ERC-20 transfers, updates reserves, decays fee state, and emits telemetry (`SwapExecuted`).
+6. Governance operations (`updateParams`, `setTargetBaseXstar`, `pause`, `unpause`) rely on dedicated structs with bounds checks.
 
-## Config Derivation
-- Oracle caps/freshness sourced from `lifinity_pools_oracle_config.json` (wSOL/USDC entry) and translated to seconds.
-- Dynamic fee multipliers & thresholds adapted from `CONFIGURATION_VALUES.md` Lifinity notes.
-- Divergence threshold defaults to 50 bps (aligns with HyperCore/Pyth drift policy).
+## Configuration Source of Truth
+- Defaults live under `config/parameters_default.json` (Lifinity parity).
+- Token + oracle identifiers in `config/tokens.hyper.json` and `config/oracle.ids.json`.
+- Mapping back to Solana bytecode documented in `docs/BYTECODE_ALIGNMENT.md`.
 
-## Extensibility
-- Additional oracle adapters can implement `IOracleAdapterHC` interface and plug into `_readOracle` chain.
-- Fee and inventory parameters adjustable via `updateParams`, wrapped in governance access controls.
-- RFQ path optional; aggregator adapters can integrate via `getTopOfBookQuote` telemetry.
+## Extensibility & Roadmap
+- Swap keepers or routers can rely on `getTopOfBookQuote` for S0 quotes.
+- Additional oracle adapters can implement the shared interfaces and be injected via governance upgrades.
+- RFQ path can be extended to support EIP-712 once signer UX requires it (currently EIP-191 padded).
 
-See `docs/BYTECODE_ALIGNMENT.md` for Solana bytecode ↔ Solidity mapping.
+Consult `docs/CONFIG.md` for parameter management, `docs/OBSERVABILITY.md` for telemetry, and `RUNBOOK.md` for deployment procedures.

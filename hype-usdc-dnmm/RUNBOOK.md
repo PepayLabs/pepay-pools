@@ -1,15 +1,16 @@
 # Deployment Runbook
 
 ## Prerequisites
+- Run `./setup.sh` to provision Node.js 20 + Foundry toolchain locally.
 - Governance multisig and pauser EOAs funded with native HYPE for gas.
 - Verified HyperCore asset/market identifiers and Pyth price IDs populated in `config/oracle.ids.json`.
 - Tokens deployed on HyperEVM with initial protocol-owned liquidity available.
-- Foundry installed locally (`terragon-forge.sh test`).
+- Foundry dependencies installed (`terragon-forge.sh install` invocations as required).
 
 ## 1. Parameter Review
 1. Validate `config/parameters_default.json` against latest risk sign-off.
 2. Confirm token addresses/decimals in `config/tokens.hyper.json`.
-3. Update divergence threshold if governance policy changes.
+3. Document any overrides in release notes and update `docs/CONFIG.md` if defaults evolve.
 
 ## 2. Contract Deployment
 1. `terragon-forge.sh script script/Deploy.s.sol --broadcast --rpc-url <RPC>`
@@ -19,12 +20,12 @@
 ## 3. Seeding Liquidity
 1. Transfer HYPE and USDC into the pool contract proportionally to desired inventory.
 2. Execute `sync()` to align internal reserves.
-3. Call `setTargetBaseXstar` to align with initial deposit split.
+3. Call `setTargetBaseXstar` to align with initial deposit split (ensure price drift ≥ threshold when recentering).
 
 ## 4. Smoke Tests
 - Run `terragon-forge.sh test --match-test testSwapBaseForQuoteHappyPath`.
-- Submit manual swaps with small size via a fork RPC.
-- Verify events through explorer or local indexer.
+- Submit manual swaps with small size via fork RPC.
+- Verify events through explorer or local indexer; confirm `feeBps` / `reason` values align with expectations.
 
 ## 5. RFQ Enablement (Optional)
 1. Deploy `QuoteRFQ` with maker key.
@@ -36,10 +37,11 @@
 - Publish Grafana dashboard using metrics defined in `docs/OBSERVABILITY.md`.
 
 ## 7. Incident Response
-- Use `pause()` to halt swaps on oracle deviation or vault issues.
-- Investigate telemetry, adjust parameters through `updateParams`.
+- Use `pause()` to halt swaps on oracle divergence or vault issues.
+- Investigate telemetry, adjust parameters through `updateParams` (emit new change logs).
 - Unpause once post-mortem complete and governance approves.
 
 ## Appendices
-- See `docs/ORACLE.md` for HyperCore/Pyth wiring.
-- See `SECURITY.md` for threat model and mitigations.
+- `docs/ORACLE.md` – HyperCore/Pyth wiring details.
+- `docs/CONFIG.md` – Parameter file reference.
+- `SECURITY.md` – Threat model and recommended audits.

@@ -1,46 +1,30 @@
 # Fee Surface & Inventory Controls
 
-## Fee Formula
+## Fee Formula (FeePolicy)
+`fee_bps = baseBps + α·conf_bps + β·inventoryDeviationBps`, capped at `capBps`, followed by exponential decay toward `baseBps` each block.
 
-`fee_bps = baseBps + alphaConf * conf_bps + betaInvDev * inventoryDeviationBps`
-
-- `alphaConf = alphaConfNumerator / alphaConfDenominator`
-- `betaInvDev = betaInvDevNumerator / betaInvDevDenominator`
-- Cap the result at `capBps`
-- Post-trade, decay towards `baseBps` via: `fee = base + (fee - base) * (1 - decayPctPerBlock/100)`
+- **α (confidence slope)** → `alphaConfNumerator / alphaConfDenominator` (SOL/USDC parity: 0.60).
+- **β (inventory slope)** → `betaInvDevNumerator / betaInvDevDenominator` (SOL/USDC parity: 0.10).
+- **Decay** → `decayPctPerBlock` (20% per block by default). Implemented via scaled exponentiation in `FeePolicy`.
+- **State**: `FeePolicy.FeeState` caches last fee + block to ensure accurate decay before recomputation.
+- **Observability**: `SwapExecuted` emits `feeBps`, allowing dashboards to reconstruct effective fees; extend analytics to derive component breakdown off-chain using oracle/conf inputs.
 
 ## Confidence (`conf_bps`)
+- Derived from HyperCore spread (primary) or Pyth confidence (fallback).
+- Capped at `confCapBpsSpot` (quotes) or `confCapBpsStrict` (strict mode, e.g. RFQ) from configuration.
 
-- Primary: `spreadBps` from HyperCore top-of-book.
-- Clamp with `confCapBpsSpot` for quoting, `confCapBpsStrict` for swaps when `OracleMode.Strict` is requested.
+## Inventory Deviation (`Inventory.deviationBps`)
+- `|baseReserves - targetBaseXstar| / poolNotional × 10_000` using latest mid price.
+- `targetBaseXstar` updates only when price change exceeds `recenterThresholdPct` (7.5% default).
 
-## Inventory Deviation
+## Floors & Partial Fills (`Inventory` Library)
+- `floorBps` reserves safeguarded per side (default 3%).
+- `Inventory.quoteBaseIn` / `quoteQuoteIn` ensure post-trade reserves stay above floor; if not, they compute maximal safe input and flag partial fills.
+- `SwapExecuted` carries `partial=true` with `reason="FLOOR"` so telemetry can track liquidity exhaustion.
 
-- `inventoryDeviationBps = |baseReserves - targetBaseXstar| * 10_000 / totalNotional`
-- `totalNotional` approximated using the latest mid price and reserves.
-- `targetBaseXstar` updates only when price change >= `recenterThresholdPct`.
+## Implementation Notes
+- All math uses `FixedPointMath` (wad + bps) to match Solana big-int semantics.
+- `Errors.FLOOR_BREACH` protects against attempts that would empty the vault.
+- Governance may tune α/β/cap/decay via `updateParams(ParamKind.Fee, ...)`; bounds checks ensure cap ≥ base and decay ≤ 100.
 
-## Floors & Partial Fills
-
-- `floorBps` ensures we keep at least that fraction of reserves on both sides.
-- For a desired input `amountIn`, we solve for the maximum size that leaves `floorBps` intact; if smaller than requested, return the partial max.
-- Emit `SwapExecuted` with `partial = true` and detail the reason (e.g., `FloorGuard`).
-
-## Fee State Machine
-
-- `lastFeeBps` caches the most recent computed fee.
-- `lastFeeUpdateBlock` records when it was last recalculated.
-- Each `swapExactIn` first decays `lastFeeBps` using block difference, then recomputes the new value.
-
-## Governance Controls
-
-- `updateParams` allows governance to update Oracle/Fee/Inventory/Maker config structs atomically per category.
-- Guards enforce reasonable bounds (e.g., `capBps >= baseBps`, `floorBps <= 5_000`).
-
-## Telemetry
-
-Track via events + off-chain analytics:
-
-- `fee_bps` time series vs. `conf_bps` and `inventoryDeviationBps`
-- Partial-fill counts / proportions
-- Aggregated LP fee capture net of partial rejections
+Refer to `test/unit/FeePolicy.t.sol` and `test/unit/Inventory.t.sol` for coverage of these behaviours.

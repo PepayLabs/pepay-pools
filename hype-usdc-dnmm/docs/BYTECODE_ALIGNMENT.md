@@ -8,7 +8,7 @@
 | `FUN_ram_00014620` (recenter) | Updates target inventory once oracle drift > threshold | `DnmPool.setTargetBaseXstar` + deviation checks | Threshold pulled from config `recenterThresholdPct`. |
 | `FUN_ram_00015b80` (fee decay) | Exponential decay of dynamic fee toward baseline | `FeePolicy.preview` / `FeePolicy.settle` | Utilises per-block decay with α/β components. |
 | `FUN_ram_00017140` (EMA fallback) | If spot fails, load EMA window and reuse solver | `_readOracle` EMA branch gated by `allowEmaFallback` | Divergence vs Pyth enforced before swap proceeds. |
-| `FUN_ram_00019590` (partial fill guard) | Solve quadratic to leave liquidity floor | `Inventory.quoteBaseIn` / `Inventory.quoteQuoteIn` | All rounding uses `FixedPointMath` to mirror Solana big-int ops. |
+| `FUN_ram_00019590` (partial fill guard) | Solve quadratic to leave liquidity floor | `Inventory.quoteBaseIn` / `Inventory.quoteQuoteIn` | Uses `FixedPointMath` for deterministic scaling and matches Solana big-int ops. |
 | `FUN_ram_0001c050` (event emit) | Emit swap + fee telemetry | `SwapExecuted` / `QuoteServed` events | Event fields mirror Solana logging schema. |
 
 ## Gap Review

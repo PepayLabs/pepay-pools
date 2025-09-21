@@ -106,7 +106,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 amountOut,
         uint256 mid,
         uint256 feeBps,
-        bool partial,
+        bool isPartial,
         bytes32 reason
     );
 
@@ -192,10 +192,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         QuoteResult memory result = _quoteInternal(amountIn, isBaseIn, mode, oracleData, true);
 
         uint256 actualAmountIn = amountIn;
-        bool partial = false;
+        bool isPartial = false;
         if (result.partialFillAmountIn > 0 && result.partialFillAmountIn < amountIn) {
             actualAmountIn = result.partialFillAmountIn;
-            partial = true;
+            isPartial = true;
         }
 
         amountOut = result.amountOut;
@@ -227,7 +227,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             amountOut,
             result.midUsed,
             result.feeBpsUsed,
-            partial,
+            isPartial,
             result.reason
         );
     }
@@ -389,9 +389,9 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             quoteScale: tokenConfig.quoteScale
         });
 
-        bool partial;
+        bool didPartial;
         if (isBaseIn) {
-            (amountOut, appliedAmountIn, partial) = Inventory.quoteBaseIn(
+            (amountOut, appliedAmountIn, didPartial) = Inventory.quoteBaseIn(
                 amountIn,
                 mid,
                 feeBps,
@@ -402,9 +402,9 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             if (appliedAmountIn > amountIn) {
                 appliedAmountIn = amountIn;
             }
-            reason = partial ? REASON_FLOOR : REASON_NONE;
+            reason = didPartial ? REASON_FLOOR : REASON_NONE;
         } else {
-            (amountOut, appliedAmountIn, partial) = Inventory.quoteQuoteIn(
+            (amountOut, appliedAmountIn, didPartial) = Inventory.quoteQuoteIn(
                 amountIn,
                 mid,
                 feeBps,
@@ -415,7 +415,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             if (appliedAmountIn > amountIn) {
                 appliedAmountIn = amountIn;
             }
-            reason = partial ? REASON_FLOOR : REASON_NONE;
+            reason = didPartial ? REASON_FLOOR : REASON_NONE;
         }
     }
 

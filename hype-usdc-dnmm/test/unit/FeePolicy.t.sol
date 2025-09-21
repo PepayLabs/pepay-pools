@@ -11,34 +11,52 @@ contract FeePolicyTest is Test {
 
     function setUp() public {
         cfg = FeePolicy.FeeConfig({
-            baseBps: 15,
+            baseBps: 25,
             alphaConfNumerator: 60,
             alphaConfDenominator: 100,
-            betaInvDevNumerator: 10,
+            betaInvDevNumerator: 12,
             betaInvDevDenominator: 100,
-            capBps: 150,
+            capBps: 250,
             decayPctPerBlock: 20
         });
     }
 
-    function testBaseFeeNoSignals() public {
+    function test_fee_base_only_calm() public {
         (uint16 feeBps, FeePolicy.FeeState memory newState) = FeePolicy.preview(state, cfg, 0, 0, block.number);
-        assertEq(feeBps, 15);
-        assertEq(newState.lastFeeBps, 15);
+        assertEq(feeBps, cfg.baseBps, "base fee");
+        assertEq(newState.lastFeeBps, cfg.baseBps, "state last fee");
     }
 
-    function testFeeCapsWithSignals() public {
-        (uint16 feeBps,) = FeePolicy.preview(state, cfg, 500, 5000, block.number);
-        assertEq(feeBps, 150, "should cap to max");
+    function test_fee_slopes_monotonic_conf() public {
+        (uint16 feeLow,) = FeePolicy.preview(state, cfg, 10, 0, block.number);
+        (uint16 feeHigh,) = FeePolicy.preview(state, cfg, 100, 0, block.number);
+        assertGt(feeHigh, feeLow, "fee should increase with conf");
     }
 
-    function testDecayTowardBase() public {
+    function test_fee_slopes_monotonic_inventory() public {
+        (uint16 feeLow,) = FeePolicy.preview(state, cfg, 0, 100, block.number);
+        (uint16 feeHigh,) = FeePolicy.preview(state, cfg, 0, 1000, block.number);
+        assertGt(feeHigh, feeLow, "fee should increase with inventory deviation");
+    }
+
+    function test_fee_cap_enforced() public {
+        (uint16 feeHigh,) = FeePolicy.preview(state, cfg, 30_000, 40_000, block.number);
+        assertEq(feeHigh, cfg.capBps, "fee capped");
+    }
+
+    function test_fee_decay_over_blocks() public {
         state.lastBlock = uint64(block.number);
-        state.lastFeeBps = 150;
+        state.lastFeeBps = 200;
 
-        // advance two blocks
-        (uint16 feeAfter,) = FeePolicy.preview(state, cfg, 0, 0, block.number + 2);
-        assertLt(feeAfter, 150);
-        assertGt(feeAfter, 15);
+        // After 3 blocks with zero signals we should decay toward base
+        (uint16 feeNext,) = FeePolicy.preview(state, cfg, 0, 0, block.number + 3);
+        assertLt(feeNext, 200, "decayed");
+        assertGe(feeNext, cfg.baseBps, "not below base");
+    }
+
+    function test_settle_updates_state() public {
+        uint16 fee = FeePolicy.settle(state, cfg, 200, 300);
+        assertEq(state.lastFeeBps, fee, "state updated");
+        assertEq(state.lastBlock, uint64(block.number), "block updated");
     }
 }

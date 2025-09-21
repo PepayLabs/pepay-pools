@@ -46,7 +46,7 @@ library Inventory {
         uint256 quoteReserves,
         uint16 floorBps,
         Tokens memory tokens
-    ) internal pure returns (uint256 amountOut, uint256 appliedAmountIn, bool partial) {
+    ) internal pure returns (uint256 amountOut, uint256 appliedAmountIn, bool isPartial) {
         uint256 amountInWad = FixedPointMath.mulDivDown(amountIn, ONE, tokens.baseScale);
         uint256 grossQuoteWad = FixedPointMath.mulDivDown(amountInWad, mid, ONE);
         uint256 feeWad = FixedPointMath.mulDivDown(grossQuoteWad, feeBps, BPS);
@@ -61,7 +61,7 @@ library Inventory {
 
         require(availableQuote > 0, Errors.FLOOR_BREACH);
         amountOut = availableQuote;
-        partial = true;
+        isPartial = true;
 
         uint256 netQuoteWadPartial = FixedPointMath.mulDivDown(amountOut, ONE, tokens.quoteScale);
         uint256 grossQuoteWadPartial = FixedPointMath.mulDivUp(netQuoteWadPartial, BPS, BPS - feeBps);
@@ -77,7 +77,7 @@ library Inventory {
         uint256 baseReserves,
         uint16 floorBps,
         Tokens memory tokens
-    ) internal pure returns (uint256 amountOut, uint256 appliedAmountIn, bool partial) {
+    ) internal pure returns (uint256 amountOut, uint256 appliedAmountIn, bool isPartial) {
         uint256 amountInWad = FixedPointMath.mulDivDown(amountIn, ONE, tokens.quoteScale);
         uint256 grossBaseWad = FixedPointMath.mulDivDown(amountInWad, ONE, mid);
         uint256 feeWad = FixedPointMath.mulDivDown(grossBaseWad, feeBps, BPS);
@@ -92,7 +92,7 @@ library Inventory {
 
         require(availableBase > 0, Errors.FLOOR_BREACH);
         amountOut = availableBase;
-        partial = true;
+        isPartial = true;
 
         uint256 netBaseWadPartial = FixedPointMath.mulDivDown(amountOut, ONE, tokens.baseScale);
         uint256 grossBaseWadPartial = FixedPointMath.mulDivUp(netBaseWadPartial, BPS, BPS - feeBps);

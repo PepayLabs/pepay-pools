@@ -1,0 +1,3170 @@
+[
+  {
+    "amm": "EoPqvR5ZcjiSeJWBfgo4cCwVxnv1gbqSwsXVKnxJVhix",
+    "pair": "wSOL/USDC",
+    "tokens": {
+      "A": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "7KV21Fmj2jUGvDdvL6ZeFacAWn3qZAUygo2NeTyAGVVZ",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "9hPWo9AKktZMHL9yRNXiVVFf8SwxYfG6j7M19No6Fxcv",
+      "tokenBAccount": "7BHm3ELjrKSmqxUMGsgNHkLwdP2yfB6QchMXigwavYuv",
+      "feeAccount": "FuihrjmkoMw7bzb3xoMKJcR6NrH1GDN9kkWWz7MC7Ag8"
+    },
+    "oracles": {
+      "main": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "sub": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "pc": "3ZDBff7jeQaksmGvmkRix36rU159EBDjYiPThvV8QVZM"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 0,
+      "freezeDeposit": 0,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 40000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "100000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "0"
+    }
+  },
+  {
+    "amm": "C1BUm2XpdEsjxM7wt8PJAFr3a11ccgZAoyw9Z3SBJcnL",
+    "pair": "HZ1J/USDC",
+    "tokens": {
+      "A": {
+        "mint": "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "8T6xPiUvyc1UYNBmnFhSTxvreXnGWKZvpD2EbiNnndfS",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "8HpaEA1FBVSxyUdi7w6RvgCAJnNCefoun3K6vD1KLPpg",
+      "tokenBAccount": "GNoB8BoDshfYvBRPKXp2WJyT9FMrY4LQrwFgv6a4nWyj",
+      "feeAccount": "5y2bSLUBxvHvpJUoQaMnFdSgK95hgb9p47tALGR9spwQ"
+    },
+    "oracles": {
+      "main": "2pf6tR5mR2W2s6acNZQ12qs7iq2oct37Va97nRy8HN2N",
+      "sub": "nrYkQQQur7z8rYTST3G9GqATviK5SxTDkrqd21MW6Ue",
+      "pc": "7KUAAbkDDGfu7Z5WeEMx4Tv34wqh8a97SN7RZq3DR4L2"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 40,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "100"
+      },
+      "priceBufferCoin": "-200",
+      "priceBufferPc": "200",
+      "rebalanceRatio": "20000000",
+      "feeTrade": "0",
+      "feePlatform": "5615473339060"
+    }
+  },
+  {
+    "amm": "3vDszXV9ei8cqmCw697L2MtPecfDqgnbdxLYmKjemZEp",
+    "pair": "bSOL/USDT",
+    "tokens": {
+      "A": {
+        "mint": "bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1",
+        "symbol": "bSOL",
+        "name": "BlazeStake Staked SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "symbol": "USDT",
+        "name": "Tether USD",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "EC72sBYcXUEkBzTqzTXGwXaoiP4nFFMp8nfQQc5JLdUz",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "AWJbQzGfnMbfRfpPGBY5P7YXkYExfxz39FCmKBBFV49s",
+      "tokenBAccount": "F12yeZr3y999aMYZvXHLs58ZkJaJyj4FDWZqsyShY6G4",
+      "feeAccount": "DbTVQrCzG1JYjuvtfiBngq3xM7cGrQzPvxvBy1bfTPWB"
+    },
+    "oracles": {
+      "main": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "sub": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "pc": "He7YiRgp1vyj3kznjbBFkhMgye4SuAqZ1ztoB7g4LWu3"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 400,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "1000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "200000",
+      "feeTrade": "0",
+      "feePlatform": "0"
+    }
+  },
+  {
+    "amm": "Cx8eWxJAaCQAFVmv1mP7B2cVie2BnkR7opP8vUh23Wcr",
+    "pair": "wSOL/USDC",
+    "tokens": {
+      "A": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "EJhqXKJEncSx1HJjS5ZpKdiKGGgLiRgNPvo8JZvw5Guj",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "Bhi2nPWnHv2ZV6rFDJc2Xepj6ufkdFZsUs24DAozNzCP",
+      "tokenBAccount": "Cqs1j5n7mJ8sCaa15FRAYrYmtDktKL3itBQzjangscB3",
+      "feeAccount": "E8Bw6Zt6NxjaHmHyhkXsq4UiLbHzicLKmhUAfCz1bgdU"
+    },
+    "oracles": {
+      "main": "8RVPH46opPd3qLy1n1djntzGMZxnqEzbYs9uoeixdnwk",
+      "sub": "8RVPH46opPd3qLy1n1djntzGMZxnqEzbYs9uoeixdnwk",
+      "pc": "7KX5bLSyGRUDjWnmKDpnCKNfsrM9Yc1ueMBwuHnJw3kU"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 0,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 1
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 40000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "100000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "2837561087465"
+    }
+  },
+  {
+    "amm": "DC8b8T6RRVfVCGh5M611tMkZVxVfPj8MXY2PyXTTieKj",
+    "pair": "7i5K/USDC",
+    "tokens": {
+      "A": {
+        "mint": "7i5KKsX2weiTkry7jA4ZwSuXGhs5eJBEjY8vVxR4pfRx",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "7dJp9FBbsK76xWhtNjJRu8Y6kkxBY5gR9WcsLbZpGyuz",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "89yKachaSXnue5eExiKT5HGEEsdCQxwu8qALZzA3Nhdd",
+      "tokenBAccount": "DeieoHtNRTWXQhPMfXvDbLAMDQjPyHSaSkzkj5BVMofv",
+      "feeAccount": "4oxNEVNVDshmbx1RzZUs3tJFtHf7kxBujY8Lq3b1vmhy"
+    },
+    "oracles": {
+      "main": "6rM17ntRqb5eynwsSvTRJeFGJAff1PADvw4R2sH6QtFZ",
+      "sub": "DZYZkJcFJThN9nZy4nK3hrHra1LaWeiyoZ9SMdLFEFpY",
+      "pc": "8mtpyEX9WdrKXiqHufHdUH17ewE9j7dCH1NMShYD6Mbs"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 4000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "10000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "200000",
+      "feeTrade": "0",
+      "feePlatform": "4345870752094"
+    }
+  },
+  {
+    "amm": "DxibGjCDKBmsFpisqxYYRrpx9R22eb1yzSePc3vSXjEZ",
+    "pair": "BONK/wSOL",
+    "tokens": {
+      "A": {
+        "mint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+        "symbol": "BONK",
+        "name": "Bonk",
+        "decimals": 5,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "5m5spKrcCL9hBhocbMHTgwLb9P47qxXw4j5XiwYdYMFa",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "GwZKKHPcgFSqkUE6kBENBUPgtPeekGCVb2kqKyNxbmHB",
+      "tokenBAccount": "EHiY6sxKN9bFv5S8zVBMCTjU6EUFQFZr1MqLReJ8nneF",
+      "feeAccount": "AMcy5K6SMGEg1imn2kw4mu55AR3N1s5cXdfoj5Xi6Sth"
+    },
+    "oracles": {
+      "main": "2dAoyGLoeFrcdZ5KhSSAtPh4R6xaJVxbipxKgG6qjU2g",
+      "sub": "2dAoyGLoeFrcdZ5KhSSAtPh4R6xaJVxbipxKgG6qjU2g",
+      "pc": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 200,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 48,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "120"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "200000",
+      "feeTrade": "0",
+      "feePlatform": "3210272287190"
+    }
+  },
+  {
+    "amm": "DGtdcYvEitDr2FbSMeKmtSwFRQVFR4w9ZVVA7MqneaVK",
+    "pair": "Eche/USDC",
+    "tokens": {
+      "A": {
+        "mint": "EchesyfXePKdLtoiZSL8pBe8Myagyy8ZRqsACNCFGnvp",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "ELXVBcN1T47aPMyGkyJPAUVj6Lb1ZgyPtc1avim9y6qu",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "BRMXPLFs2ecKkBSSyPzHhAz2zDqLHuCuXpQGpy2iVYGU",
+      "tokenBAccount": "6xqJrebZjmQ3XB9FcTB5Djhpk3QBxSCFsPTaAf9d9kCv",
+      "feeAccount": "C9zRcEtvRrEkQoKWkpcUYvtjddiDrHrDAzbbWon7xJiq"
+    },
+    "oracles": {
+      "main": "4eUCVYhyCRcZWLmoensEZfCJSv48eoPZGKHAbjTNTkAu",
+      "sub": "4eUCVYhyCRcZWLmoensEZfCJSv48eoPZGKHAbjTNTkAu",
+      "pc": "8qfPfB7kMBcd2yVJ59HMmemWoaTkuaYRp1tHPxwZC7cA"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 1440,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 4000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "3600",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "10000"
+      },
+      "priceBufferCoin": "-2",
+      "priceBufferPc": "2",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "7008166387320"
+    }
+  },
+  {
+    "amm": "DWJTcecCWA7H9ni9ykFA8s98bUqR9VKmqiQdGzpknJMw",
+    "pair": "rndr/USDC",
+    "tokens": {
+      "A": {
+        "mint": "rndrizKT3MK1iimdxRdWabcF7Zg7AR5T4nud4EkHBof",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "7FtkCsHGTjM1JLTSm2DojBrvMsL5DeHzG7vYPWQ7MEhX",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "3GJBNH5f1UbDkx7QU5NZ2hN8BvPpmhC2k7NrSGcPFJ1k",
+      "tokenBAccount": "2HVgjebmGW7dk36QtBpgPejLw2YU65sfndc91kaEEx4J",
+      "feeAccount": "8FNL4fTEfQvk2KRj1spYyrF2u1T7qyNJCvc9Kj9qQCH1"
+    },
+    "oracles": {
+      "main": "3LmVs5SXVrP4GS53ecZnAzDZ8irtNFoYpVy5xLGxkg3p",
+      "sub": "CYGfrBJB9HgLf9iZyN4aH5HvUAi2htQ4MjPxeXMf4Egn",
+      "pc": "BL9kH294QmBaaCQ5xnFhWVVGw8HKPyQNjtwCJirURtSP"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 4000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "10000"
+      },
+      "priceBufferCoin": "-20000",
+      "priceBufferPc": "-20000",
+      "rebalanceRatio": "20000000",
+      "feeTrade": "0",
+      "feePlatform": "774554744944"
+    }
+  },
+  {
+    "amm": "8Eutqc134NDhXDwXitJiAeHkVAkNro9psgbmPzgYDZLe",
+    "pair": "7GCi/USDC",
+    "tokens": {
+      "A": {
+        "mint": "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "FGPYaW5HRuMhw9y68UHSecA6mLdc3JbLfdvq11DZePRH",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "9xNYopD8DTGm2M489XavdnMshBYA81RqJeEPoTUB6sNL",
+      "tokenBAccount": "HzFLZptVPTGd3bj1fNQXeUbpUxVm6t8f9i1BsuLo41zj",
+      "feeAccount": "GbbjF9fnx6dRjqcbEbkuRPRd41r3CgSue8av4sad79rX"
+    },
+    "oracles": {
+      "main": "5A2LoA3rHP51WDfGVKbrmrDkeTLVBTiV4uvjJBDKHK2X",
+      "sub": "5A2LoA3rHP51WDfGVKbrmrDkeTLVBTiV4uvjJBDKHK2X",
+      "pc": "FVAouryrBKKtgSf4jBqU5UwuwwrT6TUniSwQC7TJXDTK"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 1,
+      "capBpsPc": 1,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 4000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "10000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "9134557312188"
+    }
+  },
+  {
+    "amm": "7MYifAntKJ4Xn6ex6A8cqUYV9wxisaXo29rdSazxpEyq",
+    "pair": "WEN/USDC",
+    "tokens": {
+      "A": {
+        "mint": "WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk",
+        "symbol": "WEN",
+        "name": "Wen",
+        "decimals": 5,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "CF5aKjbJMiwE6qYL2dwXs5jUAdCT2NMx3hK4xVczeht3",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "BBwNBUc55VzaZ3XfJAFX82rs6Lg61u4i7odAQDcW84ky",
+      "tokenBAccount": "8q5Zg6XSTzfnGsXf6JuJXLdv7iRGWWQUN4EfNN4zRDni",
+      "feeAccount": "6fnYkCTpH4hkSco2RawVnfL4Yxm6iLp5R6mWnj9zqJDG"
+    },
+    "oracles": {
+      "main": "6Uo93N83iF5U9KwC8eQpogx4XptMT4wSKfje7hB1Ufko",
+      "sub": "6Uo93N83iF5U9KwC8eQpogx4XptMT4wSKfje7hB1Ufko",
+      "pc": "FVAouryrBKKtgSf4jBqU5UwuwwrT6TUniSwQC7TJXDTK"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 4000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "10000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "0"
+    }
+  },
+  {
+    "amm": "8x9ji3HY32KJUU2fLt6fhq11BHUtWuJ2NSLXY4YNCrda",
+    "pair": "HNT/USDC",
+    "tokens": {
+      "A": {
+        "mint": "hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux",
+        "symbol": "HNT",
+        "name": "Helium",
+        "decimals": 8,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "Z9kajLKn8XjFquGtNueVWvQ3nymmyVDN77quwxbA1ZH",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "HMezMpEaEWLkeuPYSBKUuDMbWCbwJjVDG5fMG5dcQMST",
+      "tokenBAccount": "GPhCuBp6kXGcC6LCTKyPFzjDe2N9heVA8dFC7fn6u1nQ",
+      "feeAccount": "Cj4euHpQcWF3bg1zf3oA4fQVj2EnNcDepkLGBTeMzTDi"
+    },
+    "oracles": {
+      "main": "6NnYizPYK5sQVRdmxLyjHAYmwu9PjYTUpGdvQ3MKFGBj",
+      "sub": "6NnYizPYK5sQVRdmxLyjHAYmwu9PjYTUpGdvQ3MKFGBj",
+      "pc": "FVAouryrBKKtgSf4jBqU5UwuwwrT6TUniSwQC7TJXDTK"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 200,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 40000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "100000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "200000",
+      "feeTrade": "0",
+      "feePlatform": "2198979653591"
+    }
+  },
+  {
+    "amm": "3ysRB9zQrdA81dsEN4ba1e4qdqLZEgNGhbMfzXeppZZL",
+    "pair": "85VB/USDC",
+    "tokens": {
+      "A": {
+        "mint": "85VBFQZC9TZkfaptBWjvUw7YbZjy52A6mjtPGjstQAmQ",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "CpRBhU9WAL6kDTCZwJv5jViUbJ9RRMEvHJ4YXF8mTsqb",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "3r7kDUAQB7ugZgtAWmC26TU9Xeq9qRdLt4Ffsej9eXcV",
+      "tokenBAccount": "At8zJhkM6wk4xo2d82CzwB9i3EbEB3kcTF7NU8DGjizM",
+      "feeAccount": "58YkbozLEaTBWhWirYL8pCFXLv5FE1ytmsTCcNxzBFHc"
+    },
+    "oracles": {
+      "main": "H9j8CT1bFiWHaZUPMooEaxMRHdWdJ5T9CzFn41z96JHW",
+      "sub": "H9j8CT1bFiWHaZUPMooEaxMRHdWdJ5T9CzFn41z96JHW",
+      "pc": "FVAouryrBKKtgSf4jBqU5UwuwwrT6TUniSwQC7TJXDTK"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 12,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 4000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "30",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "10000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "200000",
+      "feeTrade": "0",
+      "feePlatform": "0"
+    }
+  },
+  {
+    "amm": "8kJ7Jgv8dmoLqRGB1XDLsrKNbfi5nuMgPo9gXqPedM8w",
+    "pair": "85VB/USDC",
+    "tokens": {
+      "A": {
+        "mint": "85VBFQZC9TZkfaptBWjvUw7YbZjy52A6mjtPGjstQAmQ",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "9NHMvgPDPPA5baJ8GszremJxgjjpfdsWRpFdbPQGvsu8",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "6wV3dBvSS87KdzS9URy8ej9ZNm9bbSnxNTRtw872KmuD",
+      "tokenBAccount": "F8DJSCDHBa7WEV8yoVFPLwKGuf9jDTsbY3dMkBotmhHD",
+      "feeAccount": "CspWypJqebKQDqTotgiNyFXxfBR4uboFneMvSM5HWc7N"
+    },
+    "oracles": {
+      "main": "H9j8CT1bFiWHaZUPMooEaxMRHdWdJ5T9CzFn41z96JHW",
+      "sub": "H9j8CT1bFiWHaZUPMooEaxMRHdWdJ5T9CzFn41z96JHW",
+      "pc": "FVAouryrBKKtgSf4jBqU5UwuwwrT6TUniSwQC7TJXDTK"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 4000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "10000"
+      },
+      "priceBufferCoin": "-5",
+      "priceBufferPc": "5",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "47739047197"
+    }
+  },
+  {
+    "amm": "AA3dbng9wdvLxwktdsfk5SsNE6SdJk1wNBEYho6xS1Cy",
+    "pair": "HNT/wSOL",
+    "tokens": {
+      "A": {
+        "mint": "hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux",
+        "symbol": "HNT",
+        "name": "Helium",
+        "decimals": 8,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "FPpmfXwnr7sneQLE92X2QNG3KruMdpFkAbugJhEVansa",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "AN13M5ErMhDZDP3prRgFgiuLNJcs9dADCiro9YQ2ADwU",
+      "tokenBAccount": "Cqcknexd4Xid1biKvqx38iam96fsVdRQGPeiZNLBXFop",
+      "feeAccount": "HxRRC5i2ThPXqLMpw8tknUKL2QSfvyZda8FFguoHmyQS"
+    },
+    "oracles": {
+      "main": "6NnYizPYK5sQVRdmxLyjHAYmwu9PjYTUpGdvQ3MKFGBj",
+      "sub": "6NnYizPYK5sQVRdmxLyjHAYmwu9PjYTUpGdvQ3MKFGBj",
+      "pc": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 200,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 48,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "120"
+      },
+      "priceBufferCoin": "-15",
+      "priceBufferPc": "-15",
+      "rebalanceRatio": "200000",
+      "feeTrade": "0",
+      "feePlatform": "929308702599"
+    }
+  },
+  {
+    "amm": "4BCuULvEVFLqGyiWDqUU42ao1C6YtV7oMNtNbfFmS1SU",
+    "pair": "jupS/USDC",
+    "tokens": {
+      "A": {
+        "mint": "jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "9mmSTCdTtLBNXokYxk67evU8FtMR9Tg414kT8m8FGtxy",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "3avB3RNHGWobsaks8THEiTJ8kf6xfAVFppBXMssQUCpN",
+      "tokenBAccount": "4QDyeb7BYc45p9LqJmd1wtKKUf2RNSiu5rDfzkW1mn5W",
+      "feeAccount": "8knN1ukc2ZxhAv7QueeMheP6F4yVtM92Bd21xu91P9xN"
+    },
+    "oracles": {
+      "main": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "sub": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "pc": "4VrjUJ7QyU3o5oxNE2LgnJDtryT7PfApD5Zw2PX8QPsh"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 0,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 1,
+      "capBpsPc": 1,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 4000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "10000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "81812585569"
+    }
+  },
+  {
+    "amm": "Az6u7Aw3Es5SwpaVsELTbfavgJ6itMr9PyruaTuaqH7w",
+    "pair": "JTO/USDC",
+    "tokens": {
+      "A": {
+        "mint": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+        "symbol": "JTO",
+        "name": "Jito",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "4SW3eT6jKNcyVU9JVsKuVaRmFmvARaKT9b7j25RcGSg7",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "DAxvtD3GqHZiBDRnmAgj8pKdSuXktuj24Bvdgh7uB4y3",
+      "tokenBAccount": "Dy8bkUCxxXAnXbFBvuXK6krg9yuBtKbPqSJTSsFh5E25",
+      "feeAccount": "HpSqmdtRYGVHeZXuFYE7EzEsT28W1A6NxLSCYL1S7pUx"
+    },
+    "oracles": {
+      "main": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "sub": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "pc": "EJmz5AfotebZzT6ymP4T2Jk23yQtyCnZdskBJNzfymXy"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 0,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 1
+    },
+    "oracleConfig": {
+      "capBpsSub": 1,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 400,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "1000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "1811072321330"
+    }
+  },
+  {
+    "amm": "7GXdv2r3fEuzAwEBZwtNoEjgFfrZdtHyNKBTLYfFwaAM",
+    "pair": "JUP/wSOL",
+    "tokens": {
+      "A": {
+        "mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+        "symbol": "JUP",
+        "name": "Jupiter",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "82hgVmoQ9CN6JvzK8YLfj92PUxFiM8XU9Yb35TkYx9wE",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "FZ1RGZDWvPJwkyS7nqV7YL5mkwvijPX9fjAnWgR2z6ew",
+      "tokenBAccount": "9fpZFthu9Mre1foZQ8hr5q1j6wgSCAC21ag7X2JR3tU9",
+      "feeAccount": "AUUPiT3V9DkvEVrS84rnZVG6bdw3iJywTUAg9rzbvcQK"
+    },
+    "oracles": {
+      "main": "JCQZijF7jLWqUCrA5bp3wfUfy5WKsoSvYT5BuQUKWRr1",
+      "sub": "JCQZijF7jLWqUCrA5bp3wfUfy5WKsoSvYT5BuQUKWRr1",
+      "pc": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72.4,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 48,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "1",
+        "subLimit": "25",
+        "pcLimit": "120"
+      },
+      "priceBufferCoin": "200",
+      "priceBufferPc": "3500",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "21501342877810"
+    }
+  },
+  {
+    "amm": "FuTkxuFrEkjj61FPpW3KGBX8287bb2Bhj4ZnLVsYRgJ4",
+    "pair": "wSOL/USDT",
+    "tokens": {
+      "A": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "symbol": "USDT",
+        "name": "Tether USD",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "YVSaKfvkYT4SnGdUpXpGJ6EdnSTo1wsJue9xAi92DE6",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "AYUiY8PBEtn1GSJF1REro4aYyBU1BDwWy1qDzG6Qxjgz",
+      "tokenBAccount": "FB5jqofnFZzNo5yvWPNUNnrrfjG7mNFf2C6BxVfJJcve",
+      "feeAccount": "FBYA4EbHzn15Pev96CfPvctDtTVGMW43mhvwJn9NRYbM"
+    },
+    "oracles": {
+      "main": "8RVPH46opPd3qLy1n1djntzGMZxnqEzbYs9uoeixdnwk",
+      "sub": "8RVPH46opPd3qLy1n1djntzGMZxnqEzbYs9uoeixdnwk",
+      "pc": "3ZDBff7jeQaksmGvmkRix36rU159EBDjYiPThvV8QVZM"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 0,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 1
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 40000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "100000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "847392615702"
+    }
+  },
+  {
+    "amm": "5zvhFRN45j9oePohUQ739Z4UaSrgPoJ8NLaS2izFuX1j",
+    "pair": "wSOL/USDT",
+    "tokens": {
+      "A": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "symbol": "USDT",
+        "name": "Tether USD",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "Cas7mdvJurYRD7gRa4pjXCYVngyuwBbmArVnxrUzX4JZ",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "3AoQxt2k9PYcesFxYWdKSBpJpPtmDZEXdJpw8SgJLJMb",
+      "tokenBAccount": "F7SK4t9JXn9Wx9YyKHqSECTSk3dYja2UdGXsyzxJwcdk",
+      "feeAccount": "7jt7KQ9ZDybYCSk7Mf7XpAad7Mc7NQbSzShFo2FU13Bd"
+    },
+    "oracles": {
+      "main": "8RVPH46opPd3qLy1n1djntzGMZxnqEzbYs9uoeixdnwk",
+      "sub": "8RVPH46opPd3qLy1n1djntzGMZxnqEzbYs9uoeixdnwk",
+      "pc": "3ZDBff7jeQaksmGvmkRix36rU159EBDjYiPThvV8QVZM"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 0,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 1
+    },
+    "oracleConfig": {
+      "capBpsSub": 1,
+      "capBpsPc": 1,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 40000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "100000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "242218210",
+      "feePlatform": "289566479545"
+    }
+  },
+  {
+    "amm": "4vPPqa6s3zBi3hhZ1oYDkMU7XTaYNb3C51Cu4B2M6KMP",
+    "pair": "mSOL/wSOL",
+    "tokens": {
+      "A": {
+        "mint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+        "symbol": "mSOL",
+        "name": "Marinade Staked SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "CBSyhPDPSyMoCiCLi4k54jwZWkAPRTbyEaVBPfpjbJyS",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "5wZ8cvwvsBrtVGX2v8ojTkYmqe44Px3DTda5HWFFXgbV",
+      "tokenBAccount": "8WViD7SpXD2WjsRzRdy1dAgSqeTH6T4SKzNfmUWpufnr",
+      "feeAccount": "9KfxmRtmVUbBmdVxoTLTeB8MF6Q3RqrTEu5TW1N5QwSF"
+    },
+    "oracles": {
+      "main": "3yqKF9hsqVPa8Mwgh18ZKVLgqSDumu8CURR4RDadXx7V",
+      "sub": "3yqKF9hsqVPa8Mwgh18ZKVLgqSDumu8CURR4RDadXx7V",
+      "pc": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 200,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 40,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "100"
+      },
+      "priceBufferCoin": "-2000",
+      "priceBufferPc": "1000",
+      "rebalanceRatio": "10000000",
+      "feeTrade": "0",
+      "feePlatform": "41431865256"
+    }
+  },
+  {
+    "amm": "5aA49noLf1Npt4cVWT4CAKqZhSQYYpSfy64Sv3rJdenS",
+    "pair": "stSOL/USDT",
+    "tokens": {
+      "A": {
+        "mint": "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj",
+        "symbol": "stSOL",
+        "name": "Lido Staked SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "symbol": "USDT",
+        "name": "Tether USD",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "7thU97STYodyB1N6EBod4d1ZUZaT5NioYoqddHvNr7u2",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "Cz2XEzxJLhm6GFPF8Jvgt8pYptAgn5tqdzHUrZr1BNqt",
+      "tokenBAccount": "D4gReMNn1RQfFCYtLKrKmXTBJqSuKSjUS6AGpZwtn6p6",
+      "feeAccount": "7QtMkw4NeDKyF4zTKkUjX5C4VWYqkJ97BTPpkbVGXhs7"
+    },
+    "oracles": {
+      "main": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "sub": "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG",
+      "pc": "9Ru2ENpz8wdXsBYyL7kxxnxSrhCs71BmU9ovJLKFiwt5"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 400,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "1000"
+      },
+      "priceBufferCoin": "-1",
+      "priceBufferPc": "1",
+      "rebalanceRatio": "200000",
+      "feeTrade": "0",
+      "feePlatform": "89133732758"
+    }
+  },
+  {
+    "amm": "EiEAydLqSKFqRPpuwYoVxEJ6h9UZh9tsTaHgs4f8b8Z5",
+    "pair": "wSOL/USDT",
+    "tokens": {
+      "A": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "symbol": "USDT",
+        "name": "Tether USD",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "2e6NAJy1qaKMq8PaswP2uzimMDvbr71Tbw38G6q9SNZ2",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "GUicRosQyLJCYG8hjYcbiGKAVAmT1puQTVmJjFxJmdMK",
+      "tokenBAccount": "D8F3PPxSuykAgyPPKwQdXDGGoRnUXzxowaheVJw5ATDC",
+      "feeAccount": "2EVZT2cFMvbqE9nSVidYVkrSouKfudcKG6R8AKiXoSY9"
+    },
+    "oracles": {
+      "main": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "sub": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "pc": "3ZDBff7jeQaksmGvmkRix36rU159EBDjYiPThvV8QVZM"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 0,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 1
+    },
+    "oracleConfig": {
+      "capBpsSub": 1,
+      "capBpsPc": 1,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 40000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "100000"
+      },
+      "priceBufferCoin": "100",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "21100237388571"
+    }
+  },
+  {
+    "amm": "AcU6ZBSM3qaEJUeoJYXwAwMqcffmi5NYoFswdtWmXTKh",
+    "pair": "bSOL/USDC",
+    "tokens": {
+      "A": {
+        "mint": "bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1",
+        "symbol": "bSOL",
+        "name": "BlazeStake Staked SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "BsFuJEShHAdLoY8JjeZN7EiaMAobVGzGnpdS5d3pCCXu",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "2JM5V31bjr3vdnT1jeGMB3AdZUv72FGpo9zsBnegdpGB",
+      "tokenBAccount": "GyBabQx5BkpqAnwVYeppZUkJYADJK3jnmEZ6G9znWiW9",
+      "feeAccount": "Dk3nZq6G16pnPAUmrHwEvC3HJBep4tQU5i5gpWAsRXcv"
+    },
+    "oracles": {
+      "main": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "sub": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "pc": "EF1U95mUHvhjjRms9QhodoEaRGVitnqiCsU7pkuFHXv7"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 0,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 1
+    },
+    "oracleConfig": {
+      "capBpsSub": 1,
+      "capBpsPc": 1,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 400,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "1000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "1042738395574"
+    }
+  },
+  {
+    "amm": "9YDpyJnTtD1sTNHPzMQxBqgmvxhoRksiswGKmq7WJ9cN",
+    "pair": "RAY/USDC",
+    "tokens": {
+      "A": {
+        "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+        "symbol": "RAY",
+        "name": "Raydium",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "2NX49p9mnw2PVm34PNT9zyzSNTbs2Z3YQEXzc8239KHs",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "CEnDczsUjDDoHwUJBXRABcG62GwKexwW6ZazaZBYeuk",
+      "tokenBAccount": "5meuZ7hZwJpKWJTbpuu11Py3gifMRWUXqykuiYPhU8xJ",
+      "feeAccount": "C4wKRTbut1dUHtQCV9J5qFbNWSSSsTRX7bW6uuaFuYxs"
+    },
+    "oracles": {
+      "main": "6EwaJTuvtUs1z6Le1yFh8HMx2EBBsuExa5ba53d7W1eJ",
+      "sub": "6EwaJTuvtUs1z6Le1yFh8HMx2EBBsuExa5ba53d7W1eJ",
+      "pc": "FVAouryrBKKtgSf4jBqU5UwuwwrT6TUniSwQC7TJXDTK"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 300,
+      "capBpsPc": 300,
+      "maxAgeSecMain": 144,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 8000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "360",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "20000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "20000000",
+      "feeTrade": "0",
+      "feePlatform": "14859422892728"
+    }
+  },
+  {
+    "amm": "DrRd8gYMJu9XGxLhwTCPdHNLXCKHsxJtMpbn62YqmwQe",
+    "pair": "wSOL/USDC",
+    "tokens": {
+      "A": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "FGYgFJSxZTGzaLwzUL9YZqK2yUZ8seofCwGq8BPEw4o8",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "EVGW4q1iFjDmtxtHr3NoPi5iVKAxwEjohsusMrinDxr6",
+      "tokenBAccount": "53EkU98Vbv2TQPwGG6t2asCynzFjCX5AnvaabbXafaed",
+      "feeAccount": "FwWV8a193zZsYxaRAbYkrM6tmrHMoVY1Xahh2PNFejvF"
+    },
+    "oracles": {
+      "main": "8RVPH46opPd3qLy1n1djntzGMZxnqEzbYs9uoeixdnwk",
+      "sub": "8RVPH46opPd3qLy1n1djntzGMZxnqEzbYs9uoeixdnwk",
+      "pc": "7oo7u7iXrNCekxWWpfLYCbXyjrYLAco5FM9qSjQeNn7g"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 0,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 1
+    },
+    "oracleConfig": {
+      "capBpsSub": 30,
+      "capBpsPc": 200,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 40000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "100000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "-100",
+      "rebalanceRatio": "0",
+      "feeTrade": "304304",
+      "feePlatform": "14852247464105"
+    }
+  },
+  {
+    "amm": "58MaxV1ogiD5NzQcSxmykKpsigGTXKDctfChVnYv59Bk",
+    "pair": "RAY/wSOL",
+    "tokens": {
+      "A": {
+        "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+        "symbol": "RAY",
+        "name": "Raydium",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "5bZvbDBbBgKDT3BMb4s5nTqtkkjG9fXBguZYd89FJCcK",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "3a3ofQaTst1aRz8ZjbTKwDyGvAgR1xFYPJirJuC2gTbJ",
+      "tokenBAccount": "3u31cFfpGtoDVnZSLRdQicBcJLymRUQLmmiq1ZS7dQTX",
+      "feeAccount": "94PFyieux5nPRmzafpBvu5frXzUyU21jbRaBQjL69qxu"
+    },
+    "oracles": {
+      "main": "6EwaJTuvtUs1z6Le1yFh8HMx2EBBsuExa5ba53d7W1eJ",
+      "sub": "6EwaJTuvtUs1z6Le1yFh8HMx2EBBsuExa5ba53d7W1eJ",
+      "pc": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 200,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 144,
+      "maxAgeSecSub": 24,
+      "maxAgeSecPc": 48,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "360",
+        "mainBuffer": "0",
+        "subLimit": "60",
+        "pcLimit": "120"
+      },
+      "priceBufferCoin": "100",
+      "priceBufferPc": "2500",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "3580889685260"
+    }
+  },
+  {
+    "amm": "3pveCrxqJ6TYytqC9LpRegB4HxMn7wC9wAd7S3CihEE8",
+    "pair": "JTO/USDH",
+    "tokens": {
+      "A": {
+        "mint": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+        "symbol": "JTO",
+        "name": "Jito",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "7kbnvuGBxxj8AG9qp8Scn56muWGaRaFqxg1FsRp3PaFT",
+        "symbol": "USDH",
+        "name": "Hubble USD",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "5EnK6HrNdAnsSGrJpwQoo64uU2EGgdnjyimwLLrXK4oX",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "6RiuCWfUpGRWq4QiSzc6VH98F5HGypvAS8GPp7bpPycj",
+      "tokenBAccount": "CgH5tk2bYREdwxuJ8LFWwNm5UFNKEzMjzSacPfMPv843",
+      "feeAccount": "8GizbE18TrPowgPi1G8bhfEhJ7ASe8TTYEXnWBEqtEKL"
+    },
+    "oracles": {
+      "main": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "sub": "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG",
+      "pc": "3i9i5kvq8ix7PAb5eyYTFGNpJbLqt4Y64rgpDvbm9Mba"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 400,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "1000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "200000",
+      "feeTrade": "0",
+      "feePlatform": "25648533689"
+    }
+  },
+  {
+    "amm": "5KA7eEtZKSyGHyFwrNQZfFASDXtyPCtYCu5jwMBsQcSQ",
+    "pair": "EKpQ/wSOL",
+    "tokens": {
+      "A": {
+        "mint": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "Cpau1wVxhLZV2FcvSGfR5Yxm3X1HKY1e7RZgGdJvdN3G",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "HX6hJohEhB89Cmcs3Q3DzKr9Zykwg6N36MmtKMJTq6Rm",
+      "tokenBAccount": "DoQBVdpNejaBbBR1mvfeBQN8J5Cwtmen9vNtBphv6pbX",
+      "feeAccount": "CYGJ82Ajpak3PFua2Q8xVmCXJxdTz6Y61znvr3ZYojVt"
+    },
+    "oracles": {
+      "main": "AQcdjmXpExiRxRn17mnUyjLewYadPyycCyTjGCkTXZRG",
+      "sub": "AQcdjmXpExiRxRn17mnUyjLewYadPyycCyTjGCkTXZRG",
+      "pc": "FVAouryrBKKtgSf4jBqU5UwuwwrT6TUniSwQC7TJXDTK"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 72,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "180"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "3598489626989"
+    }
+  },
+  {
+    "amm": "7rQYkPrsmAi8gubSveAnYxdxhEtYqwQHKf778TAySAMW",
+    "pair": "wSOL/EKpQ",
+    "tokens": {
+      "A": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "Dwj6p3FoMNdY2WFAeAhyYgiu6PN46EREeXJE21cz4K3D",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "6F1x8GbCzbnVbVupnFA9Fjq6E4qQFQCfkzmR3zmAmTLg",
+      "tokenBAccount": "3d3Cspmvsohv2okRxY8jwVUQa9TNQjtkFc4Fz7gTN79q",
+      "feeAccount": "Dwm6qAtiDax8BHAMZeEztpd38kAPt99ARTurwc6H3S1i"
+    },
+    "oracles": {
+      "main": "4HxqPGF14zNq6a1E7Wc6frEpUHPZjDTopDoEH1jFZ4JM",
+      "sub": "4HxqPGF14zNq6a1E7Wc6frEpUHPZjDTopDoEH1jFZ4JM",
+      "pc": "FVAouryrBKKtgSf4jBqU5UwuwwrT6TUniSwQC7TJXDTK"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 1,
+      "capBpsPc": 1,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 4000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "10000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "9993656734"
+    }
+  },
+  {
+    "amm": "HPmjoycx8Vm99Tc9mUhRZWfJy4fsEZxVwhzP5nw7XeEy",
+    "pair": "stSOL/USDC",
+    "tokens": {
+      "A": {
+        "mint": "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj",
+        "symbol": "stSOL",
+        "name": "Lido Staked SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "2bykZULRJwHikmUzDFvQLvoMZWMmbrJR1ivCAwtPuXpG",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "35xntLJUTBzV8nSAPY2s1cdMdSNprccYhq7YSZae8gzy",
+      "tokenBAccount": "AEyvfXM3pmQmAvijyWeGro25yrCXUWij5YZLhnK3sAKP",
+      "feeAccount": "2kFxaaVnxWRHnVLjmy8DpaaNDPRVU6E9UefKs1P7Riu6"
+    },
+    "oracles": {
+      "main": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "sub": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "pc": "GCEitD54CdVVzUvvGVpB4rocCaY91LDHzeAVsD7bK8RZ"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 400,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "1000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "200000",
+      "feeTrade": "0",
+      "feePlatform": "756197081371"
+    }
+  },
+  {
+    "amm": "W5s3YFGHyMnWqYxkdfimB6AgMPiofDm5S5ndjqdvPuy",
+    "pair": "wSOL/USDS",
+    "tokens": {
+      "A": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "USDSwr9ApdHk5bvJKMjzff41FfuX8bSxdKcR81vTwcA",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "HUKV99RUMeyVchf8PSTNKNJbgbRY8ZKqbPJVbsV8tys5",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "Atp2VXZjft7rBk8YRcYQG1Z6YdMAF3v8QnFUWvXLPNT3",
+      "tokenBAccount": "CZRUSjAtTAVK9yxaejoYiRVQszDA5tgWXXsBg3ASvVjb",
+      "feeAccount": "Gs2mtjBUAVk2ammDsFwaQNnzH2a4kDjwCHhEunmA6psB"
+    },
+    "oracles": {
+      "main": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "sub": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "pc": "CHyMgaiiCgr8ZnHcTSDP84tNAx3F6Gbz87xFc7cDr4z"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 0,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 1
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 40000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "100000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "2500",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "89393700571"
+    }
+  },
+  {
+    "amm": "DUJxcdYmd28XTt51fiSctuYQfCoAga1oGobWYKzrVwDR",
+    "pair": "ORCA/USDC",
+    "tokens": {
+      "A": {
+        "mint": "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE",
+        "symbol": "ORCA",
+        "name": "Orca",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "ErrZCzMwcznrwFu1ZJyvTRmveePgmqvb5mi22wCN7gts",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "5hPFcQqjbz3tWjVHgDzgEkUfaVjhHenHotMqc7uzqKLE",
+      "tokenBAccount": "AXahDYsbSSEMnFmzN3qkwik72c15cjLYE9Tmwx9wPmYn",
+      "feeAccount": "Au5EeE6bdbjeETcEuYdMR3n72DbwZE7as259hgBfQCZz"
+    },
+    "oracles": {
+      "main": "GeLisEX1kAszH8cYxLLwRR3eiA2Pic8KCTGnf8HfU6sW",
+      "sub": "4ivThkX8uRxBpHsdWSqyXYihzKF3zpRGAUCqyuagnLoV",
+      "pc": "aT1tMkAUbgrsmbQDtKnricH4PeVwceJDk6DXxHwK9qD"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 300,
+      "capBpsPc": 300,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 8000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "20000"
+      },
+      "priceBufferCoin": "-300",
+      "priceBufferPc": "300",
+      "rebalanceRatio": "20000000",
+      "feeTrade": "0",
+      "feePlatform": "805031216380"
+    }
+  },
+  {
+    "amm": "71GHcjkwmtM7HSWBuqzjEp96prcNNwu1wpUywXiytREU",
+    "pair": "wSOL/USDC",
+    "tokens": {
+      "A": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "AtpUocL94CzYR1tZouFpo76QeGsUMH7kSqicaTNy7Lvz",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "FzMQ1s9vQs4v6wyjVoVTFoDBJX2Qjr5ZsDGi1SA8a8hy",
+      "tokenBAccount": "BmKuiSYs91eP8cn8PTD2eue1vVmqfZq2ipg4WQknY23q",
+      "feeAccount": "AczCqF64dSgTjmREcaCSB7eq561frTvSeJ7uLrW37QWG"
+    },
+    "oracles": {
+      "main": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "sub": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "pc": "978Mhamcn7XDkq21kvJWhUDPytJkYtkv8pqnXrUcpUxU"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 0,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 1
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 40000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "100000"
+      },
+      "priceBufferCoin": "100",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "3205443701550"
+    }
+  },
+  {
+    "amm": "86eq4kdBkUCHGdCC2SfcqGHRCBGhp2M89aCmuvvxaXsm",
+    "pair": "wSOL/USDC",
+    "tokens": {
+      "A": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "FbQYjLEq1vNCszmxmxZDoFiy9fgyfdPxzt9Fu5zk5jJ4",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "6Nij2pGdpgd6EutLAtdRwQoHaKKxhdNBi4zoLgd9Yuaq",
+      "tokenBAccount": "ELFYDkPYWBopH5Msm2cbA2ueByCXEKpzKWanv1kZC9L2",
+      "feeAccount": "FX5PBDb4nVTs4f9dSkUsj55rEYrCkBs9e7xZpDHqDeVM"
+    },
+    "oracles": {
+      "main": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "sub": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "pc": "CdgEC82BZAxFAJFpVPZ1RtnDr9AyH8KP9KygYhCb39eJ"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 0,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 1
+    },
+    "oracleConfig": {
+      "capBpsSub": 5,
+      "capBpsPc": 300,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 40000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "100000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "31797377904026"
+    }
+  },
+  {
+    "amm": "Et83DD9wpyy4BkC3Uu68MBTKYcVsLFniwLf9ZRw1hEi1",
+    "pair": "jtoj/USDC",
+    "tokens": {
+      "A": {
+        "mint": "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "4k3QopjGHxcsJf3Db2qTFA6WXB3yYn9fnu6jge2DnRrg",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "H968ZxYf73r3sdEfryGEHzZrxy9dGiaUwS3YwU1Lc7Jz",
+      "tokenBAccount": "5Y8MeunrJD8PKTqs1jpY5TppwtwsXbqvejPocHHmAGtR",
+      "feeAccount": "5MRVAWetj9hpi1NBo7aXuBn7oXEXvBLqeEBpFc1kNMc7"
+    },
+    "oracles": {
+      "main": "56FkWmbCp4fPwndoTkoJd8jXQEj9BdLT2XR2R16tSQJ4",
+      "sub": "56FkWmbCp4fPwndoTkoJd8jXQEj9BdLT2XR2R16tSQJ4",
+      "pc": "DSwJErtJ8uut8CvdPYjYXxnuxWrQrEBmB13B9XZ9GUjQ"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 20000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "50000"
+      },
+      "priceBufferCoin": "-2",
+      "priceBufferPc": "2",
+      "rebalanceRatio": "200000",
+      "feeTrade": "0",
+      "feePlatform": "2895382800514"
+    }
+  },
+  {
+    "amm": "9xERPkyJuPBnffKX2SswG6r25sJMSyD4hTDqgm8d5QoV",
+    "pair": "EKpQ/USDC",
+    "tokens": {
+      "A": {
+        "mint": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "6iKQKJwoLsjVEx3xMdiK1Sx3239cJ3Q5aZoGRB5dpxSM",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "BfP9MT5XVyJgjbypfPs7r5sQMJeeZnwQcuKrPrHhXGFM",
+      "tokenBAccount": "H9PVMKzgaLDEBxpC5KoTd9TeSf76ko3STfPxAj43uhGV",
+      "feeAccount": "4tZseA4APZsipJ3caVHUe4E1EdTcnMXtXdSwMERh7bVk"
+    },
+    "oracles": {
+      "main": "AV8d95vSx3wFX6u8DqUJfR9cb7woG9qJY8oFDUJeByWu",
+      "sub": "AV8d95vSx3wFX6u8DqUJfR9cb7woG9qJY8oFDUJeByWu",
+      "pc": "FVAouryrBKKtgSf4jBqU5UwuwwrT6TUniSwQC7TJXDTK"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 1,
+      "capBpsPc": 1,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 4000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "10000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "75572620202301"
+    }
+  },
+  {
+    "amm": "5TLrkh8HW9jGkyRkamFLTYDTi6fMpioLZStPYTFxEPnX",
+    "pair": "JUP/USDC",
+    "tokens": {
+      "A": {
+        "mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+        "symbol": "JUP",
+        "name": "Jupiter",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "BABMfKMpMcAQLC6QR8gUm1W43U91puGYQt2p9UG8xunb",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "4Ep5XNqaDYbFAQHHdhtFXgaPuhDH6uajSG8ZfwxHzwBQ",
+      "tokenBAccount": "5ZyzUvTKsv4rjN3CL4vToBpT3Y2votfP8DZPHfgEb5qZ",
+      "feeAccount": "FG4cPYdHykGEoYq2PxFvy3KjuF24ZFxM2QDoyVVtjkMN"
+    },
+    "oracles": {
+      "main": "JCQZijF7jLWqUCrA5bp3wfUfy5WKsoSvYT5BuQUKWRr1",
+      "sub": "JCQZijF7jLWqUCrA5bp3wfUfy5WKsoSvYT5BuQUKWRr1",
+      "pc": "8Wn7WsvK4Vnuxjmq8fsVbSFsGzeCmmtH9noepDUCeiQ8"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 1,
+      "capBpsPc": 1,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 20000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "50000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "1570527306"
+    }
+  },
+  {
+    "amm": "Gkt4BpMRFxhhrrVMQsewM74ggriAbxyN2yUYDD9qt1NV",
+    "pair": "wSOL/USDC",
+    "tokens": {
+      "A": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "6zCZ17UYZmNjsfCc87pw2RpkxMEucHX1nks22KrHGhre",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "GeRsvrSDSrbWmBXFBv2n3kxpSZ15qzjRSnM1BY7oBCj9",
+      "tokenBAccount": "6Q6U8JUefrxjo8nE4GNDysFfYaY2XapMs6w8eEuoA72w",
+      "feeAccount": "8SPugpJm7gpjcpkjXYyFhvAWbHDaUUwddRmp6hZNg3Gi"
+    },
+    "oracles": {
+      "main": "8RVPH46opPd3qLy1n1djntzGMZxnqEzbYs9uoeixdnwk",
+      "sub": "8RVPH46opPd3qLy1n1djntzGMZxnqEzbYs9uoeixdnwk",
+      "pc": "BUTLLVEh7JWJjDRzoF41U7Gf4mqJ2T5VU3WA69K6QVqd"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 0,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 1
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 40000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "100000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "472128562672"
+    }
+  },
+  {
+    "amm": "8GQP8XkaXVCArWYovfiLRuHpJzgoou2ofDDZdyd6TpNK",
+    "pair": "BONK/USDC",
+    "tokens": {
+      "A": {
+        "mint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+        "symbol": "BONK",
+        "name": "Bonk",
+        "decimals": 5,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "FGEiSVkXzaCTeVPkaaBt3eKUwVZiYCf7qonTn2MxNst7",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "G8bfLN7AVZeKTfvHBcAW48PL54uZbsrWYQ2ifkgy4dN8",
+      "tokenBAccount": "31yhZ8t5zKxNXYmQ8YBsBCKhskAAbuZDEnwTsxpFQMLd",
+      "feeAccount": "DhnVbdkZAGhybsmfkUbLLXL6nCP6zJeC4QRN47m6nKZu"
+    },
+    "oracles": {
+      "main": "2dAoyGLoeFrcdZ5KhSSAtPh4R6xaJVxbipxKgG6qjU2g",
+      "sub": "2dAoyGLoeFrcdZ5KhSSAtPh4R6xaJVxbipxKgG6qjU2g",
+      "pc": "DPddLVP5FGUR3Bac5wpM9e1oe6fkF3NV4pmdNRhQmNy9"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 200,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 40000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "100000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "200",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "9438066725333"
+    }
+  },
+  {
+    "amm": "5h4dChzKSpCgGHnzTEiERiHEr2rAVDuYzquFrJEPKbqo",
+    "pair": "3NZ9/USDC",
+    "tokens": {
+      "A": {
+        "mint": "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "Cvg9iSdznEbcmnNxHQSsmqsJ58ygMRoyGt2bNak7Ka9r",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "5uhCmDcSd7vFLvwqQordJj1CmAYbvEjPUT3msiUmVfrG",
+      "tokenBAccount": "BaHxqC337tSpJz4GG7fanP4LkdsJfF5EmPqDbEFRuQyz",
+      "feeAccount": "D6PhHwKxqxDyWtg3NCMWTmFxUn4aos1fjo3frK57zZvn"
+    },
+    "oracles": {
+      "main": "4NRouqgsAZwAiFaR9WjDR5LGkWPvZEpSJjCotZhKsA3Z",
+      "sub": "GVXRSBjFk6e6J3NbVPXohDJetcTjaeeuykUpbQF8UoMU",
+      "pc": "6cfX1QWWTLcN5ebA13QebWwvH3PhXMf71AwxrWzJe8hk"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 4000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "10000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "200000",
+      "feeTrade": "0",
+      "feePlatform": "100035153"
+    }
+  },
+  {
+    "amm": "DT3TXnWySV4cEGAVwqRR3UvrG7je89sy77rGUq55LECd",
+    "pair": "CzLS/USDC",
+    "tokens": {
+      "A": {
+        "mint": "CzLSujWBLFsSjncfkh59rUFqvafWcY5tzedWJSuypump",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "FTfKRbb4Acx7fJV154u3RwxdSLBkftTkYpgPNoNhvsw5",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "HqQrG9dehe1CoUtRKtVtpA5w4D4EMsUJXwt2q6MM5fYp",
+      "tokenBAccount": "D739Ty6DNDgzm6g9WxjexGn5Vsep4Eu9FNxw4rJrrdoC",
+      "feeAccount": "5HL6VoAaHG9NrPKvThvfBjGdjUyVChbvVVgshAAGhJ9K"
+    },
+    "oracles": {
+      "main": "9naeQZCxckzpQ3ZNECdXvMuU9Mt5dos2i4YWjurYC2wo",
+      "sub": "9naeQZCxckzpQ3ZNECdXvMuU9Mt5dos2i4YWjurYC2wo",
+      "pc": "FVAouryrBKKtgSf4jBqU5UwuwwrT6TUniSwQC7TJXDTK"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 12,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 4000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "30",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "10000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "200000",
+      "feeTrade": "0",
+      "feePlatform": "0"
+    }
+  },
+  {
+    "amm": "Gu7nyFkTzTX5FLKqe9qTK4oJFpmZhFRQTrSwYg32C1m6",
+    "pair": "5oVN/USDC",
+    "tokens": {
+      "A": {
+        "mint": "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "4mMQ74nhnD5b8EeAbZBNoiXwE44gRRUaxK6Xr1QjGDG1",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "HKj9YMBKGde8Lpag4PSAoFZqekK9qUb61vuHWrhJe17R",
+      "tokenBAccount": "HuC3A69L1uoURQoqjYAf1Pd6iEa3xVtS9DZ6A8i2Mffd",
+      "feeAccount": "gmX2G4YhFYDnLa8v9oFQgtzLyD4ozgRBfBqoMSe3XCS"
+    },
+    "oracles": {
+      "main": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "sub": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "pc": "3MUDiUemaRj8tSv8nWFurxe5ir1324MiX9ScqW5NN5Ps"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 0,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 1,
+      "capBpsPc": 1,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 400,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "1000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "98160916623"
+    }
+  },
+  {
+    "amm": "BEDFPEHHUi1dGrDJykrHVjMpJ7V95hRrCHbaeWjgD3qP",
+    "pair": "MNDE/mSOL",
+    "tokens": {
+      "A": {
+        "mint": "MNDEFzGvMt87ueuHvVU9VcTqsAP5b3fTGPsHuuPA5ey",
+        "symbol": "MNDE",
+        "name": "Marinade",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+        "symbol": "mSOL",
+        "name": "Marinade Staked SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "GrE4uy7LEXiw9HeggVomUCnH1xyratArZRFuEPjtCU7P",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "CugkPvw1De6TGqgCWqM5sXmqasPz22kAibJpBmsHdM8a",
+      "tokenBAccount": "3TauBEL9fTs531NLKcaFKNr4va4XZmuvGGG13uoyq6BV",
+      "feeAccount": "CwMvXwoDSfBaX6BL8WQAcgquKmY3kHu7UT8hEnCSn5Aj"
+    },
+    "oracles": {
+      "main": "9xAw9EDQ5pqngpXLdb4u6hKPKVQb3npAogWCc7LCQjBX",
+      "sub": "4dusJxxxiYrMTLGYS6cCAyu3gPn2xXLBjS7orMToZHi1",
+      "pc": "E4v1BBgoso9s64TQvmyownAVJbhbEPGyzA3qn4n46qj9"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 300,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 24,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "60"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "200000",
+      "feeTrade": "0",
+      "feePlatform": "212117569328"
+    }
+  },
+  {
+    "amm": "HvtYZ3e8JPhy7rm6kvWVB2jJUddyytkLcwTMSSnB7T3U",
+    "pair": "mSOL/USDC",
+    "tokens": {
+      "A": {
+        "mint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+        "symbol": "mSOL",
+        "name": "Marinade Staked SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "4CuuyBmdbYFUfXh2EHdJ7o2ZT246MR6xVU9vQD1yvDbx",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "5z4wU1DidgndEk4oJPsKUDyQxRgZpVWrhwVnMAU6XTJE",
+      "tokenBAccount": "Dz6KvVqCBeiGXMEXyqQv81QHLoEdui1BYGY4RL7F6cwq",
+      "feeAccount": "2WbmNq2pbwYzpkgdxFdZjcw5nfVBhmTaUbatMui3pQes"
+    },
+    "oracles": {
+      "main": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "sub": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "pc": "F172vv3sZa6gEueEVXBi7A8mZRThUf1RC7JfWQ1JWdS7"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 0,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 1
+    },
+    "oracleConfig": {
+      "capBpsSub": 1,
+      "capBpsPc": 1,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 400,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "1000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "3141741693900"
+    }
+  },
+  {
+    "amm": "HyGVf4UhoQ4ux9ueZgTCf6aJwCcvWqeWf258ZtbeRteV",
+    "pair": "wSOL/USDT",
+    "tokens": {
+      "A": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "symbol": "wSOL",
+        "name": "Wrapped SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "symbol": "USDT",
+        "name": "Tether USD",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "FYidwukt6P8dmwKUbxNUihDbLhBmvenGeDkV8s1yxKq9",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "DHHd8MrNU6YBrfJw47dyzNuuWkr4YkWrjkt5MWVUZvUN",
+      "tokenBAccount": "4BoHhThRWuokMQz5kER3SJoEGKPHkS68dCsGgJdfYJJo",
+      "feeAccount": "7VRs5J28yYXTjjq8NSKbXoamcbe5qHGVMGbEyLQMLB31"
+    },
+    "oracles": {
+      "main": "8RVPH46opPd3qLy1n1djntzGMZxnqEzbYs9uoeixdnwk",
+      "sub": "8RVPH46opPd3qLy1n1djntzGMZxnqEzbYs9uoeixdnwk",
+      "pc": "3ZDBff7jeQaksmGvmkRix36rU159EBDjYiPThvV8QVZM"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 0,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 1
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 40000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "1000000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "100000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "0",
+      "feeTrade": "0",
+      "feePlatform": "69073854179102"
+    }
+  },
+  {
+    "amm": "FPrkqbdn25EYsW4KQfTrFa1EqFs6G1vdEU9ihCjUUzFs",
+    "pair": "MNDE/USDC",
+    "tokens": {
+      "A": {
+        "mint": "MNDEFzGvMt87ueuHvVU9VcTqsAP5b3fTGPsHuuPA5ey",
+        "symbol": "MNDE",
+        "name": "Marinade",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "GSE6ypq5t4atdNoaQ1DJhqSUU1u2UPkhkVkVirPSrVB6",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "FkNjaFGZ5KsCy4davcTJybVKjiFMkpqoWWgapzAUmGSr",
+      "tokenBAccount": "3qd8PjtE2VDdmZ44SiBCNngx4tYhK3hpGjBM6wbRN1Gp",
+      "feeAccount": "EEToxsebAtbmBvgcPXAK8HwrEbmrKwGUL9NCpceYvJai"
+    },
+    "oracles": {
+      "main": "6rM17ntRqb5eynwsSvTRJeFGJAff1PADvw4R2sH6QtFZ",
+      "sub": "4dusJxxxiYrMTLGYS6cCAyu3gPn2xXLBjS7orMToZHi1",
+      "pc": "8ZCJbBEGUYhSjRjEMkBs7xWL6Dy9GxukccbWupC7612P"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 900,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 4000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "10000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "200000",
+      "feeTrade": "0",
+      "feePlatform": "13646908764269"
+    }
+  },
+  {
+    "amm": "4ruXyJT6rgHERQeVmMCc5pJDC5wgLujuMjTQgY562sdh",
+    "pair": "mSOL/USDT",
+    "tokens": {
+      "A": {
+        "mint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+        "symbol": "mSOL",
+        "name": "Marinade Staked SOL",
+        "decimals": 9,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "symbol": "USDT",
+        "name": "Tether USD",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "Dt1EBunetoSDPSEj2EB5m5bc93bt75ZB8Yy9vmaJ2ng",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "7GawBqVSriYXQYCTr5XygeRNTeHamRWeHmVFiuf6wLfK",
+      "tokenBAccount": "7oWW46LfAzrzWaZxV8CURBKpWwR8cc3ZpaXMFi6CH8sC",
+      "feeAccount": "3hmRWv4Qik4rEzut8kqjxChN3n7Ms1MLKFKLqcoWkbGg"
+    },
+    "oracles": {
+      "main": "EPBJUVCmzvwkGPGcEuwKmXomfGt78Aozy6pj44x9xxDB",
+      "sub": "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG",
+      "pc": "8LP5YumJFjX9LD7DKXY4wWYExKSUffm7as21LP3UMVzd"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 48,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 400,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "120",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "1000"
+      },
+      "priceBufferCoin": "-1",
+      "priceBufferPc": "1",
+      "rebalanceRatio": "1000",
+      "feeTrade": "0",
+      "feePlatform": "84955838849"
+    }
+  },
+  {
+    "amm": "7ru8qArudrbWUQyENQA2NATAp7UEwg7igVWcGw2NoGo8",
+    "pair": "WETH/USDC",
+    "tokens": {
+      "A": {
+        "mint": "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
+        "symbol": "WETH",
+        "name": "WETH (Wormhole)",
+        "decimals": 8,
+        "logoURI": null,
+        "supply": null
+      },
+      "B": {
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "logoURI": null,
+        "supply": null
+      },
+      "poolMint": {
+        "mint": "FV1hz2sZMFs3hWrMC7zvtPx8vx7tCWNaBpjrnXCSg4FA",
+        "symbol": null,
+        "name": null,
+        "decimals": null,
+        "logoURI": null,
+        "supply": null
+      },
+      "tokenAAccount": "HqFDLiQaVEmTzvEwjjDZYaxmDiGV6hcaBaALmpBDwbn9",
+      "tokenBAccount": "E7N9LdnEoJ2cHwCz3ZvXSiH99PQ7GBnGLaMQd8RJv1Gz",
+      "feeAccount": "FF51QyHAXenCVWmNtPCsRA4Jg85syALFEXPSEqi15fpu"
+    },
+    "oracles": {
+      "main": "4GR2HYRS5o9HLu2bE3ZyFiRn4e4eitqz3x9GykiQ2EmZ",
+      "sub": "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB",
+      "pc": "5JLNs3VxLVVJt8CCVyRhjgTwey8WCaU3VeKcT7SJCzXQ"
+    },
+    "flags": {
+      "isInitialized": true,
+      "freezeTrade": 1,
+      "freezeDeposit": 1,
+      "freezeWithdraw": 0
+    },
+    "oracleConfig": {
+      "capBpsSub": 100,
+      "capBpsPc": 100,
+      "maxAgeSecMain": 72,
+      "maxAgeSecSub": 10,
+      "maxAgeSecPc": 4000,
+      "allowEmaFallback": true
+    },
+    "raw": {
+      "denom": "10000",
+      "slots": {
+        "mainLimit": "180",
+        "mainBuffer": "0",
+        "subLimit": "25",
+        "pcLimit": "10000"
+      },
+      "priceBufferCoin": "0",
+      "priceBufferPc": "0",
+      "rebalanceRatio": "200000",
+      "feeTrade": "0",
+      "feePlatform": "26059581550480"
+    }
+  }
+]

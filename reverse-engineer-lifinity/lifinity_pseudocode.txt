@@ -1,0 +1,69 @@
+// Lifinity V2 - Extracted Pseudocode
+// Generated from bytecode analysis
+
+
+// Function at 37 (lines 8-?)
+function_37() {
+    // *(u64 *)(r10 - 0xd8) = r1
+    store_to_stack();
+    // Stack frame size: 216 bytes
+}
+
+// Function at 38 (lines 9-?)
+function_38() {
+    // *(u64 *)(r10 - 0xb8) = r5
+    store_to_stack();
+    // Stack frame size: 184 bytes
+}
+
+// Function at 39 (lines 10-?)
+function_39() {
+    // *(u64 *)(r10 - 0xc0) = r4
+    store_to_stack();
+    // Stack frame size: 192 bytes
+}
+
+// Function at 40 (lines 11-?)
+function_40() {
+    // Stack frame size: 0 bytes
+}
+
+// Function at 42 (lines 13-?)
+function_42() {
+    // *(u64 *)(r10 - 0xc8) = r1
+    store_to_stack();
+    // Stack frame size: 200 bytes
+}
+
+// Function at 43 (lines 14-?)
+function_43() {
+    // *(u64 *)(r10 - 0xd0) = r2
+    store_to_stack();
+    // Stack frame size: 208 bytes
+}
+
+// Function at 46 (lines 17-?)
+function_46() {
+    // *(u64 *)(r10 - 0xb0) = r1
+    store_to_stack();
+    // Stack frame size: 176 bytes
+}
+
+// Function at 48 (lines 19-?)
+function_48() {
+    // *(u64 *)(r10 - 0xa8) = r6
+    store_to_stack();
+    // Stack frame size: 168 bytes
+}
+
+// Function at 49 (lines 20-?)
+function_49() {
+    // *(u64 *)(r10 - 0xa0) = r6
+    store_to_stack();
+    // Stack frame size: 160 bytes
+}
+
+// Function at 51 (lines 22-?)
+function_51() {
+    // Stack frame size: 16 bytes
+}

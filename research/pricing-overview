@@ -1,0 +1,57 @@
+Here’s the clean, “how the cash actually shows up” view.
+
+# 1) Market-making profit (MMP) — how Lifinity earns as an MM
+
+Lifinity isn’t a passive x·y=k AMM. It runs a **proactive, oracle-anchored market maker**:
+
+* **Fresh-price quoting:** every swap is priced at the **current oracle mid** (or the trade is rejected). That means the pool doesn’t sit “cheap” or “rich” waiting for arbitrage; it quotes fair value before arbers can take it.
+
+* **Inventory-aware curve:** slippage is **asymmetric**.
+  Trades that **reduce** the pool’s imbalance (bring it closer to 50/50 by value) face **softer** slippage; trades that **worsen** the imbalance face **harsher** slippage.
+  Result: order flow itself tends to “rebalance” the pool *toward* target, and the pool captures the value that would otherwise go to arbitrage bots.
+
+* **v2 delayed/threshold recentering:** the pool tracks a “last rebalance price” $p^*$. Only when $|p/p^*|$ moves past a **threshold** (e.g., 0.5–5% depending on the pair) does it **recentre targets** (no external swap—just updates what “balanced” means).
+  In practice this “buys dips / sells rips” on meaningful moves, turning what would be impermanent loss into **impermanent gain** (MMP).
+
+**Why this makes money:**
+Compared with a normal AMM that leaks value to arbitrageurs, Lifinity’s pool **keeps that edge internally**: it sells a bit **higher** on up-moves and buys a bit **lower** on down-moves (because it’s already at the updated mid, and it shapes slippage to favor balancing trades). Over time, that difference vs. just “holding” is **market-making P\&L** (MMP).
+
+# 2) Transaction fees — the straightforward revenue
+
+Every swap also pays a **trading fee** (bps). Two important twists:
+
+* **Protocol-Owned Liquidity (POL):** Lifinity’s pools are (largely) funded by the **protocol itself**, not mercenary LPs. So the **LP fee** that would normally go to outside LPs **accrues to the treasury**. In effect, the protocol earns the **full fee take** on its own liquidity.
+
+* **Fee tuning (and sometimes dynamic fees):** Fees are set per pool and can be tuned to maximize profitability and route share. Lower fees attract aggregator flow; higher fees (in volatile/imbalanced states) can compensate for risk. Either way, fee × volume is a steady income stream.
+
+**Why this adds up:**
+Because Lifinity’s quotes are tight (thanks to concentration/oracle), **aggregators route volume** to its pools. High **turnover/TVL** × bps fee = meaningful, recurring revenue, and with POL it isn’t split with external LPs.
+
+# 3) Why it works with modest TVL (capital efficiency)
+
+* **Concentration around the mid:** Lifinity effectively concentrates depth around the oracle price (a “leverage on K” idea). That yields **low slippage** with **much less capital**, so it can process large volume with small TVL—amplifying both fee yield and MMP per dollar of liquidity.
+
+# 4) Putting it together (mental P\&L)
+
+For a given pool over a period:
+
+$$
+\textbf{Revenue} \approx \underbrace{\text{fee\_rate} \times \text{volume}}_{\text{swap fees}}
+\;+\;
+\underbrace{\text{(ending pool value − HODL value)}}_{\text{MMP from proactive MM}}
+$$
+
+* **Fees** are steady and scale with routed volume.
+* **MMP** depends on price paths: it tends to be **positive** in oscillatory markets (buy-low/sell-high effect), and smaller/managed during one-way trends (v2’s threshold and inventory-aware curve reduce IL vs. a passive AMM).
+
+# 5) Optional, but real: “MM-as-a-Service”
+
+Lifinity can also run pools **on behalf of projects**: the partner supplies assets, and Lifinity’s engine manages liquidity. The protocol then **keeps the trading fees** (and possibly some performance upside), turning the engine into a service line.
+
+---
+
+## TL;DR
+
+* **As an MM:** it earns **market-making profit** by quoting the **fresh oracle mid**, shaping slippage to make **balancing trades cheaper**, and **recentering at thresholds** (v2) to harvest volatility instead of leaking to arbers.
+* **From fees:** every swap pays bps; because liquidity is **protocol-owned**, those **LP fees accrue to the treasury** rather than to external LPs.
+* **Capital efficiency** (concentration) means high turnover on low TVL, so both fee yield and MM P\&L per dollar of liquidity are amplified.

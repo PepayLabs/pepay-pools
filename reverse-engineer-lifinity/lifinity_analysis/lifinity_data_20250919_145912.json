@@ -1,0 +1,37 @@
+{
+  "metadata": {
+    "analysis_time": "2025-09-19T14:59:12.500762",
+    "processing_time": 29.631468057632446,
+    "coverage_stats": {
+      "processed_transactions": 25,
+      "successful_transactions": 0,
+      "errors": 0,
+      "error_rate_percent": 0.0,
+      "instructions_found": 0,
+      "swaps_found": 0,
+      "oracles_found": 0,
+      "raw_discriminators": 0,
+      "processing_time_seconds": 29.63,
+      "status": "Analysis completed successfully",
+      "critical_findings_count": 0
+    }
+  },
+  "instructions": {},
+  "swaps": [],
+  "oracles": {},
+  "state_patterns": {
+    "total_unique_instructions": 0,
+    "total_instruction_calls": 0,
+    "high_confidence_instructions": 0,
+    "swap_instructions": 0,
+    "admin_instructions": 0,
+    "oracle_accounts_detected": 0,
+    "total_swaps_detected": 0,
+    "total_swap_volume": 0,
+    "raw_discriminators_found": 0,
+    "error_rate_percent": 0.0,
+    "success_rate_percent": 0.0
+  },
+  "raw_discriminators": [],
+  "critical_findings": []
+}

@@ -1,0 +1,182 @@
+{
+  "summary": {
+    "total_instructions": 56462,
+    "function_calls": 1769,
+    "memory_operations": 19269,
+    "constants": 2196,
+    "functions_identified": 15449,
+    "discriminators_found": 777
+  },
+  "function_calls": {
+    "count": 1769,
+    "unique_targets": 1748,
+    "most_called": [
+      [
+        "0x1",
+        4
+      ],
+      [
+        "0xd061",
+        2
+      ],
+      [
+        "0xa7d2",
+        2
+      ],
+      [
+        "0xd1bc",
+        2
+      ],
+      [
+        "0x831c",
+        2
+      ],
+      [
+        "0xd04c",
+        2
+      ],
+      [
+        "0xce07",
+        2
+      ],
+      [
+        "0xc200",
+        2
+      ],
+      [
+        "0x9ab9",
+        2
+      ],
+      [
+        "0x81bf",
+        2
+      ]
+    ]
+  },
+  "memory_layout": {
+    "stack_offsets": [
+      "0x8",
+      "0xa",
+      "0xc",
+      "0x10",
+      "0x12",
+      "0x14",
+      "0x18",
+      "0x1a",
+      "0x1c",
+      "0x20",
+      "0x24",
+      "0x28",
+      "0x2c",
+      "0x30",
+      "0x33",
+      "0x34",
+      "0x38",
+      "0x3b",
+      "0x3c",
+      "0x40"
+    ],
+    "total_unique_offsets": 389
+  },
+  "control_flow": {
+    "jne": 2149,
+    "jeq": 1860,
+    "goto": 2249,
+    "je": 210
+  },
+  "potential_discriminators": [
+    {
+      "value": "0x3feb6d359898ce1c",
+      "addr": "388"
+    },
+    {
+      "value": "0x3feb6d359898ce1c",
+      "addr": "407"
+    },
+    {
+      "value": "0x554f40a2ca8d342c",
+      "addr": "410"
+    },
+    {
+      "value": "0x554f40a2ca8d342c",
+      "addr": "428"
+    },
+    {
+      "value": "0x3feb6d359898ce1c",
+      "addr": "538"
+    },
+    {
+      "value": "0x3feb6d359898ce1c",
+      "addr": "557"
+    },
+    {
+      "value": "0x554f40a2ca8d342c",
+      "addr": "560"
+    },
+    {
+      "value": "0x554f40a2ca8d342c",
+      "addr": "578"
+    },
+    {
+      "value": "0x3feb6d359898ce1c",
+      "addr": "1694"
+    },
+    {
+      "value": "0x3feb6d359898ce1c",
+      "addr": "1713"
+    }
+  ],
+  "swap_patterns_found": 22357,
+  "functions": [
+    {
+      "start": "37",
+      "end": "37",
+      "instruction_count": 1
+    },
+    {
+      "start": "38",
+      "end": "38",
+      "instruction_count": 1
+    },
+    {
+      "start": "39",
+      "end": "39",
+      "instruction_count": 1
+    },
+    {
+      "start": "40",
+      "end": "41",
+      "instruction_count": 2
+    },
+    {
+      "start": "42",
+      "end": "42",
+      "instruction_count": 1
+    },
+    {
+      "start": "43",
+      "end": "45",
+      "instruction_count": 3
+    },
+    {
+      "start": "46",
+      "end": "47",
+      "instruction_count": 2
+    },
+    {
+      "start": "48",
+      "end": "48",
+      "instruction_count": 1
+    },
+    {
+      "start": "49",
+      "end": "50",
+      "instruction_count": 2
+    },
+    {
+      "start": "51",
+      "end": "52",
+      "instruction_count": 2
+    }
+  ]
+}

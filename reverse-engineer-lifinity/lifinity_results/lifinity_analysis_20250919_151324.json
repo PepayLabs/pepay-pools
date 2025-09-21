@@ -1,0 +1,17 @@
+{
+  "metadata": {
+    "analysis_time": "2025-09-19T15:13:24.652710",
+    "processing_time": 27.49998140335083,
+    "status": "Analysis completed"
+  },
+  "summary": {
+    "total_transactions": 50,
+    "successful_transactions": 0,
+    "instructions_found": 0,
+    "oracle_accounts_found": 0,
+    "raw_discriminators_found": 0
+  },
+  "instructions": {},
+  "raw_discriminators": [],
+  "oracle_accounts": []
+}

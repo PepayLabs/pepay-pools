@@ -1,0 +1,63 @@
+{
+  "timestamp": "20250919_151659",
+  "program_id": "2wT8Yq49kHgDzXuPxZSaeLaH1qbmGXtEyPy64bL7aD3c",
+  "pools_found": {},
+  "instructions": {
+    "7f454c4602010100": {
+      "count": 0,
+      "data_sizes": [],
+      "source": "binary"
+    },
+    "0300f70001000000": {
+      "count": 0,
+      "data_sizes": [],
+      "source": "binary"
+    },
+    "2003030000000000": {
+      "count": 0,
+      "data_sizes": [],
+      "source": "binary"
+    },
+    "e017080000000000": {
+      "count": 0,
+      "data_sizes": [],
+      "source": "binary"
+    },
+    "0000000040003800": {
+      "count": 0,
+      "data_sizes": [],
+      "source": "binary"
+    },
+    "0400400009000800": {
+      "count": 0,
+      "data_sizes": [],
+      "source": "binary"
+    },
+    "0100000005000000": {
+      "count": 0,
+      "data_sizes": [],
+      "source": "binary"
+    },
+    "2001000000000000": {
+      "count": 0,
+      "data_sizes": [],
+      "source": "binary"
+    },
+    "a02c070000000000": {
+      "count": 0,
+      "data_sizes": [],
+      "source": "binary"
+    },
+    "0100000006000000": {
+      "count": 0,
+      "data_sizes": [],
+      "source": "binary"
+    }
+  },
+  "account_frequencies": {},
+  "analysis": {
+    "total_transactions_analyzed": 0,
+    "unique_accounts": 0,
+    "likely_pools": 0
+  }
+}

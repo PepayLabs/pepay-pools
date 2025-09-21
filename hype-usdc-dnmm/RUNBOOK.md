@@ -35,11 +35,17 @@
 ## 6. Observability Bring-Up
 - Connect indexer to `SwapExecuted`, `QuoteServed`, `ParamsUpdated`, `Paused`, `Unpaused`.
 - Publish Grafana dashboard using metrics defined in `docs/OBSERVABILITY.md`.
+- Persist test artifacts from `metrics/` (CSV/JSON) and `gas-snapshots.txt` into the monitoring pipeline for historical comparisons.
 
 ## 7. Incident Response
 - Use `pause()` to halt swaps on oracle divergence or vault issues.
 - Investigate telemetry, adjust parameters through `updateParams` (emit new change logs).
 - Unpause once post-mortem complete and governance approves.
+
+## 8. Performance & Metric Validation
+- Execute `forge test --match-path test/perf` to capture gas profiles (`metrics/gas_snapshots.csv`, `gas-snapshots.txt`) and burst reliability metrics (`metrics/load_burst_summary.csv`).
+- Ensure tuple/decimal sweep outputs (`metrics/tuple_decimal_sweep.csv`) and fee dynamics series (`metrics/fee_B*.csv`) are reviewed before deployment to detect scaling regressions.
+- Run invariant suites with `terragon-forge.sh test --match-path test/invariants --fuzz-runs 10000` after cleaning `cache/invariant` to confirm post-change safety.
 
 ## Appendices
 - `docs/ORACLE.md` – HyperCore/Pyth wiring details.

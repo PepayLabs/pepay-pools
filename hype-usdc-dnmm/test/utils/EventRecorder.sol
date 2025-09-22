@@ -12,6 +12,8 @@ library EventRecorder {
     bytes32 internal constant QUOTE_SERVED_SIG =
         keccak256("QuoteServed(uint256,uint256,uint256,uint256,uint256,uint256)");
     bytes32 internal constant TARGET_XSTAR_SIG = keccak256("TargetBaseXstarUpdated(uint128,uint128,uint256,uint64)");
+    bytes32 internal constant CONF_DEBUG_SIG =
+        keccak256("ConfidenceDebug(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)");
 
     bytes32 internal constant REASON_NONE = bytes32(0);
     bytes32 internal constant REASON_FLOOR = bytes32("FLOOR");
@@ -62,6 +64,18 @@ library EventRecorder {
         uint256 pyth;
         uint256 spread;
         uint256 partials;
+    }
+
+    struct ConfidenceDebugEvent {
+        uint256 confSpreadBps;
+        uint256 confSigmaBps;
+        uint256 confPythBps;
+        uint256 confBlendedBps;
+        uint256 sigmaBps;
+        uint256 feeBaseBps;
+        uint256 feeVolBps;
+        uint256 feeInvBps;
+        uint256 feeTotalBps;
     }
 
     function decodeSwapEvents(Vm.Log[] memory entries) internal pure returns (SwapEvent[] memory swaps) {
@@ -123,6 +137,49 @@ library EventRecorder {
                 ttlMs: ttlMs,
                 mid: mid,
                 feeBps: feeBps
+            });
+        }
+    }
+
+    function decodeConfidenceDebug(Vm.Log[] memory entries)
+        internal
+        pure
+        returns (ConfidenceDebugEvent[] memory events)
+    {
+        uint256 count;
+        for (uint256 i = 0; i < entries.length; ++i) {
+            if (entries[i].topics.length > 0 && entries[i].topics[0] == CONF_DEBUG_SIG) {
+                ++count;
+            }
+        }
+        events = new ConfidenceDebugEvent[](count);
+        uint256 ptr;
+        for (uint256 i = 0; i < entries.length; ++i) {
+            Vm.Log memory logEntry = entries[i];
+            if (logEntry.topics.length == 0 || logEntry.topics[0] != CONF_DEBUG_SIG) continue;
+            (
+                uint256 confSpreadBps,
+                uint256 confSigmaBps,
+                uint256 confPythBps,
+                uint256 confBlendedBps,
+                uint256 sigmaBps,
+                uint256 feeBaseBps,
+                uint256 feeVolBps,
+                uint256 feeInvBps,
+                uint256 feeTotalBps
+            ) = abi.decode(
+                logEntry.data, (uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256)
+            );
+            events[ptr++] = ConfidenceDebugEvent({
+                confSpreadBps: confSpreadBps,
+                confSigmaBps: confSigmaBps,
+                confPythBps: confPythBps,
+                confBlendedBps: confBlendedBps,
+                sigmaBps: sigmaBps,
+                feeBaseBps: feeBaseBps,
+                feeVolBps: feeVolBps,
+                feeInvBps: feeInvBps,
+                feeTotalBps: feeTotalBps
             });
         }
     }
@@ -251,6 +308,44 @@ library EventRecorder {
         return TARGET_XSTAR_SIG;
     }
 
+    function computePearsonCorrelation(uint256[] memory x, uint256[] memory y) internal pure returns (int256) {
+        require(x.length == y.length && x.length > 1, "CORR_INPUT");
+
+        uint256 len = x.length;
+        int256 sumX;
+        int256 sumY;
+        for (uint256 i = 0; i < len; ++i) {
+            sumX += int256(uint256(x[i]));
+            sumY += int256(uint256(y[i]));
+        }
+
+        int256 meanX = sumX / int256(uint256(len));
+        int256 meanY = sumY / int256(uint256(len));
+
+        int256 numerator;
+        uint256 sumSqX;
+        uint256 sumSqY;
+
+        for (uint256 i = 0; i < len; ++i) {
+            int256 dx = int256(uint256(x[i])) - meanX;
+            int256 dy = int256(uint256(y[i])) - meanY;
+            numerator += dx * dy;
+            sumSqX += uint256(dx * dx);
+            sumSqY += uint256(dy * dy);
+        }
+
+        if (sumSqX == 0 || sumSqY == 0) {
+            return 0;
+        }
+
+        uint256 denom = _sqrt(sumSqX * sumSqY);
+        if (denom == 0) {
+            return 0;
+        }
+
+        return (numerator * int256(10_000)) / int256(denom);
+    }
+
     function _writeFile(Vm vm, string memory path, string memory data) private {
         string memory quotedPath = string.concat("'", path, "'");
         string memory command =
@@ -260,6 +355,16 @@ library EventRecorder {
         inputs[1] = "-lc";
         inputs[2] = command;
         vm.ffi(inputs);
+    }
+
+    function _sqrt(uint256 x) private pure returns (uint256 y) {
+        if (x == 0) return 0;
+        uint256 z = (x + 1) / 2;
+        y = x;
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
     }
 
     function _tradeVolumesAndPrice(SwapEvent memory evt, uint256 baseScale, uint256 quoteScale)

@@ -14,5 +14,8 @@ interface IOracleAdapterPyth {
 
     function readPythUsdMid(bytes calldata updateData) external payable returns (PythResult memory);
 
-    function computePairMid(PythResult memory result) external pure returns (uint256 mid, uint256 ageSec, uint256 confBps);
+    function computePairMid(PythResult memory result)
+        external
+        pure
+        returns (uint256 mid, uint256 ageSec, uint256 confBps);
 }

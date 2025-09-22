@@ -34,4 +34,4 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- Update this section whenever significant architectural or dependency changes land.
+- 2024-07-12: Documented confidence blending weights, EWMA sigma, and the `ConfidenceDebug` telemetry stream.

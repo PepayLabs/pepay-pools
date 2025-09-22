@@ -51,14 +51,16 @@ abstract contract BaseTest is MathAsserts {
         _setOracleDefaults();
 
         pool = _deployPool(defaultInventoryConfig(), defaultOracleConfig(), defaultFeeConfig(), defaultMakerConfig());
-        seedPOL(DeployConfig({
-            baseLiquidity: 100_000 ether,
-            quoteLiquidity: 10_000_000000,
-            floorBps: defaultInventoryConfig().floorBps,
-            recenterPct: defaultInventoryConfig().recenterThresholdPct,
-            divergenceBps: defaultOracleConfig().divergenceBps,
-            allowEmaFallback: defaultOracleConfig().allowEmaFallback
-        }));
+        seedPOL(
+            DeployConfig({
+                baseLiquidity: 100_000 ether,
+                quoteLiquidity: 10_000_000000,
+                floorBps: defaultInventoryConfig().floorBps,
+                recenterPct: defaultInventoryConfig().recenterThresholdPct,
+                divergenceBps: defaultOracleConfig().divergenceBps,
+                allowEmaFallback: defaultOracleConfig().allowEmaFallback
+            })
+        );
 
         _seedUser(alice, 20_000 ether, 2_000_000000);
         _seedUser(bob, 15_000 ether, 1_500_000000);
@@ -88,6 +90,7 @@ abstract contract BaseTest is MathAsserts {
             oracleCfg,
             feeCfg,
             makerCfg,
+            defaultFeatureFlags(),
             guardians
         );
         return newPool;
@@ -113,7 +116,11 @@ abstract contract BaseTest is MathAsserts {
             confCapBpsSpot: 80,
             confCapBpsStrict: 50,
             divergenceBps: 75,
-            allowEmaFallback: true
+            allowEmaFallback: true,
+            confWeightSpreadBps: 10_000,
+            confWeightSigmaBps: 10_000,
+            confWeightPythBps: 10_000,
+            sigmaEwmaLambdaBps: 9000
         });
     }
 
@@ -124,7 +131,11 @@ abstract contract BaseTest is MathAsserts {
             confCapBpsSpot: 40,
             confCapBpsStrict: 30,
             divergenceBps: 25,
-            allowEmaFallback: true
+            allowEmaFallback: true,
+            confWeightSpreadBps: 10_000,
+            confWeightSigmaBps: 10_000,
+            confWeightPythBps: 10_000,
+            sigmaEwmaLambdaBps: 9000
         });
     }
 
@@ -154,6 +165,26 @@ abstract contract BaseTest is MathAsserts {
 
     function defaultMakerConfig() internal pure returns (DnmPool.MakerConfig memory) {
         return DnmPool.MakerConfig({s0Notional: 5_000 ether, ttlMs: 300});
+    }
+
+    function defaultFeatureFlags() internal pure returns (DnmPool.FeatureFlags memory) {
+        return DnmPool.FeatureFlags({blendOn: false, parityCiOn: false, debugEmit: true});
+    }
+
+    function getFeatureFlags() internal view returns (DnmPool.FeatureFlags memory flags) {
+        (bool blendOn, bool parityCiOn, bool debugEmit) = pool.featureFlags();
+        flags = DnmPool.FeatureFlags({blendOn: blendOn, parityCiOn: parityCiOn, debugEmit: debugEmit});
+    }
+
+    function setFeatureFlags(DnmPool.FeatureFlags memory flags) internal {
+        vm.prank(gov);
+        pool.updateParams(DnmPool.ParamKind.Feature, abi.encode(flags));
+    }
+
+    function enableBlend() internal {
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        flags.blendOn = true;
+        setFeatureFlags(flags);
     }
 
     function seedPOL(DeployConfig memory cfg) internal {
@@ -210,7 +241,14 @@ abstract contract BaseTest is MathAsserts {
         oracleHC.setEma(mid, ageSec, success);
     }
 
-    function updatePyth(uint256 hypeUsd, uint256 usdcUsd, uint64 ageHype, uint64 ageUsdc, uint64 confHype, uint64 confUsdc) internal {
+    function updatePyth(
+        uint256 hypeUsd,
+        uint256 usdcUsd,
+        uint64 ageHype,
+        uint64 ageUsdc,
+        uint64 confHype,
+        uint64 confUsdc
+    ) internal {
         IOracleAdapterPyth.PythResult memory result = IOracleAdapterPyth.PythResult({
             hypeUsd: hypeUsd,
             usdcUsd: usdcUsd,

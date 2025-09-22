@@ -134,7 +134,7 @@ contract FeeDynamicsTest is BaseTest {
         require(spikeQuote.feeBpsUsed > cfg.baseBps, "initial fee should spike");
 
         vm.prank(alice);
-        pool.swapExactIn(20 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        pool.swapExactIn(5 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
 
         _setBidAskWithSpread(WAD, 25);
 
@@ -153,6 +153,141 @@ contract FeeDynamicsTest is BaseTest {
         }
 
         EventRecorder.writeCSV(vm, "metrics/fee_B4_decay_series.csv", "block_offset,fee_bps,expected_bps", rows);
+    }
+
+    function test_B5_confidence_fee_correlation_exceeds_threshold() public {
+        _freshPool();
+        enableBlend();
+        FeePolicy.FeeConfig memory cfg = _feeConfig();
+
+        uint256 sampleCount = 9;
+        uint256[] memory observedFees = new uint256[](sampleCount);
+        uint256[] memory confSeries = new uint256[](sampleCount);
+        string[] memory rows = new string[](sampleCount + 1);
+
+        vm.recordLogs();
+
+        for (uint256 i = 0; i < sampleCount; ++i) {
+            vm.roll(block.number + 1);
+            vm.warp(block.timestamp + 1);
+            uint256 spread = 10 + i * 20;
+            uint256 mid = WAD + (i * 5e14);
+            _setBidAskWithSpread(mid, spread);
+            DnmPool.QuoteResult memory quoteRes = quote(10 ether, true, IDnmPool.OracleMode.Spot);
+            observedFees[i] = quoteRes.feeBpsUsed;
+        }
+
+        EventRecorder.ConfidenceDebugEvent[] memory debugEvents =
+            EventRecorder.decodeConfidenceDebug(vm.getRecordedLogs());
+        require(debugEvents.length == sampleCount, "debug event count");
+
+        for (uint256 i = 0; i < sampleCount; ++i) {
+            confSeries[i] = debugEvents[i].confBlendedBps;
+            rows[i] = _formatCorrelationRow(i, confSeries[i], observedFees[i]);
+            require(debugEvents[i].feeTotalBps == observedFees[i], "fee total mismatch");
+
+            uint256 expectedVol =
+                cfg.alphaConfDenominator == 0 ? 0 : (confSeries[i] * cfg.alphaConfNumerator) / cfg.alphaConfDenominator;
+            require(_withinTolerance(debugEvents[i].feeVolBps, expectedVol, 1), "feeVol deviates from alpha*conf");
+            require(debugEvents[i].feeBaseBps == cfg.baseBps, "base component mismatch");
+            require(debugEvents[i].feeInvBps == 0, "inventory component should be zero");
+        }
+
+        int256 corrBps = EventRecorder.computePearsonCorrelation(confSeries, observedFees);
+        require(corrBps >= 8000, "correlation below threshold");
+
+        rows[sampleCount] = _formatCorrelationSummary(corrBps);
+        EventRecorder.writeCSV(vm, "metrics/fee_correlation.csv", "step,conf_bps,fee_bps", rows);
+    }
+
+    function test_B6_confidence_cap_edge_behavior() public {
+        DnmPool.InventoryConfig memory invCfg = defaultInventoryConfig();
+        DnmPool.OracleConfig memory oracleCfg = defaultOracleConfig();
+        oracleCfg.confCapBpsSpot = 400;
+        oracleCfg.confCapBpsStrict = 250;
+
+        FeePolicy.FeeConfig memory feeCfg = defaultFeeConfig();
+        feeCfg.capBps = 150;
+
+        redeployPool(invCfg, oracleCfg, feeCfg, defaultMakerConfig());
+        seedPOL(
+            DeployConfig({
+                baseLiquidity: 100_000 ether,
+                quoteLiquidity: 10_000_000000,
+                floorBps: invCfg.floorBps,
+                recenterPct: invCfg.recenterThresholdPct,
+                divergenceBps: oracleCfg.divergenceBps,
+                allowEmaFallback: oracleCfg.allowEmaFallback
+            })
+        );
+        approveAll(alice);
+        approveAll(bob);
+        approveAll(carol);
+        enableBlend();
+
+        FeePolicy.FeeConfig memory cfgAfter = _feeConfig();
+
+        vm.recordLogs();
+
+        _setBidAskWithSpread(WAD, 40);
+        DnmPool.QuoteResult memory calmQuote = quote(5 ether, true, IDnmPool.OracleMode.Spot);
+        require(calmQuote.feeBpsUsed < feeCfg.capBps, "baseline should be below cap");
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+        _setBidAskWithSpread(WAD, 320);
+        vm.prank(alice);
+        pool.swapExactIn(20 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+
+        uint256 postMeasurements = 5;
+        uint256 entryCount = postMeasurements + 2; // baseline + swap + post samples
+        string[] memory labels = new string[](entryCount);
+        uint256[] memory spreads = new uint256[](entryCount);
+
+        labels[0] = "baseline";
+        spreads[0] = 40;
+
+        labels[1] = "swap_peak";
+        spreads[1] = 320;
+
+        for (uint256 i = 0; i < postMeasurements; ++i) {
+            vm.roll(block.number + 1);
+            vm.warp(block.timestamp + 1);
+            uint256 spread = i % 2 == 0 ? 160 : 80;
+            _setBidAskWithSpread(WAD, spread);
+            DnmPool.QuoteResult memory res = quote(5 ether, true, IDnmPool.OracleMode.Spot);
+            require(res.feeBpsUsed <= feeCfg.capBps, "fee exceeded cap");
+            labels[i + 2] = string.concat("post_", EventRecorder.uintToString(i));
+            spreads[i + 2] = spread;
+        }
+
+        EventRecorder.ConfidenceDebugEvent[] memory debugEvents =
+            EventRecorder.decodeConfidenceDebug(vm.getRecordedLogs());
+        require(debugEvents.length == entryCount, "cap debug events mismatch");
+
+        require(debugEvents[0].feeTotalBps == calmQuote.feeBpsUsed, "baseline fee mismatch");
+        require(debugEvents[0].feeBaseBps == cfgAfter.baseBps, "baseline base component mismatch");
+        require(debugEvents[1].feeTotalBps == feeCfg.capBps, "swap should hit cap exactly");
+        uint256 expectedSwapVol = cfgAfter.alphaConfDenominator == 0
+            ? 0
+            : (debugEvents[1].confBlendedBps * cfgAfter.alphaConfNumerator) / cfgAfter.alphaConfDenominator;
+        require(_withinTolerance(debugEvents[1].feeVolBps, expectedSwapVol, 1), "swap vol mismatch");
+
+        string[] memory csvRows = new string[](entryCount + 1);
+        csvRows[0] = _formatCapEdgeRow(labels[0], spreads[0], debugEvents[0].confBlendedBps, debugEvents[0].feeTotalBps);
+        for (uint256 i = 1; i < entryCount; ++i) {
+            EventRecorder.ConfidenceDebugEvent memory evt = debugEvents[i];
+            require(evt.feeTotalBps <= feeCfg.capBps, "event fee above cap");
+            require(evt.feeBaseBps == cfgAfter.baseBps, "base component drift");
+            uint256 expectedVol = cfgAfter.alphaConfDenominator == 0
+                ? 0
+                : (evt.confBlendedBps * cfgAfter.alphaConfNumerator) / cfgAfter.alphaConfDenominator;
+            require(_withinTolerance(evt.feeVolBps, expectedVol, 1), "vol component mismatch");
+            csvRows[i] = _formatCapEdgeRow(labels[i], spreads[i], evt.confBlendedBps, evt.feeTotalBps);
+        }
+
+        csvRows[entryCount] = _formatCapEdgeRow("cap", feeCfg.capBps, feeCfg.capBps, feeCfg.capBps);
+        EventRecorder.writeCSV(vm, "metrics/fee_cap_edge.csv", "label,spread_bps,conf_bps,fee_bps", csvRows);
     }
 
     // --- helpers ---
@@ -209,6 +344,40 @@ contract FeeDynamicsTest is BaseTest {
             EventRecorder.uintToString(actualFee),
             ",",
             EventRecorder.uintToString(expectedFee)
+        );
+    }
+
+    function _formatCorrelationRow(uint256 step, uint256 confBps, uint256 feeBps)
+        internal
+        pure
+        returns (string memory)
+    {
+        return string.concat(
+            EventRecorder.uintToString(step),
+            ",",
+            EventRecorder.uintToString(confBps),
+            ",",
+            EventRecorder.uintToString(feeBps)
+        );
+    }
+
+    function _formatCorrelationSummary(int256 corrBps) internal pure returns (string memory) {
+        return string.concat("correlation,", EventRecorder.intToString(corrBps), ",");
+    }
+
+    function _formatCapEdgeRow(string memory label, uint256 spreadBps, uint256 confBps, uint256 feeBps)
+        internal
+        pure
+        returns (string memory)
+    {
+        return string.concat(
+            label,
+            ",",
+            EventRecorder.uintToString(spreadBps),
+            ",",
+            EventRecorder.uintToString(confBps),
+            ",",
+            EventRecorder.uintToString(feeBps)
         );
     }
 

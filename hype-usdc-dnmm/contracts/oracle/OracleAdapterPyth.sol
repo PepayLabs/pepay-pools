@@ -52,7 +52,12 @@ contract OracleAdapterPyth is IOracleAdapterPyth {
         });
     }
 
-    function computePairMid(PythResult memory result) external pure override returns (uint256 mid, uint256 ageSec, uint256 confBps) {
+    function computePairMid(PythResult memory result)
+        external
+        pure
+        override
+        returns (uint256 mid, uint256 ageSec, uint256 confBps)
+    {
         if (!result.success || result.usdcUsd == 0) {
             return (0, type(uint256).max, type(uint256).max);
         }

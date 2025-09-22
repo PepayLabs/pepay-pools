@@ -26,10 +26,8 @@ contract ScenarioHedgeSignalsOptTest is BaseTest {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; ++i) {
             if (logs[i].topics.length > 0 && logs[i].topics[0] == EventRecorder.targetXstarSig()) {
-                (uint128 oldTarget, uint128 updatedTarget, uint256 mid, uint64 ts) = abi.decode(
-                    logs[i].data,
-                    (uint128, uint128, uint256, uint64)
-                );
+                (uint128 oldTarget, uint128 updatedTarget, uint256 mid, uint64 ts) =
+                    abi.decode(logs[i].data, (uint128, uint128, uint256, uint64));
                 assertEq(oldTarget, target, "old target");
                 assertEq(updatedTarget, newTarget, "new target");
                 assertEq(mid, pool.lastMid(), "mid context");

@@ -195,7 +195,10 @@ contract MockCurveDEX {
         amountOut = baseReserves - newBase;
     }
 
-    function swapBaseIn(uint256 amountIn, uint256 minAmountOut, address recipient) external returns (uint256 amountOut) {
+    function swapBaseIn(uint256 amountIn, uint256 minAmountOut, address recipient)
+        external
+        returns (uint256 amountOut)
+    {
         require(base.transferFrom(msg.sender, address(this), amountIn), "BASE_IN");
         amountOut = quoteBaseIn(amountIn);
         require(amountOut >= minAmountOut, "SLIPPAGE");
@@ -204,7 +207,10 @@ contract MockCurveDEX {
         require(quote.transfer(recipient, amountOut), "QUOTE_OUT");
     }
 
-    function swapQuoteIn(uint256 amountIn, uint256 minAmountOut, address recipient) external returns (uint256 amountOut) {
+    function swapQuoteIn(uint256 amountIn, uint256 minAmountOut, address recipient)
+        external
+        returns (uint256 amountOut)
+    {
         require(quote.transferFrom(msg.sender, address(this), amountIn), "QUOTE_IN");
         amountOut = quoteQuoteIn(amountIn);
         require(amountOut >= minAmountOut, "SLIPPAGE");

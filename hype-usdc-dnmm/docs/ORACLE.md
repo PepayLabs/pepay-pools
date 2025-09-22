@@ -5,7 +5,8 @@
 - **IDs**: Fill in `config/oracle.ids.json` (`assetIdHype`, `assetIdUsdc`, `marketIdHypeUsdc`, `precompile`).
 - **Selectors**: Placeholder function selectors exist in `OracleAdapterHC.sol`; replace with official HyperEVM ABI once published.
 - **Freshness**: `maxAgeSec` (Lifinity slots → seconds) and `stallWindowSec` enforce recency before swaps progress.
-- **Confidence Proxy**: Uses top-of-book spread; capped by `confCapBpsSpot` or `confCapBpsStrict` depending on mode.
+- **Confidence Proxy**: Confidence is blended via `conf_bps = max(w_spread·spread, w_sigma·sigma, w_pyth·pyth_conf)` with weights sourced from `config/parameters_default.json`. Components are clamped by the relevant cap (`confCapBpsSpot` / `confCapBpsStrict`).
+- **Sigma EWMA**: `sigma` tracks realized volatility as an EWMA of per-block price deltas (λ ≈ 0.9). Sigma updates run at-most-once per block and seed from configured weights when `BLEND_ON` is enabled.
 
 ### Adapter Functions
 - `readMidAndAge()` – Spot mid and age (seconds) from HyperCore.

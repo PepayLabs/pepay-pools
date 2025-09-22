@@ -23,7 +23,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         Oracle,
         Fee,
         Inventory,
-        Maker
+        Maker,
+        Feature
     }
 
     struct TokenConfig {
@@ -53,6 +54,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint16 confCapBpsStrict;
         uint16 divergenceBps;
         bool allowEmaFallback;
+        uint16 confWeightSpreadBps;
+        uint16 confWeightSigmaBps;
+        uint16 confWeightPythBps;
+        uint16 sigmaEwmaLambdaBps; // 0-10000 (1.0 -> 10000)
     }
 
     struct MakerConfig {
@@ -60,9 +65,21 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint32 ttlMs;
     }
 
+    struct FeatureFlags {
+        bool blendOn;
+        bool parityCiOn;
+        bool debugEmit;
+    }
+
     struct Guardians {
         address governance;
         address pauser;
+    }
+
+    struct ConfidenceState {
+        uint64 lastSigmaBlock;
+        uint64 sigmaBps;
+        uint128 lastObservedMid;
     }
 
     struct OracleOutcome {
@@ -70,8 +87,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 confBps;
         uint256 spreadBps;
         uint256 ageSec;
-        uint256 fallbackMid;
-        uint256 fallbackConfBps;
+        uint256 sigmaBps;
+        uint256 confSpreadBps;
+        uint256 confSigmaBps;
+        uint256 confPythBps;
         bool usedFallback;
         bytes32 reason;
     }
@@ -92,6 +111,9 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
     uint256 public lastMid;
     uint64 public lastMidTimestamp;
+
+    FeatureFlags public featureFlags;
+    ConfidenceState private confidenceState;
 
     bytes32 private constant REASON_NONE = bytes32(0);
     bytes32 private constant REASON_FLOOR = bytes32("FLOOR");
@@ -115,6 +137,17 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     event Paused(address indexed caller);
     event Unpaused(address indexed caller);
     event TargetBaseXstarUpdated(uint128 oldTarget, uint128 newTarget, uint256 mid, uint64 timestamp);
+    event ConfidenceDebug(
+        uint256 confSpreadBps,
+        uint256 confSigmaBps,
+        uint256 confPythBps,
+        uint256 confBlendedBps,
+        uint256 sigmaBps,
+        uint256 feeBaseBps,
+        uint256 feeVolBps,
+        uint256 feeInvBps,
+        uint256 feeTotalBps
+    );
 
     modifier onlyGovernance() {
         require(msg.sender == guardians.governance, Errors.NOT_GOVERNANCE);
@@ -142,6 +175,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         OracleConfig memory oracleConfig_,
         FeePolicy.FeeConfig memory feeConfig_,
         MakerConfig memory makerConfig_,
+        FeatureFlags memory featureFlags_,
         Guardians memory guardians_
     ) {
         require(baseToken_ != address(0) && quoteToken_ != address(0), "TOKENS_ZERO");
@@ -149,6 +183,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         require(inventoryConfig_.floorBps <= 5000, Errors.INVALID_CONFIG);
         require(feeConfig_.capBps >= feeConfig_.baseBps, Errors.INVALID_CONFIG);
         require(oracleConfig_.confCapBpsStrict <= oracleConfig_.confCapBpsSpot, Errors.INVALID_CONFIG);
+        require(oracleConfig_.sigmaEwmaLambdaBps <= BPS, Errors.INVALID_CONFIG);
 
         tokenConfig = TokenConfig({
             baseToken: baseToken_,
@@ -165,17 +200,16 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         oracleConfig = oracleConfig_;
         feeConfig = feeConfig_;
         makerConfig = makerConfig_;
+        featureFlags = featureFlags_;
         guardians = guardians_;
     }
 
     // --- User actions ---
 
-    function quoteSwapExactIn(
-        uint256 amountIn,
-        bool isBaseIn,
-        OracleMode mode,
-        bytes calldata oracleData
-    ) external returns (QuoteResult memory result) {
+    function quoteSwapExactIn(uint256 amountIn, bool isBaseIn, OracleMode mode, bytes calldata oracleData)
+        external
+        returns (QuoteResult memory result)
+    {
         result = _quoteInternal(amountIn, isBaseIn, mode, oracleData, false);
     }
 
@@ -221,14 +255,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         lastMidTimestamp = uint64(block.timestamp);
 
         emit SwapExecuted(
-            msg.sender,
-            isBaseIn,
-            actualAmountIn,
-            amountOut,
-            result.midUsed,
-            result.feeBpsUsed,
-            isPartial,
-            result.reason
+            msg.sender, isBaseIn, actualAmountIn, amountOut, result.midUsed, result.feeBpsUsed, isPartial, result.reason
         );
     }
 
@@ -238,17 +265,16 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         override
         returns (uint256 bidPx, uint256 askPx, uint256 ttlMs, bytes32 quoteId)
     {
+        OracleConfig memory cfg = oracleConfig;
         IOracleAdapterHC.MidResult memory midRes = oracleHC.readMidAndAge();
-        require(midRes.success && midRes.ageSec <= oracleConfig.maxAgeSec, Errors.ORACLE_STALE);
+        require(midRes.success && midRes.ageSec <= cfg.maxAgeSec, Errors.ORACLE_STALE);
         IOracleAdapterHC.BidAskResult memory baRes = oracleHC.readBidAsk();
 
-        uint256 confBps = _capConfidence(baRes.spreadBps, 0, OracleMode.Spot);
+        uint256 confBps = _previewConfidenceView(cfg, OracleMode.Spot, baRes.spreadBps, baRes.success, false, 0);
         uint256 invDev = _computeInventoryDeviationBps(midRes.mid);
-        FeePolicy.FeeState memory state = FeePolicy.FeeState({
-            lastBlock: feeState.lastBlock,
-            lastFeeBps: feeState.lastFeeBps
-        });
-        (uint16 feeBps, ) = FeePolicy.preview(state, feeConfig, confBps, invDev, block.number);
+        FeePolicy.FeeState memory state =
+            FeePolicy.FeeState({lastBlock: feeState.lastBlock, lastFeeBps: feeState.lastFeeBps});
+        (uint16 feeBps,) = FeePolicy.preview(state, feeConfig, confBps, invDev, block.number);
 
         bidPx = FixedPointMath.mulDivDown(midRes.mid, BPS - feeBps, BPS);
         askPx = FixedPointMath.mulDivUp(midRes.mid, BPS + feeBps, BPS);
@@ -270,14 +296,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         )
     {
         TokenConfig memory cfg = tokenConfig;
-        return (
-            cfg.baseToken,
-            cfg.quoteToken,
-            cfg.baseDecimals,
-            cfg.quoteDecimals,
-            cfg.baseScale,
-            cfg.quoteScale
-        );
+        return (cfg.baseToken, cfg.quoteToken, cfg.baseDecimals, cfg.quoteDecimals, cfg.baseScale, cfg.quoteScale);
     }
 
     // --- Governance ---
@@ -306,6 +325,11 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             MakerConfig memory newCfg = abi.decode(data, (MakerConfig));
             makerConfig = newCfg;
             emit ParamsUpdated("MAKER", abi.encode(oldCfg), data);
+        } else if (kind == ParamKind.Feature) {
+            FeatureFlags memory oldFlags = featureFlags;
+            FeatureFlags memory newFlags = abi.decode(data, (FeatureFlags));
+            featureFlags = newFlags;
+            emit ParamsUpdated("FEATURE", abi.encode(oldFlags), data);
         } else {
             revert("PARAM_KIND");
         }
@@ -313,7 +337,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
     function setTargetBaseXstar(uint128 newTarget) external onlyGovernance {
         require(lastMid > 0, "MID_UNSET");
-        uint256 deviationBps = FixedPointMath.toBps(FixedPointMath.absDiff(uint256(newTarget), uint256(inventoryConfig.targetBaseXstar)), inventoryConfig.targetBaseXstar == 0 ? 1 : inventoryConfig.targetBaseXstar);
+        uint256 deviationBps = FixedPointMath.toBps(
+            FixedPointMath.absDiff(uint256(newTarget), uint256(inventoryConfig.targetBaseXstar)),
+            inventoryConfig.targetBaseXstar == 0 ? 1 : inventoryConfig.targetBaseXstar
+        );
         require(deviationBps >= inventoryConfig.recenterThresholdPct, "THRESHOLD");
         uint128 oldTarget = inventoryConfig.targetBaseXstar;
         inventoryConfig.targetBaseXstar = newTarget;
@@ -351,15 +378,36 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         OracleOutcome memory outcome = _readOracle(mode, oracleData);
 
         uint256 invDevBps = _computeInventoryDeviationBps(outcome.mid);
+        FeePolicy.FeeConfig memory cfg = feeConfig;
         uint16 feeBps;
         if (shouldSettleFee) {
-            feeBps = FeePolicy.settle(feeState, feeConfig, outcome.confBps, invDevBps);
+            feeBps = FeePolicy.settle(feeState, cfg, outcome.confBps, invDevBps);
         } else {
-            FeePolicy.FeeState memory state = FeePolicy.FeeState({
-                lastBlock: feeState.lastBlock,
-                lastFeeBps: feeState.lastFeeBps
-            });
-            (feeBps, ) = FeePolicy.preview(state, feeConfig, outcome.confBps, invDevBps, block.number);
+            FeePolicy.FeeState memory state =
+                FeePolicy.FeeState({lastBlock: feeState.lastBlock, lastFeeBps: feeState.lastFeeBps});
+            (feeBps,) = FeePolicy.preview(state, cfg, outcome.confBps, invDevBps, block.number);
+        }
+
+        if (featureFlags.debugEmit) {
+            uint256 feeBaseComponent = cfg.baseBps;
+            uint256 feeVolComponent = cfg.alphaConfDenominator == 0
+                ? 0
+                : FixedPointMath.mulDivDown(outcome.confBps, cfg.alphaConfNumerator, cfg.alphaConfDenominator);
+            uint256 feeInvComponent = cfg.betaInvDevDenominator == 0
+                ? 0
+                : FixedPointMath.mulDivDown(invDevBps, cfg.betaInvDevNumerator, cfg.betaInvDevDenominator);
+
+            emit ConfidenceDebug(
+                outcome.confSpreadBps,
+                outcome.confSigmaBps,
+                outcome.confPythBps,
+                outcome.confBps,
+                outcome.sigmaBps,
+                feeBaseComponent,
+                feeVolComponent,
+                feeInvComponent,
+                feeBps
+            );
         }
 
         uint256 amountOut;
@@ -377,27 +425,19 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         });
     }
 
-    function _computeSwapAmounts(
-        uint256 amountIn,
-        bool isBaseIn,
-        uint256 mid,
-        uint256 feeBps
-    ) internal view returns (uint256 amountOut, uint256 appliedAmountIn, bytes32 reason) {
+    function _computeSwapAmounts(uint256 amountIn, bool isBaseIn, uint256 mid, uint256 feeBps)
+        internal
+        view
+        returns (uint256 amountOut, uint256 appliedAmountIn, bytes32 reason)
+    {
         require(feeBps < BPS, "FEE_CAP");
-        Inventory.Tokens memory invTokens = Inventory.Tokens({
-            baseScale: tokenConfig.baseScale,
-            quoteScale: tokenConfig.quoteScale
-        });
+        Inventory.Tokens memory invTokens =
+            Inventory.Tokens({baseScale: tokenConfig.baseScale, quoteScale: tokenConfig.quoteScale});
 
         bool didPartial;
         if (isBaseIn) {
             (amountOut, appliedAmountIn, didPartial) = Inventory.quoteBaseIn(
-                amountIn,
-                mid,
-                feeBps,
-                uint256(reserves.quoteReserves),
-                inventoryConfig.floorBps,
-                invTokens
+                amountIn, mid, feeBps, uint256(reserves.quoteReserves), inventoryConfig.floorBps, invTokens
             );
             if (appliedAmountIn > amountIn) {
                 appliedAmountIn = amountIn;
@@ -405,12 +445,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             reason = didPartial ? REASON_FLOOR : REASON_NONE;
         } else {
             (amountOut, appliedAmountIn, didPartial) = Inventory.quoteQuoteIn(
-                amountIn,
-                mid,
-                feeBps,
-                uint256(reserves.baseReserves),
-                inventoryConfig.floorBps,
-                invTokens
+                amountIn, mid, feeBps, uint256(reserves.baseReserves), inventoryConfig.floorBps, invTokens
             );
             if (appliedAmountIn > amountIn) {
                 appliedAmountIn = amountIn;
@@ -420,10 +455,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     }
 
     function _computeInventoryDeviationBps(uint256 mid) internal view returns (uint256) {
-        Inventory.Tokens memory invTokens = Inventory.Tokens({
-            baseScale: tokenConfig.baseScale,
-            quoteScale: tokenConfig.quoteScale
-        });
+        Inventory.Tokens memory invTokens =
+            Inventory.Tokens({baseScale: tokenConfig.baseScale, quoteScale: tokenConfig.quoteScale});
         return Inventory.deviationBps(
             uint256(reserves.baseReserves),
             uint256(reserves.quoteReserves),
@@ -438,7 +471,6 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         IOracleAdapterHC.MidResult memory midRes = oracleHC.readMidAndAge();
         IOracleAdapterHC.BidAskResult memory baRes = oracleHC.readBidAsk();
 
-        IOracleAdapterPyth.PythResult memory pythResult;
         uint256 pythMid;
         uint256 pythAge;
         uint256 pythConf;
@@ -446,22 +478,21 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
         if (address(oraclePyth) != address(0)) {
             try oraclePyth.readPythUsdMid(oracleData) returns (IOracleAdapterPyth.PythResult memory res) {
-                pythResult = res;
                 if (res.success) {
                     (pythMid, pythAge, pythConf) = oraclePyth.computePairMid(res);
                     pythFresh = pythMid > 0 && pythAge <= cfg.maxAgeSec;
                 }
             } catch {
-                // ignore
+                // ignore precompile errors; handled via staleness/guards below
             }
         }
 
         bool spotEligible = midRes.success && baRes.success && midRes.ageSec <= cfg.maxAgeSec;
+        bool spreadAvailable = baRes.success;
         bool spreadAcceptable = baRes.spreadBps <= cfg.confCapBpsSpot;
 
         if (spotEligible && spreadAcceptable) {
             outcome.mid = midRes.mid;
-            outcome.confBps = _capConfidence(baRes.spreadBps, pythFresh ? pythConf : 0, mode);
             outcome.spreadBps = baRes.spreadBps;
             outcome.ageSec = midRes.ageSec;
             outcome.reason = REASON_NONE;
@@ -470,7 +501,6 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             bool emaFresh = emaRes.success && emaRes.ageSec <= cfg.maxAgeSec && emaRes.ageSec <= cfg.stallWindowSec;
             if (emaFresh) {
                 outcome.mid = emaRes.mid;
-                outcome.confBps = _capConfidence(baRes.success ? baRes.spreadBps : 0, pythFresh ? pythConf : 0, mode);
                 outcome.spreadBps = baRes.success ? baRes.spreadBps : 0;
                 outcome.ageSec = emaRes.ageSec;
                 outcome.usedFallback = true;
@@ -480,14 +510,17 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
         if (outcome.mid == 0 && pythFresh) {
             outcome.mid = pythMid;
-            outcome.confBps = _capConfidence(pythConf, pythConf, mode);
             outcome.spreadBps = 0;
             outcome.ageSec = pythAge;
             outcome.usedFallback = true;
             outcome.reason = REASON_PYTH;
+            spreadAvailable = false;
         }
 
         require(outcome.mid > 0, Errors.ORACLE_STALE);
+
+        (outcome.confBps, outcome.confSpreadBps, outcome.confSigmaBps, outcome.confPythBps, outcome.sigmaBps) =
+            _computeConfidence(cfg, mode, outcome.mid, outcome.spreadBps, spreadAvailable, pythFresh, pythConf);
 
         if (!outcome.usedFallback && pythFresh && cfg.divergenceBps > 0) {
             uint256 divergenceBps = OracleUtils.computeDivergenceBps(outcome.mid, pythMid);
@@ -497,16 +530,131 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         return outcome;
     }
 
-    function _capConfidence(
-        uint256 primary,
-        uint256 fallbackConf,
-        OracleMode mode
-    ) internal view returns (uint256) {
-        uint256 conf = primary;
-        if (fallbackConf > conf) conf = fallbackConf;
-        uint256 cap = mode == OracleMode.Strict ? oracleConfig.confCapBpsStrict : oracleConfig.confCapBpsSpot;
-        if (cap > 0 && conf > cap) conf = cap;
-        return conf;
+    function _computeConfidence(
+        OracleConfig memory cfg,
+        OracleMode mode,
+        uint256 mid,
+        uint256 spreadBps,
+        bool spreadAvailable,
+        bool pythFresh,
+        uint256 pythConf
+    )
+        internal
+        returns (uint256 confBps, uint256 confSpreadBps, uint256 confSigmaBps, uint256 confPythBps, uint256 sigmaBps)
+    {
+        uint256 cap = mode == OracleMode.Strict ? cfg.confCapBpsStrict : cfg.confCapBpsSpot;
+        uint256 fallbackConf = pythFresh ? pythConf : 0;
+
+        if (!featureFlags.blendOn) {
+            uint256 primary = spreadAvailable ? spreadBps : 0;
+            confBps = primary;
+            if (fallbackConf > confBps) confBps = fallbackConf;
+            if (cap > 0 && confBps > cap) confBps = cap;
+
+            if (featureFlags.debugEmit) {
+                confSpreadBps = FixedPointMath.min(primary, cap);
+                confSigmaBps = 0;
+            }
+            confPythBps = FixedPointMath.min(fallbackConf, cap);
+            ConfidenceState storage state = confidenceState;
+            state.lastObservedMid = uint128(mid);
+            sigmaBps = state.sigmaBps;
+            return (confBps, confSpreadBps, confSigmaBps, confPythBps, sigmaBps);
+        }
+
+        uint256 spreadSample = spreadAvailable ? FixedPointMath.min(spreadBps, cap) : 0;
+        sigmaBps = _updateSigma(cfg, mid, spreadSample);
+
+        confSpreadBps = spreadAvailable ? FixedPointMath.mulDivDown(spreadSample, cfg.confWeightSpreadBps, BPS) : 0;
+        uint256 cappedSigma = cap > 0 ? FixedPointMath.min(sigmaBps, cap) : sigmaBps;
+        confSigmaBps = cappedSigma > 0 ? FixedPointMath.mulDivDown(cappedSigma, cfg.confWeightSigmaBps, BPS) : 0;
+        uint256 cappedPyth = cap > 0 ? FixedPointMath.min(fallbackConf, cap) : fallbackConf;
+        confPythBps = cappedPyth > 0 ? FixedPointMath.mulDivDown(cappedPyth, cfg.confWeightPythBps, BPS) : 0;
+
+        confBps = confSpreadBps;
+        if (confSigmaBps > confBps) confBps = confSigmaBps;
+        if (confPythBps > confBps) confBps = confPythBps;
+        if (cap > 0 && confBps > cap) confBps = cap;
+
+        return (confBps, confSpreadBps, confSigmaBps, confPythBps, sigmaBps);
+    }
+
+    function _updateSigma(OracleConfig memory cfg, uint256 mid, uint256 spreadSample) internal returns (uint256) {
+        ConfidenceState storage state = confidenceState;
+
+        if (state.lastSigmaBlock == uint64(block.number)) {
+            state.lastObservedMid = uint128(mid);
+            return state.sigmaBps;
+        }
+
+        uint256 cap = cfg.confCapBpsSpot;
+        uint256 sample = spreadSample;
+
+        if (state.lastObservedMid > 0 && mid > 0) {
+            uint256 priorMid = uint256(state.lastObservedMid);
+            uint256 deltaBps = FixedPointMath.toBps(FixedPointMath.absDiff(mid, priorMid), priorMid);
+            if (cap > 0 && deltaBps > cap) {
+                deltaBps = cap;
+            }
+            if (deltaBps > sample) {
+                sample = deltaBps;
+            }
+        }
+
+        uint256 lambda = cfg.sigmaEwmaLambdaBps;
+        uint256 newSigma;
+
+        if (state.lastSigmaBlock == 0) {
+            newSigma = sample;
+        } else if (lambda >= BPS) {
+            newSigma = state.sigmaBps;
+        } else {
+            uint256 prevSigma = state.sigmaBps;
+            newSigma = (prevSigma * lambda + sample * (BPS - lambda)) / BPS;
+        }
+
+        if (cap > 0 && newSigma > cap) {
+            newSigma = cap;
+        }
+
+        state.lastSigmaBlock = uint64(block.number);
+        state.sigmaBps = uint64(newSigma);
+        state.lastObservedMid = uint128(mid);
+
+        return newSigma;
+    }
+
+    function _previewConfidenceView(
+        OracleConfig memory cfg,
+        OracleMode mode,
+        uint256 spreadBps,
+        bool spreadAvailable,
+        bool pythFresh,
+        uint256 pythConf
+    ) internal view returns (uint256 confBps) {
+        uint256 cap = mode == OracleMode.Strict ? cfg.confCapBpsStrict : cfg.confCapBpsSpot;
+        uint256 fallbackConf = pythFresh ? pythConf : 0;
+
+        if (!featureFlags.blendOn) {
+            uint256 conf = spreadAvailable ? spreadBps : 0;
+            if (fallbackConf > conf) conf = fallbackConf;
+            if (cap > 0 && conf > cap) conf = cap;
+            return conf;
+        }
+
+        uint256 spreadSample = spreadAvailable ? FixedPointMath.min(spreadBps, cap) : 0;
+        uint256 sigmaStored = confidenceState.sigmaBps;
+        uint256 cappedSigma = cap > 0 ? FixedPointMath.min(sigmaStored, cap) : sigmaStored;
+
+        uint256 confSpread = spreadAvailable ? FixedPointMath.mulDivDown(spreadSample, cfg.confWeightSpreadBps, BPS) : 0;
+        uint256 confSigma = cappedSigma > 0 ? FixedPointMath.mulDivDown(cappedSigma, cfg.confWeightSigmaBps, BPS) : 0;
+        uint256 cappedPyth = cap > 0 ? FixedPointMath.min(fallbackConf, cap) : fallbackConf;
+        uint256 confPyth = cappedPyth > 0 ? FixedPointMath.mulDivDown(cappedPyth, cfg.confWeightPythBps, BPS) : 0;
+
+        confBps = confSpread;
+        if (confSigma > confBps) confBps = confSigma;
+        if (confPyth > confBps) confBps = confPyth;
+        if (cap > 0 && confBps > cap) confBps = cap;
     }
 
     function _pow10(uint8 exp) private pure returns (uint256) {

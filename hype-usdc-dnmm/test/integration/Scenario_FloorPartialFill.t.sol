@@ -60,8 +60,8 @@ contract ScenarioFloorPartialFillTest is BaseTest {
         deal(address(usdc), bob, 10_000_000000);
         approveAll(bob);
 
-        (uint128 baseBefore, ) = pool.reserves();
-        (, uint16 floorBps, ) = pool.inventoryConfig();
+        (uint128 baseBefore,) = pool.reserves();
+        (, uint16 floorBps,) = pool.inventoryConfig();
         uint256 expectedBaseFloor = Inventory.floorAmount(uint256(baseBefore), floorBps);
 
         recordLogs();
@@ -71,7 +71,7 @@ contract ScenarioFloorPartialFillTest is BaseTest {
         assertTrue(swaps[0].isPartial, "partial quote in");
         assertEq(swaps[0].reason, bytes32("FLOOR"), "floor reason quote");
 
-        (uint128 baseAfter, ) = pool.reserves();
+        (uint128 baseAfter,) = pool.reserves();
         assertEq(uint256(baseAfter), expectedBaseFloor, "base reserves at floor");
     }
 }

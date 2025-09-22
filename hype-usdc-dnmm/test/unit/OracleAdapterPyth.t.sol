@@ -53,7 +53,7 @@ contract OracleAdapterPythTest is Test {
         IOracleAdapterPyth.PythResult memory res = adapter.readPythUsdMid(bytes(""));
         (uint256 mid, uint256 age,) = adapter.computePairMid(res);
         assertTrue(res.success, "success");
-        assertGt(age, 10, "age picks worst" );
+        assertGt(age, 10, "age picks worst");
         assertEq(mid, (res.hypeUsd * 1e18) / res.usdcUsd, "mid matches ratio");
     }
 

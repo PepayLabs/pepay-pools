@@ -36,3 +36,4 @@
 ## Change Log
 - 2024-05-24: Folder initialized with contracts, docs, and Foundry harness.
 - 2024-05-25: Synced fee/oracle config, added Inventory/Fee libraries, extended tests and tooling.
+- 2024-07-12: Integrated Phase 8 confidence blend (EWMA sigma, feature flags), diagnostics, and extended fee parity metrics.

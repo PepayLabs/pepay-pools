@@ -6,7 +6,11 @@
       "maxAgeSec": 48,
       "stallWindowSec": 10,
       "allowEmaFallback": true,
-      "divergenceBps": 50
+      "divergenceBps": 50,
+      "confWeightSpreadBps": 10000,
+      "confWeightSigmaBps": 10000,
+      "confWeightPythBps": 10000,
+      "sigmaEwmaLambdaBps": 9000
     },
     "pyth": {
       "maxAgeSec": 40000,

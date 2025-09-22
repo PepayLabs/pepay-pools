@@ -78,7 +78,11 @@ contract TupleSweepTest is Test {
             confCapBpsSpot: 80,
             confCapBpsStrict: 50,
             divergenceBps: 90,
-            allowEmaFallback: true
+            allowEmaFallback: true,
+            confWeightSpreadBps: 10_000,
+            confWeightSigmaBps: 10_000,
+            confWeightPythBps: 10_000,
+            sigmaEwmaLambdaBps: 9000
         });
         FeePolicy.FeeConfig memory feeCfg = FeePolicy.FeeConfig({
             baseBps: 12,
@@ -103,6 +107,7 @@ contract TupleSweepTest is Test {
             oracleCfg,
             feeCfg,
             makerCfg,
+            DnmPool.FeatureFlags({blendOn: false, parityCiOn: false, debugEmit: true}),
             guardians
         );
 

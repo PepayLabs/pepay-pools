@@ -17,7 +17,9 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
     mapping(uint256 => bool) public consumedSalts;
 
     event MakerKeyUpdated(address indexed oldKey, address indexed newKey);
-    event QuoteFilled(address indexed taker, bool isBaseIn, uint256 amountIn, uint256 amountOut, uint256 expiry, uint256 salt);
+    event QuoteFilled(
+        address indexed taker, bool isBaseIn, uint256 amountIn, uint256 amountOut, uint256 expiry, uint256 salt
+    );
 
     modifier onlyOwner() {
         require(msg.sender == owner, "NOT_OWNER");
@@ -31,11 +33,12 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         owner = msg.sender;
     }
 
-    function verifyAndSwap(
-        bytes calldata makerSignature,
-        QuoteParams calldata params,
-        bytes calldata oracleData
-    ) external nonReentrant override returns (uint256 amountOut) {
+    function verifyAndSwap(bytes calldata makerSignature, QuoteParams calldata params, bytes calldata oracleData)
+        external
+        override
+        nonReentrant
+        returns (uint256 amountOut)
+    {
         require(params.taker == msg.sender, "NOT_TAKER");
         require(block.timestamp <= params.expiry, "RFQ_EXPIRED");
         require(!consumedSalts[params.salt], "RFQ_USED");
@@ -55,12 +58,7 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
 
         inputToken.safeApprove(address(pool), params.amountIn);
         uint256 poolAmountOut = pool.swapExactIn(
-            params.amountIn,
-            params.minAmountOut,
-            params.isBaseIn,
-            IDnmPool.OracleMode.Spot,
-            oracleData,
-            params.expiry
+            params.amountIn, params.minAmountOut, params.isBaseIn, IDnmPool.OracleMode.Spot, oracleData, params.expiry
         );
         inputToken.safeApprove(address(pool), 0);
 
@@ -92,7 +90,9 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
     function _hashQuote(QuoteParams calldata params) internal view returns (bytes32) {
         bytes32 structHash = keccak256(
             abi.encode(
-                keccak256("Quote(address taker,uint256 amountIn,uint256 minAmountOut,bool isBaseIn,uint256 expiry,uint256 salt,address pool,uint256 chainId)"),
+                keccak256(
+                    "Quote(address taker,uint256 amountIn,uint256 minAmountOut,bool isBaseIn,uint256 expiry,uint256 salt,address pool,uint256 chainId)"
+                ),
                 params.taker,
                 params.amountIn,
                 params.minAmountOut,
@@ -120,5 +120,4 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         require(v == 27 || v == 28, "SIG_V");
         return ecrecover(digest, v, r, s);
     }
-
 }

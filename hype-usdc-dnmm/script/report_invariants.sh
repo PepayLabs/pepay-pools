@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import argparse
 import json
 import os
@@ -31,6 +33,8 @@ def parse_log(log_path: Path) -> dict:
         "sample": None,
         "estimate_secs": None,
         "target_runs": None,
+        "eta_parallel_secs": None,
+        "eta_sequential_secs": None,
         "shards": [],
         "suite_runs": [],
         "durations": [],
@@ -53,34 +57,93 @@ def parse_log(log_path: Path) -> dict:
             report["estimate_secs"] = int(est_secs)
             report["target_runs"] = int(target_runs)
 
-    shard_lines = [line for line in lines if "Shard" in line and "seed=" in line]
+    eta_line = next((line for line in lines if "Parallel ETA" in line), None)
+    if eta_line:
+        eta_match = re.search(r"Parallel ETA ≈\s+(\d+)s.*sequential\s+(\d+)s", eta_line)
+        if eta_match:
+            report["eta_parallel_secs"] = int(eta_match.group(1))
+            report["eta_sequential_secs"] = int(eta_match.group(2))
+
+    shard_lines = [line for line in lines if line.startswith("▶️  Shard")]
     for line in shard_lines:
-        match = re.search(r"Shard\s+(\d+)/(\d+)\s+seed=(\d+)(?:\s+runs=(\d+))?", line)
+        match = re.search(r"Shard\s+(\d+)/(\d+)\s+seed=(\d+)\s+runs_planned=(\d+)(?:\s+\(skipped\))?", line)
+        bool_skipped = "(skipped)" in line
         if match:
-            shard_idx, shard_total, seed, runs = match.groups()
-            report["shards"].append({
-                "index": int(shard_idx),
-                "total": int(shard_total),
-                "seed": int(seed),
-                "runs": int(runs) if runs else None,
-            })
+            shard_idx, shard_total, seed, planned = match.groups()
+            planned_int = int(planned)
+        else:
+            legacy = re.search(r"Shard\s+(\d+)/(\d+)\s+seed=(\d+)\s+runs=(\d+)", line)
+            if not legacy:
+                continue
+            shard_idx, shard_total, seed, planned = legacy.groups()
+            planned_int = int(planned)
+            bool_skipped = planned_int == 0
+        report["shards"].append({
+            "index": int(shard_idx),
+            "total": int(shard_total),
+            "seed": int(seed),
+            "planned_runs": planned_int,
+            "skipped": bool_skipped,
+        })
 
-    pass_lines = [line for line in lines if "[PASS]" in line and "runs:" in line and "reverts:" in line]
-    for idx, line in enumerate(pass_lines):
-        match = re.search(r"runs:\s*(\d+).*reverts:\s*(\d+)", line)
-        if match:
-            runs, reverts = match.groups()
-            entry = {"runs": int(runs), "reverts": int(reverts)}
-            if idx < len(report["shards"]):
-                report["shards"][idx]["result"] = entry
-            else:
-                report["suite_runs"].append(entry)
+    suite_stats: dict[str, dict[str, int]] = {}
+    current_test_path: str | None = None
+    shard_results_iter = iter([s for s in report["shards"] if not s.get("skipped") and s.get("planned_runs", 0) > 0])
 
-    duration_lines = [line for line in lines if "Suite result" in line and "finished in" in line]
-    for line in duration_lines:
-        match = re.search(r"finished in\s+([0-9.]+)s", line)
-        if match:
-            report["durations"].append(float(match.group(1)))
+    for line in lines:
+        if line.startswith("Ran 1 test for "):
+            match = re.search(r"Ran 1 test for\s+([^:]+):", line)
+            if match:
+                current_test_path = match.group(1)
+            continue
+
+        if "[PASS]" in line and "runs:" in line and "reverts:" in line:
+            match = re.search(r"runs:\s*(\d+).*reverts:\s*(\d+)", line)
+            if not match:
+                continue
+            runs_val, reverts_val = match.groups()
+            runs_int = int(runs_val)
+            reverts_int = int(reverts_val)
+
+            try:
+                shard_entry = next(shard_results_iter)
+                shard_entry["result"] = {"runs": runs_int, "reverts": reverts_int}
+            except StopIteration:
+                pass
+
+            if current_test_path:
+                stats = suite_stats.setdefault(
+                    current_test_path,
+                    {"executions": 0, "runs": 0, "reverts": 0},
+                )
+                stats["executions"] += 1
+                stats["runs"] += runs_int
+                stats["reverts"] += reverts_int
+            current_test_path = None
+
+        if "Suite result" in line and "finished in" in line:
+            match = re.search(r"finished in\s+([0-9.]+)s", line)
+            if match:
+                report["durations"].append(float(match.group(1)))
+
+    suite_summary = []
+    for path, stats in suite_stats.items():
+        runs = stats["runs"]
+        reverts = stats["reverts"]
+        rate_bps = 0
+        if runs:
+            rate_bps = (reverts * 10_000) // runs
+        suite_summary.append(
+            {
+                "path": path,
+                "executions": stats["executions"],
+                "runs": runs,
+                "reverts": reverts,
+                "revert_rate_bps": rate_bps,
+            }
+        )
+
+    report["suite_runs"] = suite_summary
 
     return report
 
@@ -127,18 +190,40 @@ def main() -> int:
 
     csv_stats = collect_csv_stats(args.fresh_minutes)
 
+    planned_total = 0
+    executed_total = 0
+    revert_total = 0
+    for shard in report["shards"]:
+        planned_total += shard.get("planned_runs", 0)
+        result = shard.get("result")
+        if result:
+            executed_total += result.get("runs", 0)
+            revert_total += result.get("reverts", 0)
+
+    revert_rate_bps = 0
+    if executed_total:
+        revert_rate_bps = (revert_total * 10_000) // executed_total
+
     output = {
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "log_path": str(args.log),
         "decision": report["decision"],
         "sample": report["sample"],
         "estimate_secs": report["estimate_secs"],
+        "eta_parallel_secs": report["eta_parallel_secs"],
+        "eta_sequential_secs": report["eta_sequential_secs"],
         "target_runs": report["target_runs"],
         "shards": report["shards"],
         "suite_runs": report["suite_runs"],
         "durations_secs": report["durations"],
         "csv": csv_stats,
         "freshness_minutes": args.fresh_minutes,
+        "totals": {
+            "runs_planned": planned_total,
+            "runs_executed": executed_total,
+            "reverts": revert_total,
+            "revert_rate_bps": revert_rate_bps,
+        },
     }
 
     output_path = args.output

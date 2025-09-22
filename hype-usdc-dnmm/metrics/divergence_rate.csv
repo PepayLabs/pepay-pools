@@ -1,4 +1,4 @@
 metric,value
-divergence_attempts,1
-divergence_rejections,1
-divergence_reject_rate_bps,10000
+divergence_attempts,7
+divergence_rejections,3
+divergence_reject_rate_bps,4285

@@ -143,22 +143,6 @@ contract ForkParityTest is BaseTest {
             ++idx;
         }
 
-        // Divergence guard: HC fresh but deviates from Pyth beyond epsilon
-        vm.roll(block.number + 1);
-        vm.warp(block.timestamp + 1);
-        updateSpot(1e18, 5, true);
-        updateBidAsk(995e15, 1_005e15, 20, true);
-        updateEma(1e18, 6, true);
-        updatePyth(1_120_000_000_000_000_000, 1e18, 5, 5, 25, 25);
-        unchecked {
-            ++divergenceAttempts;
-        }
-        vm.expectRevert(bytes(Errors.ORACLE_DIVERGENCE));
-        quote(15 ether, true, IDnmPool.OracleMode.Spot);
-        unchecked {
-            ++divergenceRejections;
-        }
-
         // Stall guard: all sources stale -> reject
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 1);
@@ -256,6 +240,64 @@ contract ForkParityTest is BaseTest {
         sourceRows[3] = _formatCountRow("pyth", pythCount);
         EventRecorder.writeCSV(vm, "metrics/source_counts.csv", "source,count", sourceRows);
 
+        // Divergence guard sweep: run multiple deltas and capture histogram
+        uint256[] memory divergenceDeltasBps = new uint256[](7);
+        divergenceDeltasBps[0] = 10;
+        divergenceDeltasBps[1] = 25;
+        divergenceDeltasBps[2] = divergenceCap > 0 ? divergenceCap - 1 : 0;
+        divergenceDeltasBps[3] = divergenceCap;
+        divergenceDeltasBps[4] = divergenceCap + 10;
+        divergenceDeltasBps[5] = divergenceCap + 50;
+        divergenceDeltasBps[6] = 1_200;
+
+        uint256[] memory divergenceAttemptsByDelta = new uint256[](divergenceDeltasBps.length);
+        uint256[] memory divergenceRejectionsByDelta = new uint256[](divergenceDeltasBps.length);
+        uint256 expectedDivergenceRejections;
+
+        for (uint256 i = 0; i < divergenceDeltasBps.length; ++i) {
+            uint256 deltaBps = divergenceDeltasBps[i];
+            vm.roll(block.number + 1);
+            vm.warp(block.timestamp + 1);
+            updateSpot(1e18, 5, true);
+            updateBidAsk(995e15, 1_005e15, 20, true);
+            updateEma(1e18, 6, true);
+
+            uint256 pythMid = (1e18 * (10_000 + deltaBps)) / 10_000;
+            updatePyth(pythMid, 1e18, 5, 5, 25, 25);
+
+            unchecked {
+                ++divergenceAttempts;
+                ++divergenceAttemptsByDelta[i];
+            }
+
+            bool expectsRevert = deltaBps > divergenceCap;
+            if (expectsRevert) {
+                vm.expectRevert(bytes(Errors.ORACLE_DIVERGENCE));
+                quote(15 ether, true, IDnmPool.OracleMode.Spot);
+                unchecked {
+                    ++divergenceRejections;
+                    ++divergenceRejectionsByDelta[i];
+                    ++expectedDivergenceRejections;
+                }
+            } else {
+                DnmPool.QuoteResult memory qrDelta = quote(15 ether, true, IDnmPool.OracleMode.Spot);
+                require(!qrDelta.usedFallback, "divergence fallback");
+                require(qrDelta.reason == REASON_NONE, "divergence reason");
+            }
+        }
+
+        for (uint256 i = 0; i < divergenceDeltasBps.length; ++i) {
+            bool shouldReject = divergenceDeltasBps[i] > divergenceCap;
+            if (shouldReject) {
+                require(
+                    divergenceRejectionsByDelta[i] == divergenceAttemptsByDelta[i],
+                    "divergence bin must reject"
+                );
+            } else {
+                require(divergenceRejectionsByDelta[i] == 0, "divergence bin should pass");
+            }
+        }
+
         string[] memory divergenceRows = new string[](3);
         divergenceRows[0] = _formatCountRow("divergence_attempts", divergenceAttempts);
         divergenceRows[1] = _formatCountRow("divergence_rejections", divergenceRejections);
@@ -265,7 +307,32 @@ contract ForkParityTest is BaseTest {
         divergenceRows[2] = _formatCountRow("divergence_reject_rate_bps", divergenceRateBps);
         EventRecorder.writeCSV(vm, "metrics/divergence_rate.csv", "metric,value", divergenceRows);
 
-        require(divergenceAttempts == divergenceRejections, "divergence must reject");
+        string[] memory divergenceHistogram = new string[](divergenceDeltasBps.length);
+        for (uint256 i = 0; i < divergenceDeltasBps.length; ++i) {
+            uint256 attemptsBin = divergenceAttemptsByDelta[i];
+            uint256 rejectsBin = divergenceRejectionsByDelta[i];
+            uint256 rateBps = attemptsBin == 0 ? 0 : (rejectsBin * 10_000) / attemptsBin;
+            divergenceHistogram[i] = string.concat(
+                EventRecorder.uintToString(divergenceDeltasBps[i]),
+                ",",
+                EventRecorder.uintToString(attemptsBin),
+                ",",
+                EventRecorder.uintToString(rejectsBin),
+                ",",
+                EventRecorder.uintToString(rateBps)
+            );
+        }
+        EventRecorder.writeCSV(
+            vm,
+            "metrics/divergence_histogram.csv",
+            "delta_bps,attempts,rejections,reject_rate_bps",
+            divergenceHistogram
+        );
+
+        require(
+            divergenceRejections == expectedDivergenceRejections,
+            "divergence rejection count"
+        );
         require(staleAttempts == staleRejections, "stale must reject");
     }
 

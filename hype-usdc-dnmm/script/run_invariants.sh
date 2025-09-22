@@ -16,12 +16,11 @@ info() { printf '\033[1;34m%s\033[0m\n' "$1"; }
 warn() { printf '\033[1;33m%s\033[0m\n' "$1"; }
 
 info "🔧 Building (forge build)"
-forge build >/dev/null
+FOUNDRY_PROFILE="$PROFILE_SHORT" forge build >/dev/null
 
 info "⏱️  Sampling ${SAMPLE_RUNS} runs"
 start=$(date +%s)
 FOUNDRY_PROFILE="$PROFILE_SHORT" FOUNDRY_INVARIANT_RUNS="$SAMPLE_RUNS" forge test \
-  --profile "$PROFILE_SHORT" \
   --match-path "$TEST_PATH" \
   -vv >/tmp/invariant_sample.log 2>&1 || true
 end=$(date +%s)
@@ -34,7 +33,7 @@ info "📈 Sample ${sample_secs}s ⇒ ~${per_run_ms}ms/run ⇒ est ${est_secs}s 
 
 if (( est_secs > BUDGET_SECS )); then
   warn "⚠️  Skipping long run: estimate ${est_secs}s exceeds budget ${BUDGET_SECS}s"
-  FOUNDRY_PROFILE="$PROFILE_SHORT" FOUNDRY_INVARIANT_RUNS=2000 forge test --profile "$PROFILE_SHORT" --match-path "$TEST_PATH" -vv
+  FOUNDRY_PROFILE="$PROFILE_SHORT" FOUNDRY_INVARIANT_RUNS=2000 forge test --match-path "$TEST_PATH" -vv
   exit 0
 fi
 
@@ -52,7 +51,6 @@ for shard in $(seq 1 "$SHARDS"); do
     FOUNDRY_INVARIANT_RUNS="$runs_per_shard" \
     timeout --signal=SIGINT --kill-after=30 "$shard_budget" \
       stdbuf -oL -eL forge test \
-        --profile "$PROFILE_LONG" \
         --match-path "$TEST_PATH" \
         --fuzz-seed "$seed" -vv 2>&1 \
       | awk -v idle="$IDLE_SECS" 'BEGIN { last = systime(); } { print; fflush(); last = systime(); } (systime() - last) > idle { print "## idle timeout"; fflush(); exit 124 }'

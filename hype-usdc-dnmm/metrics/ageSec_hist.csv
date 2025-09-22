@@ -1,4 +1,5 @@
 label,source,age_sec
 hc_fresh,hc,3
 ema_stall,ema,5
-pyth_fallback,pyth,6
+ema_precompile_revert,ema,4
+pyth_precompile_empty,pyth,4

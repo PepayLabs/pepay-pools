@@ -1,5 +1,8 @@
 metric,value
-total_swaps,30
-partial_swaps,0
+total_swaps,5000
+partial_swaps,2292
+spread_rejects,0
+stale_rejects,0
+divergence_rejects,0
 failure_rate_bps,0
-avg_fee_bps,184
+avg_fee_bps,248

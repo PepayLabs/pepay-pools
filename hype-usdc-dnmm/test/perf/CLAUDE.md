@@ -34,4 +34,5 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-09-22: Introduced 5k swap load burst burn-in and DoS failure gas campaign with CSV exports.
 - 2024-05-27: Added performance and load suites with metrics/gas exports.

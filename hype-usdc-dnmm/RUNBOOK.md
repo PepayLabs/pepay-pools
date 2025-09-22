@@ -45,7 +45,7 @@
 ## 8. Performance & Metric Validation
 - Execute `forge test --match-path test/perf` to capture gas profiles (`metrics/gas_snapshots.csv`, `gas-snapshots.txt`) and burst reliability metrics (`metrics/load_burst_summary.csv`).
 - Ensure tuple/decimal sweep outputs (`metrics/tuple_decimal_sweep.csv`) and fee dynamics series (`metrics/fee_B*.csv`) are reviewed before deployment to detect scaling regressions.
-- Run invariant suites with `terragon-forge.sh test --match-path test/invariants --fuzz-runs 10000` after cleaning `cache/invariant` to confirm post-change safety.
+- Run invariant suites with `script/run_invariants.sh` (defaults to an adaptive 20k run with sampling + idle guards) after cleaning `cache/invariant`; fall back to `FOUNDRY_INVARIANT_RUNS=2000 forge test --profile ci --match-path test/invariants` for quick smoke checks.
 
 ## Appendices
 - `docs/ORACLE.md` – HyperCore/Pyth wiring details.

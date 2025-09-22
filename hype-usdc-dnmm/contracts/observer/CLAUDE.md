@@ -1,8 +1,8 @@
-# HYPE/USDC DNMM Integration Tests Implementation Guide
+# HYPE/USDC DNMM Observer Implementation Guide
 
-**Path**: `hype-usdc-dnmm/test/integration`
+**Path**: `hype-usdc-dnmm/contracts/observer`
 
-**Description**: Deterministic scenario suites validating oracle selection, parity, fallbacks, RFQ, and operational behavior for the HYPE/USDC DNMM.
+**Description**: On-chain observer contracts that mirror DNMM oracle reads for parity monitoring and canary deployments.
 
 ## Purpose
 - Capture the intent of this module/folder and its relationship to the broader HYPE/HyperEVM initiative.
@@ -34,5 +34,4 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2025-09-22: Added fork parity matrix (FP1–FP5), Pyth hygiene/delta flap scenarios, preview↔settlement parity (base, quote, RFQ), canary shadow observer coverage, and timestamp guard tests.
-- 2024-07-12: Established Phase-8 confidence blend, fee dynamics, and fallback regression scenarios.
+- 2025-09-22: Added DnmOracleObserver for canary parity snapshots aligned with DNMM oracle usage.

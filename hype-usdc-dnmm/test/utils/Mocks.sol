@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IERC20} from "../../contracts/interfaces/IERC20.sol";
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {IPyth} from "../../contracts/oracle/OracleAdapterPyth.sol";
+import {MockERC20 as BaseMockERC20} from "../../contracts/mocks/MockERC20.sol";
 
 interface IReentrancyHook {
     function onTokenTransfer(address token, address from, address to, uint256 amount) external;
@@ -116,7 +117,7 @@ contract ReentrantERC20 is IERC20 {
         return true;
     }
 
-    function _transfer(address from, address to, uint256 value) internal {
+    function _transfer(address from, address to, uint256 value) internal virtual {
         require(balanceOf[from] >= value, "BALANCE");
         balanceOf[from] -= value;
         balanceOf[to] += value;
@@ -160,6 +161,39 @@ contract MaliciousReceiver is IReentrancyHook {
         IERC20 tokenIn = attackBaseIn ? IERC20(baseToken) : IERC20(quoteToken);
         tokenIn.approve(address(pool), type(uint256).max);
         pool.swapExactIn(1, 0, attackBaseIn, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+    }
+}
+
+contract FeeOnTransferERC20 is BaseMockERC20 {
+    uint16 public immutable feeBps;
+    address public immutable feeRecipient;
+
+    constructor(string memory name_, string memory symbol_, uint8 decimals_, uint16 feeBps_, address feeRecipient_)
+        BaseMockERC20(name_, symbol_, decimals_, 0, msg.sender)
+    {
+        feeBps = feeBps_;
+        feeRecipient = feeRecipient_;
+    }
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+
+    function _transfer(address from, address to, uint256 value) internal virtual override {
+        require(balanceOf[from] >= value, "BALANCE");
+
+        uint256 fee = feeBps == 0 ? 0 : (value * feeBps) / 10_000;
+        uint256 net = value - fee;
+
+        balanceOf[from] -= value;
+        balanceOf[to] += net;
+        emit Transfer(from, to, net);
+
+        if (fee > 0) {
+            balanceOf[feeRecipient] += fee;
+            emit Transfer(from, feeRecipient, fee);
+        }
+
     }
 }
 

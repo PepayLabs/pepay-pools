@@ -16,10 +16,12 @@
 - `ParamsUpdated(kind, oldVal, newVal)` – Governance changes (Oracle/Fee/Inventory/Maker).
 - `Paused(pauser)` / `Unpaused(pauser)` – Lifecycle controls.
 - `ConfidenceDebug(confSpreadBps, confSigmaBps, confPythBps, confBps, sigmaBps, feeBaseBps, feeVolBps, feeInvBps, feeTotalBps)` – Optional diagnostic log gated by `DEBUG_EMIT`; surfaces confidence blend and fee decomposition per quote/swap.
+- `OracleSnapshot(label, mid, ageSec, spreadBps, pythMid, deltaBps, hcSuccess, bookSuccess, pythSuccess)` – Emitted by the on-chain observer canary; mirrors pool oracle reads for block-synchronous parity dashboards.
 
 ## Dashboards
 - **Liquidity Health** – Track inventory deviation, floor breaches, partial percentages.
 - **Oracle Health** – Monitor fallback usage, divergence rejects (`Errors.ORACLE_DIVERGENCE`).
+- **Canary Shadow** – Track `canary_deltas.csv` median vs ε and ensure divergence rejections line up with observer deltas.
 - **Fee Dynamics** – Graph fee_bps vs time; overlay α/β contributions derived from oracle + inventory inputs.
 - **Revenue** – Aggregate LP fees per period (amountIn × fee_bps/BPS).
 
@@ -33,5 +35,6 @@
 - Ingest events via an indexer (e.g., Subsquid on HyperEVM) and push to Prometheus/Grafana.
 - Join on block timestamps with RFQ service logs to analyse latency and S0 consumption.
 - Emit structured logs in keeper services including oracle payload metadata for replay.
+- Archive observer events alongside pool swaps to validate block-level parity (HC→EMA→PYTH) and drive automatic alerts when deltas exceed ε.
 
 See also `docs/CONFIG.md` for parameter traceability and `docs/rfq_spec.md` for RFQ-specific telemetry.

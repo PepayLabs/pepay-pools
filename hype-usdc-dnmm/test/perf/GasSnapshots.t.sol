@@ -11,6 +11,9 @@ import {BaseTest} from "../utils/BaseTest.sol";
 import {EventRecorder} from "../utils/EventRecorder.sol";
 
 contract GasSnapshotsTest is BaseTest {
+    uint256 internal constant QUOTE_GAS_BUDGET = 130_000;
+    uint256 internal constant SWAP_GAS_BUDGET = 225_000;
+
     QuoteRFQ internal rfq;
     uint256 internal makerKey = 0xBADA55;
 
@@ -46,6 +49,12 @@ contract GasSnapshotsTest is BaseTest {
         labels[5] = "rfq_verify_swap";
         gasUsed[5] = _measureRFQGas();
 
+        _assertGasWithin("quote_hc", gasUsed[0], QUOTE_GAS_BUDGET);
+        _assertGasWithin("quote_ema", gasUsed[1], QUOTE_GAS_BUDGET);
+        _assertGasWithin("quote_pyth", gasUsed[2], QUOTE_GAS_BUDGET);
+        _assertGasWithin("swap_base_hc", gasUsed[3], SWAP_GAS_BUDGET);
+        _assertGasWithin("swap_quote_hc", gasUsed[4], SWAP_GAS_BUDGET);
+
         string[] memory rows = new string[](labels.length);
         for (uint256 i = 0; i < labels.length; ++i) {
             rows[i] = string.concat(labels[i], ",", EventRecorder.uintToString(gasUsed[i]));
@@ -75,7 +84,7 @@ contract GasSnapshotsTest is BaseTest {
     function _measureQuotePYTH() internal returns (uint256) {
         _resetScenario();
         updateSpot(WAD, defaultOracleConfig().maxAgeSec + 5, true);
-        updateBidAsk(WAD, WAD, 20, true);
+        updateBidAsk(0, 0, 0, false);
         updateEma(WAD, defaultOracleConfig().maxAgeSec + 5, true);
         updatePyth(WAD, WAD, 1, 1, 20, 20);
         uint256 gasBefore = gasleft();
@@ -152,27 +161,21 @@ contract GasSnapshotsTest is BaseTest {
         hype.approve(address(rfq), type(uint256).max);
         usdc.approve(address(rfq), type(uint256).max);
         vm.stopPrank();
+
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        if (flags.debugEmit) {
+            flags.debugEmit = false;
+            setFeatureFlags(flags);
+        }
     }
 
     function _sign(QuoteRFQ target, IQuoteRFQ.QuoteParams memory params) internal view returns (bytes memory) {
-        bytes32 typeHash = keccak256(
-            "Quote(address taker,uint256 amountIn,uint256 minAmountOut,bool isBaseIn,uint256 expiry,uint256 salt,address pool,uint256 chainId)"
-        );
-        bytes32 structHash = keccak256(
-            abi.encode(
-                typeHash,
-                params.taker,
-                params.amountIn,
-                params.minAmountOut,
-                params.isBaseIn,
-                params.expiry,
-                params.salt,
-                address(target.pool()),
-                block.chainid
-            )
-        );
-        bytes32 digest = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", structHash));
+        bytes32 digest = target.hashQuote(params);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(makerKey, digest);
         return abi.encodePacked(r, s, v);
+    }
+
+    function _assertGasWithin(string memory label, uint256 gasUsed, uint256 maxGas) internal view {
+        assertLe(gasUsed, maxGas, string.concat(label, ": gas budget exceeded"));
     }
 }

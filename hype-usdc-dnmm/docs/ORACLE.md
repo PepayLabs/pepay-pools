@@ -17,7 +17,8 @@
 - **Feeds**: HYPE/USD + USDC/USD price IDs referenced in `config/oracle.ids.json`.
 - **Updates**: Supports push updates via calldata bundle (`readPythUsdMid(bytes updateData)`); also works with externally updated storage feeds.
 - **Confidence**: Returns confidence bps per asset, combined using max() in the adapter.
-- **Fallback Logic**: `_readOracle` takes Pyth mid when HyperCore fails gates and `allowEmaFallback` cannot recover.
+- **Fallback Logic**: `_readOracle` takes Pyth mid when HyperCore fails gates and `allowEmaFallback` cannot recover. EMA wins priority when it is fresh; only if both spot and EMA are unusable does Pyth drive the swap.
+- **Strict Cap Discipline**: Whenever Pyth contributes to the blended confidence (either as the primary source or within the EWMA blend), the strict cap (`confCapBpsStrict`) is enforced regardless of the requested mode.
 - **Divergence Guard**: When HyperCore is primary and Pyth is fresh, swaps revert if absolute difference exceeds `divergenceBps`.
 
 ## Operational Notes

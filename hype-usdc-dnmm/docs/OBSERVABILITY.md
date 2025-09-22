@@ -13,6 +13,7 @@
 ## Logs & Events
 - `SwapExecuted(user, isBaseIn, amountIn, amountOut, mid, feeBps, partial, reason)` – Primary execution telemetry.
 - `QuoteServed(bid, ask, s0, ttlMs, mid, feeBps)` – Top-of-book quoting for RFQ/aggregators.
+- `TokenFeeUnsupported(user, isBaseIn, expectedAmountIn, receivedAmountIn)` – Canary for fee-on-transfer tokens causing swap aborts.
 - `QuoteRFQ.verifyQuoteSignature(maker, params, sig)` / `hashQuote(params)` – View helpers to confirm RFQ EIP-712 signatures and present the digest to off-chain monitors.
 - `ParamsUpdated(kind, oldVal, newVal)` – Governance changes (Oracle/Fee/Inventory/Maker).
 - `Paused(pauser)` / `Unpaused(pauser)` – Lifecycle controls.

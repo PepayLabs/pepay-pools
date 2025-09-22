@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-TEST_PATH="${1:-test/invariants/Invariant_NoRunDry.t.sol}"
+DEFAULT_TEST="test/invariants/Invariant_NoRunDry.t.sol"
 
 BUDGET_SECS="${BUDGET_SECS:-3600}"
 IDLE_SECS="${IDLE_SECS:-600}"
@@ -12,57 +12,136 @@ PROFILE_SHORT="${PROFILE_SHORT:-ci}"
 PROFILE_LONG="${PROFILE_LONG:-long}"
 SEED_BASE="${SEED_BASE:-123456}"
 
+shopt -s nullglob
+
 info() { printf '\033[1;34m%s\033[0m\n' "$1"; }
 warn() { printf '\033[1;33m%s\033[0m\n' "$1"; }
 
-info "🔧 Building (forge build)"
-FOUNDRY_PROFILE="$PROFILE_SHORT" forge build >/dev/null
-
-info "⏱️  Sampling ${SAMPLE_RUNS} runs"
-start=$(date +%s)
-FOUNDRY_PROFILE="$PROFILE_SHORT" FOUNDRY_INVARIANT_RUNS="$SAMPLE_RUNS" forge test \
-  --match-path "$TEST_PATH" \
-  -vv >/tmp/invariant_sample.log 2>&1 || true
-end=$(date +%s)
-
-sample_secs=$(( end - start ))
-if (( sample_secs == 0 )); then sample_secs=1; fi
-per_run_ms=$(( sample_secs * 1000 / SAMPLE_RUNS ))
-est_secs=$(( per_run_ms * TARGET_RUNS / 1000 ))
-info "📈 Sample ${sample_secs}s ⇒ ~${per_run_ms}ms/run ⇒ est ${est_secs}s for ${TARGET_RUNS} runs"
-
-if (( est_secs > BUDGET_SECS )); then
-  warn "⚠️  Skipping long run: estimate ${est_secs}s exceeds budget ${BUDGET_SECS}s"
-  FOUNDRY_PROFILE="$PROFILE_SHORT" FOUNDRY_INVARIANT_RUNS=2000 forge test --match-path "$TEST_PATH" -vv
-  exit 0
-fi
-
-runs_per_shard=$(( TARGET_RUNS / SHARDS ))
-if (( runs_per_shard == 0 )); then runs_per_shard=$TARGET_RUNS; SHARDS=1; fi
-info "🚀 Running ${TARGET_RUNS} runs across ${SHARDS} shard(s) (~${runs_per_shard} each)"
-
-pids=()
-for shard in $(seq 1 "$SHARDS"); do
-  seed=$(( SEED_BASE + shard ))
-  shard_budget=$(( BUDGET_SECS / SHARDS + 120 ))
-  info "▶️  Shard ${shard}/${SHARDS} seed=${seed}"
-  (
-    FOUNDRY_PROFILE="$PROFILE_LONG" \
-    FOUNDRY_INVARIANT_RUNS="$runs_per_shard" \
-    timeout --signal=SIGINT --kill-after=30 "$shard_budget" \
-      stdbuf -oL -eL forge test \
-        --match-path "$TEST_PATH" \
-        --fuzz-seed "$seed" -vv 2>&1 \
-      | awk -v idle="$IDLE_SECS" 'BEGIN { last = systime(); } { print; fflush(); last = systime(); } (systime() - last) > idle { print "## idle timeout"; fflush(); exit 124 }'
-  ) &
-  pids+=($!)
-done
-
-status=0
-for pid in "${pids[@]}"; do
-  if ! wait "$pid"; then
-    status=1
+collect_tests() {
+  if (( $# == 0 )); then
+    printf '%s\n' "$DEFAULT_TEST"
+    return
   fi
-done
 
-exit "$status"
+  local matches=()
+  while (( $# > 0 )); do
+    local pattern="$1"
+    shift
+    local expanded=( $pattern )
+    if (( ${#expanded[@]} == 0 )); then
+      warn "⚠️  No invariant tests matched pattern: ${pattern}"
+      continue
+    fi
+    matches+=("${expanded[@]}")
+  done
+
+  if (( ${#matches[@]} == 0 )); then
+    warn "⚠️  No invariant test files found; aborting"
+    exit 1
+  fi
+
+  printf '%s\n' "${matches[@]}"
+}
+
+resolve_depth() {
+  local profile="$1"
+  awk -v profile="$profile" '
+    $0 ~ "\\[profile\\." profile "\\.invariant\\]" { section=1; next }
+    /^\[/ && section { exit }
+    section && $1 == "depth" { print $3; exit }
+  ' foundry.toml
+}
+
+slugify() {
+  local file="$1"
+  echo "${file//[^a-zA-Z0-9]/_}"
+}
+
+run_single_test() {
+  local test_path="$1"
+
+  info "═▶ Processing invariant suite: ${test_path}"
+
+  info "🔧 Building (forge build)"
+  FOUNDRY_PROFILE="$PROFILE_SHORT" forge build >/dev/null
+
+  local depth
+  depth=$(resolve_depth "$PROFILE_LONG")
+  info "📋 Config ⇒ sample_profile=${PROFILE_SHORT} long_profile=${PROFILE_LONG} depth=${depth:-unknown} target_runs=${TARGET_RUNS} shards=${SHARDS} idle_secs=${IDLE_SECS}"
+
+  local sample_runs=$SAMPLE_RUNS
+  if (( sample_runs < 1 )); then
+    warn "⚠️  SAMPLE_RUNS < 1 supplied; coerce to 1"
+    sample_runs=1
+  fi
+
+  info "⏱️  Sampling ${sample_runs} runs"
+  local start
+  start=$(date +%s)
+  local sample_log
+  sample_log="/tmp/invariant_sample_$(slugify "$test_path").log"
+  FOUNDRY_PROFILE="$PROFILE_SHORT" FOUNDRY_INVARIANT_RUNS="$sample_runs" forge test \
+    --match-path "$test_path" \
+    -vv >"$sample_log" 2>&1 || true
+  local end
+  end=$(date +%s)
+
+  local sample_secs=$(( end - start ))
+  if (( sample_secs == 0 )); then sample_secs=1; fi
+  local per_run_ms=$(( sample_secs * 1000 / sample_runs ))
+  local est_secs=$(( per_run_ms * TARGET_RUNS / 1000 ))
+  info "📈 Sample ${sample_secs}s ⇒ ~${per_run_ms}ms/run ⇒ est ${est_secs}s for ${TARGET_RUNS} runs"
+
+  if (( est_secs > BUDGET_SECS )); then
+    warn "⚠️  Skipping long run: estimate ${est_secs}s exceeds budget ${BUDGET_SECS}s"
+    FOUNDRY_PROFILE="$PROFILE_SHORT" FOUNDRY_INVARIANT_RUNS=2000 forge test --match-path "$test_path" -vv
+    return 0
+  fi
+
+  local shard_count=$SHARDS
+  if (( shard_count < 1 )); then
+    warn "⚠️  SHARDS < 1 supplied; coerce to 1"
+    shard_count=1
+  fi
+  local runs_per_shard=$(( (TARGET_RUNS + shard_count - 1) / shard_count ))
+  info "🚀 Running ${TARGET_RUNS} runs across ${shard_count} shard(s) (~${runs_per_shard} each)"
+
+  local pids=()
+  for shard in $(seq 1 "$shard_count"); do
+    local seed=$(( SEED_BASE + shard ))
+    local shard_budget=$(( BUDGET_SECS / shard_count + 120 ))
+    info "▶️  Shard ${shard}/${shard_count} seed=${seed} runs=${runs_per_shard}"
+    (
+      FOUNDRY_PROFILE="$PROFILE_LONG" \
+      FOUNDRY_INVARIANT_RUNS="$runs_per_shard" \
+      timeout --signal=SIGINT --kill-after=30 "$shard_budget" \
+        stdbuf -oL -eL forge test \
+          --match-path "$test_path" \
+          --fuzz-seed "$seed" -vv 2>&1 \
+        | awk -v idle="$IDLE_SECS" 'BEGIN { last = systime(); } { print; fflush(); last = systime(); } (systime() - last) > idle { print "## idle timeout"; fflush(); exit 124 }'
+    ) &
+    pids+=($!)
+  done
+
+  local status=0
+  for pid in "${pids[@]}"; do
+    if ! wait "$pid"; then
+      status=1
+    fi
+  done
+
+  return "$status"
+}
+
+main() {
+  mapfile -t suites < <(collect_tests "$@")
+  local overall=0
+  for suite in "${suites[@]}"; do
+    if ! run_single_test "$suite"; then
+      overall=1
+    fi
+  done
+  exit "$overall"
+}
+
+main "$@"

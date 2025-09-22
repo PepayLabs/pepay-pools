@@ -137,6 +137,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     event Paused(address indexed caller);
     event Unpaused(address indexed caller);
     event TargetBaseXstarUpdated(uint128 oldTarget, uint128 newTarget, uint256 mid, uint64 timestamp);
+    event TokenFeeUnsupported(address indexed user, bool isBaseIn, uint256 expectedAmountIn, uint256 receivedAmountIn);
     event ConfidenceDebug(
         uint256 confSpreadBps,
         uint256 confSigmaBps,
@@ -239,7 +240,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             uint256 beforeBal = IERC20(tokenConfig.baseToken).balanceOf(address(this));
             tokenConfig.baseToken.safeTransferFrom(msg.sender, address(this), actualAmountIn);
             uint256 received = IERC20(tokenConfig.baseToken).balanceOf(address(this)) - beforeBal;
-            require(received == actualAmountIn, Errors.TOKEN_FEE_UNSUPPORTED);
+            if (received != actualAmountIn) {
+                emit TokenFeeUnsupported(msg.sender, true, actualAmountIn, received);
+                revert(Errors.TOKEN_FEE_UNSUPPORTED);
+            }
             tokenConfig.quoteToken.safeTransfer(msg.sender, amountOut);
             require(uint256(reserves.baseReserves) + actualAmountIn <= type(uint128).max, "BASE_OOB");
             require(uint256(reserves.quoteReserves) >= amountOut, "INSUFFICIENT_QUOTE");
@@ -249,7 +253,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             uint256 beforeBal = IERC20(tokenConfig.quoteToken).balanceOf(address(this));
             tokenConfig.quoteToken.safeTransferFrom(msg.sender, address(this), actualAmountIn);
             uint256 received = IERC20(tokenConfig.quoteToken).balanceOf(address(this)) - beforeBal;
-            require(received == actualAmountIn, Errors.TOKEN_FEE_UNSUPPORTED);
+            if (received != actualAmountIn) {
+                emit TokenFeeUnsupported(msg.sender, false, actualAmountIn, received);
+                revert(Errors.TOKEN_FEE_UNSUPPORTED);
+            }
             tokenConfig.baseToken.safeTransfer(msg.sender, amountOut);
             require(uint256(reserves.quoteReserves) + actualAmountIn <= type(uint128).max, "QUOTE_OOB");
             require(uint256(reserves.baseReserves) >= amountOut, "INSUFFICIENT_BASE");

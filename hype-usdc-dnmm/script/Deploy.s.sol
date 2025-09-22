@@ -24,11 +24,8 @@ contract Deploy is Script {
         bytes32 priceIdUsdcUsd = bytes32(0);
         OracleAdapterPyth pyth = new OracleAdapterPyth(pythContract, priceIdHypeUsd, priceIdUsdcUsd);
 
-        DnmPool.InventoryConfig memory inventoryCfg = DnmPool.InventoryConfig({
-            targetBaseXstar: 0,
-            floorBps: 300,
-            recenterThresholdPct: 750
-        });
+        DnmPool.InventoryConfig memory inventoryCfg =
+            DnmPool.InventoryConfig({targetBaseXstar: 0, floorBps: 300, recenterThresholdPct: 750});
 
         DnmPool.OracleConfig memory oracleCfg = DnmPool.OracleConfig({
             maxAgeSec: 48,
@@ -36,7 +33,11 @@ contract Deploy is Script {
             confCapBpsSpot: 100,
             confCapBpsStrict: 100,
             divergenceBps: 50,
-            allowEmaFallback: true
+            allowEmaFallback: true,
+            confWeightSpreadBps: 10_000,
+            confWeightSigmaBps: 10_000,
+            confWeightPythBps: 10_000,
+            sigmaEwmaLambdaBps: 9000
         });
 
         FeePolicy.FeeConfig memory feeCfg = FeePolicy.FeeConfig({
@@ -49,15 +50,9 @@ contract Deploy is Script {
             decayPctPerBlock: 20
         });
 
-        DnmPool.MakerConfig memory makerCfg = DnmPool.MakerConfig({
-            s0Notional: 5_000 ether,
-            ttlMs: 200
-        });
+        DnmPool.MakerConfig memory makerCfg = DnmPool.MakerConfig({s0Notional: 5_000 ether, ttlMs: 200});
 
-        DnmPool.Guardians memory guardians = DnmPool.Guardians({
-            governance: msg.sender,
-            pauser: msg.sender
-        });
+        DnmPool.Guardians memory guardians = DnmPool.Guardians({governance: msg.sender, pauser: msg.sender});
 
         new DnmPool(
             address(0),
@@ -70,6 +65,7 @@ contract Deploy is Script {
             oracleCfg,
             feeCfg,
             makerCfg,
+            DnmPool.FeatureFlags({blendOn: false, parityCiOn: false, debugEmit: true}),
             guardians
         );
 

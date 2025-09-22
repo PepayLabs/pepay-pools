@@ -69,12 +69,10 @@ library FeePolicy {
         feeBps = uint16(fee);
     }
 
-    function settle(
-        FeeState storage state,
-        FeeConfig memory cfg,
-        uint256 confBps,
-        uint256 inventoryDeviationBps
-    ) internal returns (uint16) {
+    function settle(FeeState storage state, FeeConfig memory cfg, uint256 confBps, uint256 inventoryDeviationBps)
+        internal
+        returns (uint16)
+    {
         (uint16 feeBps, FeeState memory newState) = preview(state, cfg, confBps, inventoryDeviationBps, block.number);
         state.lastBlock = newState.lastBlock;
         state.lastFeeBps = newState.lastFeeBps;

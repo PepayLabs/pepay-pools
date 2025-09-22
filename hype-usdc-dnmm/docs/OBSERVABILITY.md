@@ -15,6 +15,7 @@
 - `QuoteServed(bid, ask, s0, ttlMs, mid, feeBps)` – Top-of-book quoting for RFQ/aggregators.
 - `ParamsUpdated(kind, oldVal, newVal)` – Governance changes (Oracle/Fee/Inventory/Maker).
 - `Paused(pauser)` / `Unpaused(pauser)` – Lifecycle controls.
+- `ConfidenceDebug(confSpreadBps, confSigmaBps, confPythBps, confBps, sigmaBps, feeBaseBps, feeVolBps, feeInvBps, feeTotalBps)` – Optional diagnostic log gated by `DEBUG_EMIT`; surfaces confidence blend and fee decomposition per quote/swap.
 
 ## Dashboards
 - **Liquidity Health** – Track inventory deviation, floor breaches, partial percentages.

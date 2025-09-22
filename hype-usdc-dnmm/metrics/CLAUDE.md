@@ -35,3 +35,4 @@
 
 ## Change Log
 - 2024-05-27: Directory initialized for Phase 3 metrics exports and dashboards.
+- 2024-07-12: Added Phase 8 confidence blend outputs (`fee_correlation.csv`, `fee_cap_edge.csv`) and cap-edge validations.

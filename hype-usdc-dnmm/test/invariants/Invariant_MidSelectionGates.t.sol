@@ -137,7 +137,11 @@ contract GateHandler {
             uint16 confCapBpsSpot,
             uint16 confCapBpsStrict,
             uint16 divergenceBps,
-            bool allowEmaFallback
+            bool allowEmaFallback,
+            uint16 confWeightSpreadBps,
+            uint16 confWeightSigmaBps,
+            uint16 confWeightPythBps,
+            uint16 sigmaEwmaLambdaBps
         ) = pool.oracleConfig();
         cfg = DnmPool.OracleConfig({
             maxAgeSec: maxAgeSec,
@@ -145,7 +149,11 @@ contract GateHandler {
             confCapBpsSpot: confCapBpsSpot,
             confCapBpsStrict: confCapBpsStrict,
             divergenceBps: divergenceBps,
-            allowEmaFallback: allowEmaFallback
+            allowEmaFallback: allowEmaFallback,
+            confWeightSpreadBps: confWeightSpreadBps,
+            confWeightSigmaBps: confWeightSigmaBps,
+            confWeightPythBps: confWeightPythBps,
+            sigmaEwmaLambdaBps: sigmaEwmaLambdaBps
         });
         res = lastResult;
         errored = lastErrored;

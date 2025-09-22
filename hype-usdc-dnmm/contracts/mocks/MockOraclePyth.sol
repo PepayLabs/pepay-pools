@@ -15,7 +15,12 @@ contract MockOraclePyth is IOracleAdapterPyth {
         return result;
     }
 
-    function computePairMid(PythResult memory res) external pure override returns (uint256 mid, uint256 ageSec, uint256 confBps) {
+    function computePairMid(PythResult memory res)
+        external
+        pure
+        override
+        returns (uint256 mid, uint256 ageSec, uint256 confBps)
+    {
         if (!res.success || res.usdcUsd == 0) {
             return (0, type(uint256).max, type(uint256).max);
         }

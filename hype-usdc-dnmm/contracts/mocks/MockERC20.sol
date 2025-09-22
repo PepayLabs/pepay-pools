@@ -12,7 +12,13 @@ contract MockERC20 is IERC20 {
     mapping(address => uint256) public override balanceOf;
     mapping(address => mapping(address => uint256)) public override allowance;
 
-    constructor(string memory name_, string memory symbol_, uint8 decimals_, uint256 initialSupply, address initialHolder) {
+    constructor(
+        string memory name_,
+        string memory symbol_,
+        uint8 decimals_,
+        uint256 initialSupply,
+        address initialHolder
+    ) {
         name = name_;
         symbol = symbol_;
         decimals = decimals_;

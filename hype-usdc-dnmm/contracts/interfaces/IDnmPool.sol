@@ -16,12 +16,9 @@ interface IDnmPool {
         bytes32 reason;
     }
 
-    function quoteSwapExactIn(
-        uint256 amountIn,
-        bool isBaseIn,
-        OracleMode mode,
-        bytes calldata oracleData
-    ) external returns (QuoteResult memory);
+    function quoteSwapExactIn(uint256 amountIn, bool isBaseIn, OracleMode mode, bytes calldata oracleData)
+        external
+        returns (QuoteResult memory);
 
     function swapExactIn(
         uint256 amountIn,
@@ -32,7 +29,10 @@ interface IDnmPool {
         uint256 deadline
     ) external returns (uint256 amountOut);
 
-    function getTopOfBookQuote(uint256 s0Notional) external view returns (uint256 bidPx, uint256 askPx, uint256 ttlMs, bytes32 quoteId);
+    function getTopOfBookQuote(uint256 s0Notional)
+        external
+        view
+        returns (uint256 bidPx, uint256 askPx, uint256 ttlMs, bytes32 quoteId);
 
     function tokens()
         external

@@ -25,7 +25,8 @@ contract DnmPoolSwapTest is BaseTest {
     function test_swap_base_in_normal() public {
         recordLogs();
         vm.prank(alice);
-        uint256 amountOut = pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        uint256 amountOut =
+            pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
         assertGt(amountOut, 0, "amount out");
         EventRecorder.SwapEvent[] memory swaps = drainLogsToSwapEvents();
         assertEq(swaps.length, 1, "swap event");
@@ -37,7 +38,8 @@ contract DnmPoolSwapTest is BaseTest {
     function test_swap_quote_in_normal() public {
         recordLogs();
         vm.prank(bob);
-        uint256 amountOut = pool.swapExactIn(500_000000, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        uint256 amountOut =
+            pool.swapExactIn(500_000000, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
         assertGt(amountOut, 0, "amount out");
         EventRecorder.SwapEvent[] memory swaps = drainLogsToSwapEvents();
         assertEq(swaps[0].amountOut, amountOut, "event out");
@@ -55,7 +57,8 @@ contract DnmPoolSwapTest is BaseTest {
 
         recordLogs();
         vm.prank(alice);
-        uint256 amountOut = pool.swapExactIn(largeAmount, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        uint256 amountOut =
+            pool.swapExactIn(largeAmount, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
         EventRecorder.SwapEvent[] memory swaps = drainLogsToSwapEvents();
         assertTrue(swaps[0].isPartial, "partial fill");
         assertEq(swaps[0].reason, bytes32("FLOOR"), "floor reason");
@@ -109,6 +112,7 @@ contract DnmPoolSwapTest is BaseTest {
             defaultOracleConfig(),
             defaultFeeConfig(),
             defaultMakerConfig(),
+            defaultFeatureFlags(),
             DnmPool.Guardians({governance: gov, pauser: pauser})
         );
 

@@ -10,8 +10,10 @@
 - **Observability**: `SwapExecuted` emits `feeBps`, allowing dashboards to reconstruct effective fees; extend analytics to derive component breakdown off-chain using oracle/conf inputs.
 
 ## Confidence (`conf_bps`)
-- Derived from HyperCore spread (primary) or Pyth confidence (fallback).
-- Capped at `confCapBpsSpot` (quotes) or `confCapBpsStrict` (strict mode, e.g. RFQ) from configuration.
+- Blended per block as `max(w_spread·spread, w_sigma·sigma, w_pyth·pyth_conf)` with weights from `config/parameters_default.json`.
+- `sigma` is an EWMA of realized price deltas (λ ≈ 0.9) and updates at most once per block; fallback to spread seeds the initial value.
+- Final confidence is clamped by `confCapBpsSpot` (quotes) or `confCapBpsStrict` (strict mode, e.g. RFQ).
+- When `DEBUG_EMIT` is enabled the `ConfidenceDebug` event exposes each component (`confSpread`, `confSigma`, `confPyth`, blended `conf_bps`, and fee decomposition) for telemetry.
 
 ## Inventory Deviation (`Inventory.deviationBps`)
 - `|baseReserves - targetBaseXstar| / poolNotional × 10_000` using latest mid price.

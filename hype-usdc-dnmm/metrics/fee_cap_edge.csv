@@ -1,0 +1,9 @@
+label,spread_bps,conf_bps,fee_bps
+baseline,40,40,39
+swap_peak,320,320,150
+post_0,160,160,111
+post_1,80,80,63
+post_2,160,160,111
+post_3,80,84,65
+post_4,160,160,111
+cap,150,150,150

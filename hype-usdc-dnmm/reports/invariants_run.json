@@ -1,100 +1,232 @@
 {
-  "generated_at": "2025-09-22T22:33:42Z",
-  "log_path": "metrics/invariant_long_run_2025-09-22.log",
+  "generated_at": "2025-09-22T23:36:59Z",
+  "log_path": "metrics/invariant_long_run_2025-09-23.log",
   "decision": "run",
   "sample": {
-    "seconds": 21,
-    "ms_per_run": 52
+    "seconds": 3,
+    "ms_per_run": 7
   },
-  "estimate_secs": 1040,
+  "estimate_secs": 140,
   "target_runs": 20000,
   "shards": [
     {
       "index": 1,
       "total": 6,
       "seed": 123457,
-      "runs": null,
+      "runs": 3334,
       "result": {
-        "runs": 3333,
-        "reverts": 538
+        "runs": 3334,
+        "reverts": 0
       }
     },
     {
       "index": 2,
       "total": 6,
       "seed": 123458,
-      "runs": null,
+      "runs": 3334,
       "result": {
-        "runs": 3333,
-        "reverts": 504
+        "runs": 3334,
+        "reverts": 0
       }
     },
     {
       "index": 3,
       "total": 6,
       "seed": 123459,
-      "runs": null,
+      "runs": 3334,
       "result": {
-        "runs": 3333,
-        "reverts": 525
+        "runs": 3334,
+        "reverts": 0
       }
     },
     {
       "index": 4,
       "total": 6,
       "seed": 123460,
-      "runs": null,
+      "runs": 3334,
       "result": {
-        "runs": 3333,
-        "reverts": 476
+        "runs": 3334,
+        "reverts": 0
       }
     },
     {
       "index": 5,
       "total": 6,
       "seed": 123461,
-      "runs": null,
+      "runs": 3334,
       "result": {
-        "runs": 3333,
-        "reverts": 521
+        "runs": 3334,
+        "reverts": 0
       }
     },
     {
       "index": 6,
       "total": 6,
       "seed": 123462,
-      "runs": null,
+      "runs": 3334,
       "result": {
-        "runs": 3333,
-        "reverts": 404
+        "runs": 3334,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 1,
+      "total": 6,
+      "seed": 123457,
+      "runs": 3334,
+      "result": {
+        "runs": 3334,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 2,
+      "total": 6,
+      "seed": 123458,
+      "runs": 3334,
+      "result": {
+        "runs": 3334,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 3,
+      "total": 6,
+      "seed": 123459,
+      "runs": 3334,
+      "result": {
+        "runs": 3334,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 4,
+      "total": 6,
+      "seed": 123460,
+      "runs": 3334,
+      "result": {
+        "runs": 3334,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 5,
+      "total": 6,
+      "seed": 123461,
+      "runs": 3334,
+      "result": {
+        "runs": 3334,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 6,
+      "total": 6,
+      "seed": 123462,
+      "runs": 3334,
+      "result": {
+        "runs": 3334,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 1,
+      "total": 6,
+      "seed": 123457,
+      "runs": 3334,
+      "result": {
+        "runs": 3334,
+        "reverts": 534
+      }
+    },
+    {
+      "index": 2,
+      "total": 6,
+      "seed": 123458,
+      "runs": 3334,
+      "result": {
+        "runs": 3334,
+        "reverts": 524
+      }
+    },
+    {
+      "index": 3,
+      "total": 6,
+      "seed": 123459,
+      "runs": 3334,
+      "result": {
+        "runs": 3334,
+        "reverts": 499
+      }
+    },
+    {
+      "index": 4,
+      "total": 6,
+      "seed": 123460,
+      "runs": 3334,
+      "result": {
+        "runs": 3334,
+        "reverts": 400
+      }
+    },
+    {
+      "index": 5,
+      "total": 6,
+      "seed": 123461,
+      "runs": 3334,
+      "result": {
+        "runs": 3334,
+        "reverts": 475
+      }
+    },
+    {
+      "index": 6,
+      "total": 6,
+      "seed": 123462,
+      "runs": 3334,
+      "result": {
+        "runs": 3334,
+        "reverts": 521
       }
     }
   ],
   "suite_runs": [],
   "durations_secs": [
-    483.74,
-    484.26,
-    486.05,
-    486.31,
-    486.39,
-    486.48
+    62.85,
+    63.03,
+    63.03,
+    63.09,
+    63.28,
+    63.53,
+    256.73,
+    258.14,
+    258.37,
+    258.95,
+    259.09,
+    259.52,
+    201.37,
+    201.6,
+    202.46,
+    202.66,
+    202.9,
+    204.19
   ],
   "csv": {
     "metrics/mid_event_vs_precompile_mid_bps.csv": {
       "exists": true,
       "rows": 6,
       "data_rows": 5,
-      "age_minutes": 170,
+      "age_minutes": 2,
       "min_rows": 2,
-      "fresh": false
+      "fresh": true
     },
     "metrics/canary_deltas.csv": {
       "exists": true,
       "rows": 5,
       "data_rows": 4,
-      "age_minutes": 170,
+      "age_minutes": 2,
       "min_rows": 2,
-      "fresh": false
+      "fresh": true
     }
   },
   "freshness_minutes": 30

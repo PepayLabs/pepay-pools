@@ -270,7 +270,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         require(midRes.success && midRes.ageSec <= cfg.maxAgeSec, Errors.ORACLE_STALE);
         IOracleAdapterHC.BidAskResult memory baRes = oracleHC.readBidAsk();
 
-        uint256 confBps = _previewConfidenceView(cfg, OracleMode.Spot, baRes.spreadBps, baRes.success, false, 0);
+        uint256 confBps =
+            _previewConfidenceView(cfg, OracleMode.Spot, midRes.mid, baRes.spreadBps, baRes.success, false, 0);
         uint256 invDev = _computeInventoryDeviationBps(midRes.mid);
         FeePolicy.FeeState memory state =
             FeePolicy.FeeState({lastBlock: feeState.lastBlock, lastFeeBps: feeState.lastFeeBps});
@@ -581,17 +582,51 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
     function _updateSigma(OracleConfig memory cfg, uint256 mid, uint256 spreadSample) internal returns (uint256) {
         ConfidenceState storage state = confidenceState;
+        ConfidenceState memory snapshot = ConfidenceState({
+            lastSigmaBlock: state.lastSigmaBlock,
+            sigmaBps: state.sigmaBps,
+            lastObservedMid: state.lastObservedMid
+        });
 
-        if (state.lastSigmaBlock == uint64(block.number)) {
-            state.lastObservedMid = uint128(mid);
-            return state.sigmaBps;
+        (uint256 sigmaBps, uint64 nextBlock, uint128 nextObservedMid) =
+            _forecastSigma(cfg, mid, spreadSample, snapshot, uint64(block.number));
+
+        state.lastSigmaBlock = nextBlock;
+        state.sigmaBps = uint64(sigmaBps);
+        state.lastObservedMid = nextObservedMid;
+
+        return sigmaBps;
+    }
+
+    function _previewSigma(OracleConfig memory cfg, uint256 mid, uint256 spreadSample) internal view returns (uint256) {
+        ConfidenceState memory snapshot = ConfidenceState({
+            lastSigmaBlock: confidenceState.lastSigmaBlock,
+            sigmaBps: confidenceState.sigmaBps,
+            lastObservedMid: confidenceState.lastObservedMid
+        });
+
+        (uint256 sigmaBps,,) = _forecastSigma(cfg, mid, spreadSample, snapshot, uint64(block.number));
+        return sigmaBps;
+    }
+
+    function _forecastSigma(
+        OracleConfig memory cfg,
+        uint256 mid,
+        uint256 spreadSample,
+        ConfidenceState memory snapshot,
+        uint64 currentBlock
+    ) internal pure returns (uint256 sigmaBps, uint64 nextBlock, uint128 nextObservedMid) {
+        nextObservedMid = uint128(mid);
+
+        if (snapshot.lastSigmaBlock == currentBlock) {
+            return (snapshot.sigmaBps, currentBlock, nextObservedMid);
         }
 
         uint256 cap = cfg.confCapBpsSpot;
         uint256 sample = spreadSample;
 
-        if (state.lastObservedMid > 0 && mid > 0) {
-            uint256 priorMid = uint256(state.lastObservedMid);
+        if (snapshot.lastObservedMid > 0 && mid > 0) {
+            uint256 priorMid = uint256(snapshot.lastObservedMid);
             uint256 deltaBps = FixedPointMath.toBps(FixedPointMath.absDiff(mid, priorMid), priorMid);
             if (cap > 0 && deltaBps > cap) {
                 deltaBps = cap;
@@ -602,31 +637,26 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         uint256 lambda = cfg.sigmaEwmaLambdaBps;
-        uint256 newSigma;
 
-        if (state.lastSigmaBlock == 0) {
-            newSigma = sample;
+        if (snapshot.lastSigmaBlock == 0) {
+            sigmaBps = sample;
         } else if (lambda >= BPS) {
-            newSigma = state.sigmaBps;
+            sigmaBps = snapshot.sigmaBps;
         } else {
-            uint256 prevSigma = state.sigmaBps;
-            newSigma = (prevSigma * lambda + sample * (BPS - lambda)) / BPS;
+            sigmaBps = (uint256(snapshot.sigmaBps) * lambda + sample * (BPS - lambda)) / BPS;
         }
 
-        if (cap > 0 && newSigma > cap) {
-            newSigma = cap;
+        if (cap > 0 && sigmaBps > cap) {
+            sigmaBps = cap;
         }
 
-        state.lastSigmaBlock = uint64(block.number);
-        state.sigmaBps = uint64(newSigma);
-        state.lastObservedMid = uint128(mid);
-
-        return newSigma;
+        nextBlock = currentBlock;
     }
 
     function _previewConfidenceView(
         OracleConfig memory cfg,
         OracleMode mode,
+        uint256 mid,
         uint256 spreadBps,
         bool spreadAvailable,
         bool pythFresh,
@@ -643,8 +673,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         uint256 spreadSample = spreadAvailable ? FixedPointMath.min(spreadBps, cap) : 0;
-        uint256 sigmaStored = confidenceState.sigmaBps;
-        uint256 cappedSigma = cap > 0 ? FixedPointMath.min(sigmaStored, cap) : sigmaStored;
+        uint256 sigmaPreview = _previewSigma(cfg, mid, spreadSample);
+        uint256 cappedSigma = cap > 0 ? FixedPointMath.min(sigmaPreview, cap) : sigmaPreview;
 
         uint256 confSpread = spreadAvailable ? FixedPointMath.mulDivDown(spreadSample, cfg.confWeightSpreadBps, BPS) : 0;
         uint256 confSigma = cappedSigma > 0 ? FixedPointMath.mulDivDown(cappedSigma, cfg.confWeightSigmaBps, BPS) : 0;

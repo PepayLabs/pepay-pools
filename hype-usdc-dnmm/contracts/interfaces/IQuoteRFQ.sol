@@ -16,4 +16,11 @@ interface IQuoteRFQ {
         returns (uint256 amountOut);
 
     function setMakerKey(address newKey) external;
+
+    function hashQuote(QuoteParams calldata params) external view returns (bytes32);
+
+    function verifyQuoteSignature(address signer, QuoteParams calldata params, bytes calldata signature)
+        external
+        view
+        returns (bool);
 }

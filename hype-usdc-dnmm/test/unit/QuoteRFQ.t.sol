@@ -10,12 +10,12 @@ import {BaseTest} from "../utils/BaseTest.sol";
 
 contract QuoteRFQTest is BaseTest {
     QuoteRFQ internal rfq;
-    uint256 internal makerKey = 0xA11ce;
+    uint256 internal makerKey;
     address internal makerAddr;
 
     function setUp() public {
         setUpBase();
-        makerAddr = vm.addr(makerKey);
+        (makerKey, makerAddr) = _loadMakerSigner();
         rfq = new QuoteRFQ(address(pool), makerAddr);
         approveAll(alice);
         approveAll(bob);
@@ -48,6 +48,37 @@ contract QuoteRFQTest is BaseTest {
         assertTrue(rfq.consumedSalts(params.salt), "salt consumed");
     }
 
+    function test_hash_and_verify_signature() public view {
+        IQuoteRFQ.QuoteParams memory params = IQuoteRFQ.QuoteParams({
+            taker: alice,
+            amountIn: 20 ether,
+            minAmountOut: 0,
+            isBaseIn: true,
+            expiry: block.timestamp + 60,
+            salt: 10
+        });
+
+        bytes memory sig = _sign(params);
+
+        assertTrue(rfq.verifyQuoteSignature(makerAddr, params, sig), "signature should verify");
+    }
+
+    function test_verify_quote_signature_rejects_tampered_amount() public view {
+        IQuoteRFQ.QuoteParams memory params = IQuoteRFQ.QuoteParams({
+            taker: alice,
+            amountIn: 50 ether,
+            minAmountOut: 0,
+            isBaseIn: true,
+            expiry: block.timestamp + 60,
+            salt: 11
+        });
+
+        bytes memory sig = _sign(params);
+        params.amountIn += 1 ether;
+
+        assertFalse(rfq.verifyQuoteSignature(makerAddr, params, sig), "tampered amount");
+    }
+
     function test_rfq_expired_reverts() public {
         IQuoteRFQ.QuoteParams memory params = IQuoteRFQ.QuoteParams({
             taker: alice,
@@ -75,9 +106,27 @@ contract QuoteRFQTest is BaseTest {
         });
 
         uint256 badKey = 0xBEEF;
-        bytes32 digest = _hash(params);
+        bytes32 digest = rfq.hashQuote(params);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(badKey, digest);
         bytes memory sig = abi.encodePacked(r, s, v);
+
+        vm.prank(alice);
+        vm.expectRevert("BAD_SIG");
+        rfq.verifyAndSwap(sig, params, bytes(""));
+    }
+
+    function test_rfq_wrong_domain_reverts() public {
+        IQuoteRFQ.QuoteParams memory params = IQuoteRFQ.QuoteParams({
+            taker: alice,
+            amountIn: 75 ether,
+            minAmountOut: 0,
+            isBaseIn: true,
+            expiry: block.timestamp + 120,
+            salt: 6
+        });
+
+        QuoteRFQ other = new QuoteRFQ(address(pool), makerAddr);
+        bytes memory sig = _signWith(params, other);
 
         vm.prank(alice);
         vm.expectRevert("BAD_SIG");
@@ -119,29 +168,33 @@ contract QuoteRFQTest is BaseTest {
         assertGt(amountOut, 0, "amount out");
     }
 
-    function _sign(IQuoteRFQ.QuoteParams memory params) internal returns (bytes memory) {
-        bytes32 digest = _hash(params);
+    function _sign(IQuoteRFQ.QuoteParams memory params) internal view returns (bytes memory) {
+        bytes32 digest = rfq.hashQuote(params);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(makerKey, digest);
         return abi.encodePacked(r, s, v);
     }
 
-    function _hash(IQuoteRFQ.QuoteParams memory params) internal view returns (bytes32) {
-        bytes32 typeHash = keccak256(
-            "Quote(address taker,uint256 amountIn,uint256 minAmountOut,bool isBaseIn,uint256 expiry,uint256 salt,address pool,uint256 chainId)"
-        );
-        bytes32 structHash = keccak256(
-            abi.encode(
-                typeHash,
-                params.taker,
-                params.amountIn,
-                params.minAmountOut,
-                params.isBaseIn,
-                params.expiry,
-                params.salt,
-                address(pool),
-                block.chainid
-            )
-        );
-        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", structHash));
+    function _signWith(IQuoteRFQ.QuoteParams memory params, QuoteRFQ target) internal view returns (bytes memory) {
+        bytes32 digest = target.hashQuote(params);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(makerKey, digest);
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _loadMakerSigner() internal view returns (uint256 key, address addr) {
+        key = _loadSignerKey();
+        address derivedAddr = vm.addr(key);
+        addr = derivedAddr;
+        try vm.envAddress("RFQ_SIGNER_ADDR") returns (address envAddr) {
+            require(envAddr == derivedAddr, "RFQ_SIGNER_MISMATCH");
+            addr = envAddr;
+        } catch {}
+    }
+
+    function _loadSignerKey() internal view returns (uint256 key) {
+        try vm.envUint("RFQ_SIGNER_PK") returns (uint256 envKey) {
+            key = envKey;
+        } catch {
+            key = 0xA11ce;
+        }
     }
 }

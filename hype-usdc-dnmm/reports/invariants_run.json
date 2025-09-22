@@ -1,0 +1,101 @@
+{
+  "generated_at": "2025-09-22T22:33:42Z",
+  "log_path": "metrics/invariant_long_run_2025-09-22.log",
+  "decision": "run",
+  "sample": {
+    "seconds": 21,
+    "ms_per_run": 52
+  },
+  "estimate_secs": 1040,
+  "target_runs": 20000,
+  "shards": [
+    {
+      "index": 1,
+      "total": 6,
+      "seed": 123457,
+      "runs": null,
+      "result": {
+        "runs": 3333,
+        "reverts": 538
+      }
+    },
+    {
+      "index": 2,
+      "total": 6,
+      "seed": 123458,
+      "runs": null,
+      "result": {
+        "runs": 3333,
+        "reverts": 504
+      }
+    },
+    {
+      "index": 3,
+      "total": 6,
+      "seed": 123459,
+      "runs": null,
+      "result": {
+        "runs": 3333,
+        "reverts": 525
+      }
+    },
+    {
+      "index": 4,
+      "total": 6,
+      "seed": 123460,
+      "runs": null,
+      "result": {
+        "runs": 3333,
+        "reverts": 476
+      }
+    },
+    {
+      "index": 5,
+      "total": 6,
+      "seed": 123461,
+      "runs": null,
+      "result": {
+        "runs": 3333,
+        "reverts": 521
+      }
+    },
+    {
+      "index": 6,
+      "total": 6,
+      "seed": 123462,
+      "runs": null,
+      "result": {
+        "runs": 3333,
+        "reverts": 404
+      }
+    }
+  ],
+  "suite_runs": [],
+  "durations_secs": [
+    483.74,
+    484.26,
+    486.05,
+    486.31,
+    486.39,
+    486.48
+  ],
+  "csv": {
+    "metrics/mid_event_vs_precompile_mid_bps.csv": {
+      "exists": true,
+      "rows": 6,
+      "data_rows": 5,
+      "age_minutes": 170,
+      "min_rows": 2,
+      "fresh": false
+    },
+    "metrics/canary_deltas.csv": {
+      "exists": true,
+      "rows": 5,
+      "data_rows": 4,
+      "age_minutes": 170,
+      "min_rows": 2,
+      "fresh": false
+    }
+  },
+  "freshness_minutes": 30
+}

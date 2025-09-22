@@ -195,11 +195,19 @@ contract DnmPoolSwapTest is BaseTest {
         vm.prank(bob);
         feeQuote.approve(address(poolLocal), type(uint256).max);
 
+        uint256 feeBpsBase = feeBase.feeBps();
+        uint256 expectedBaseReceived = 10 ether - ((10 ether) * feeBpsBase) / 10_000;
         vm.prank(alice);
+        vm.expectEmit(true, false, false, true);
+        emit DnmPool.TokenFeeUnsupported(alice, true, 10 ether, expectedBaseReceived);
         vm.expectRevert(bytes(Errors.TOKEN_FEE_UNSUPPORTED));
         poolLocal.swapExactIn(10 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 10);
 
+        uint256 feeBpsQuote = feeQuote.feeBps();
+        uint256 expectedQuoteReceived = 500_000000 - ((500_000000) * feeBpsQuote) / 10_000;
         vm.prank(bob);
+        vm.expectEmit(true, false, false, true);
+        emit DnmPool.TokenFeeUnsupported(bob, false, 500_000000, expectedQuoteReceived);
         vm.expectRevert(bytes(Errors.TOKEN_FEE_UNSUPPORTED));
         poolLocal.swapExactIn(500_000000, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 10);
     }

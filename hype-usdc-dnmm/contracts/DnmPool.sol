@@ -272,7 +272,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         require(!baRes.success || (baRes.bid > 0 && baRes.ask > baRes.bid), Errors.INVALID_OB);
 
         uint256 confBps =
-            _previewConfidenceView(cfg, OracleMode.Spot, midRes.mid, baRes.spreadBps, baRes.success, false, 0);
+            _previewConfidenceView(cfg, OracleMode.Spot, midRes.mid, baRes.spreadBps, baRes.success, false, 0, false);
         uint256 invDev = _computeInventoryDeviationBps(midRes.mid);
         FeePolicy.FeeState memory state =
             FeePolicy.FeeState({lastBlock: feeState.lastBlock, lastFeeBps: feeState.lastFeeBps});
@@ -583,7 +583,17 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         internal
         returns (uint256 confBps, uint256 confSpreadBps, uint256 confSigmaBps, uint256 confPythBps, uint256 sigmaBps)
     {
-        uint256 cap = mode == OracleMode.Strict ? cfg.confCapBpsStrict : cfg.confCapBpsSpot;
+        uint256 capSpot = cfg.confCapBpsSpot;
+        uint256 capStrict = cfg.confCapBpsStrict;
+        uint256 cap = mode == OracleMode.Strict ? capStrict : capSpot;
+        if (pythUsed) {
+            // Force strict cap discipline whenever the PYTH path contributes confidence.
+            if (capStrict == 0) {
+                cap = 0;
+            } else if (cap == 0 || capStrict < cap) {
+                cap = capStrict;
+            }
+        }
         uint256 fallbackConf = pythFresh && pythUsed ? pythConf : 0;
 
         if (!featureFlags.blendOn) {
@@ -603,10 +613,11 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             return (confBps, confSpreadBps, confSigmaBps, confPythBps, sigmaBps);
         }
 
-        uint256 spreadSample = spreadAvailable ? FixedPointMath.min(spreadBps, cap) : 0;
+        uint256 spreadSample = spreadAvailable && cap > 0 ? FixedPointMath.min(spreadBps, cap) : spreadBps;
         sigmaBps = _updateSigma(cfg, mid, spreadSample);
 
-        confSpreadBps = spreadAvailable ? FixedPointMath.mulDivDown(spreadSample, cfg.confWeightSpreadBps, BPS) : 0;
+        uint256 cappedSpread = cap > 0 ? FixedPointMath.min(spreadSample, cap) : spreadSample;
+        confSpreadBps = spreadAvailable ? FixedPointMath.mulDivDown(cappedSpread, cfg.confWeightSpreadBps, BPS) : 0;
         uint256 cappedSigma = cap > 0 ? FixedPointMath.min(sigmaBps, cap) : sigmaBps;
         confSigmaBps = cappedSigma > 0 ? FixedPointMath.mulDivDown(cappedSigma, cfg.confWeightSigmaBps, BPS) : 0;
         uint256 cappedPyth = cap > 0 ? FixedPointMath.min(fallbackConf, cap) : fallbackConf;
@@ -700,10 +711,20 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 spreadBps,
         bool spreadAvailable,
         bool pythFresh,
-        uint256 pythConf
+        uint256 pythConf,
+        bool pythUsed
     ) internal view returns (uint256 confBps) {
-        uint256 cap = mode == OracleMode.Strict ? cfg.confCapBpsStrict : cfg.confCapBpsSpot;
-        uint256 fallbackConf = pythFresh ? pythConf : 0;
+        uint256 capSpot = cfg.confCapBpsSpot;
+        uint256 capStrict = cfg.confCapBpsStrict;
+        uint256 cap = mode == OracleMode.Strict ? capStrict : capSpot;
+        if (pythUsed && pythFresh) {
+            if (capStrict == 0) {
+                cap = 0;
+            } else if (cap == 0 || capStrict < cap) {
+                cap = capStrict;
+            }
+        }
+        uint256 fallbackConf = (pythFresh && pythUsed) ? pythConf : 0;
 
         if (!featureFlags.blendOn) {
             uint256 conf = spreadAvailable ? spreadBps : 0;
@@ -712,11 +733,12 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             return conf;
         }
 
-        uint256 spreadSample = spreadAvailable ? FixedPointMath.min(spreadBps, cap) : 0;
+        uint256 spreadSample = spreadAvailable && cap > 0 ? FixedPointMath.min(spreadBps, cap) : spreadBps;
         uint256 sigmaPreview = _previewSigma(cfg, mid, spreadSample);
         uint256 cappedSigma = cap > 0 ? FixedPointMath.min(sigmaPreview, cap) : sigmaPreview;
 
-        uint256 confSpread = spreadAvailable ? FixedPointMath.mulDivDown(spreadSample, cfg.confWeightSpreadBps, BPS) : 0;
+        uint256 cappedSpread = cap > 0 ? FixedPointMath.min(spreadSample, cap) : spreadSample;
+        uint256 confSpread = spreadAvailable ? FixedPointMath.mulDivDown(cappedSpread, cfg.confWeightSpreadBps, BPS) : 0;
         uint256 confSigma = cappedSigma > 0 ? FixedPointMath.mulDivDown(cappedSigma, cfg.confWeightSigmaBps, BPS) : 0;
         uint256 cappedPyth = cap > 0 ? FixedPointMath.min(fallbackConf, cap) : fallbackConf;
         uint256 confPyth = cappedPyth > 0 ? FixedPointMath.mulDivDown(cappedPyth, cfg.confWeightPythBps, BPS) : 0;

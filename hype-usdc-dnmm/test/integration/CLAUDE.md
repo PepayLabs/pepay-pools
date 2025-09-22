@@ -1,8 +1,8 @@
-# HYPE/USDC DNMM Contracts Implementation Guide
+# HYPE/USDC DNMM Integration Tests Implementation Guide
 
-**Path**: `hype-usdc-dnmm/contracts`
+**Path**: `hype-usdc-dnmm/test/integration`
 
-**Description**: Solidity sources for the HYPE/USDC dynamic market maker, oracle adapters, libraries, mocks, and interfaces.
+**Description**: Deterministic scenario suites validating oracle selection, parity, fallbacks, RFQ, and operational behavior for the HYPE/USDC DNMM.
 
 ## Purpose
 - Capture the intent of this module/folder and its relationship to the broader HYPE/HyperEVM initiative.
@@ -34,5 +34,5 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2025-09-22: Hardened oracle handling with precompile failure fallbacks, invalid orderbook guardrails, Pyth-only confidence blending + strict caps, and timestamp regression checks in `DnmPool`.
-- 2024-07-12: Added confidence-blend feature flags, EWMA sigma state, and `ConfidenceDebug` emission across quoting/swap paths.
+- 2025-09-22: Added fork parity matrix (FP1–FP5), Pyth hygiene/delta flap scenarios, preview↔settlement parity (base, quote, RFQ), and timestamp guard coverage.
+- 2024-07-12: Established Phase-8 confidence blend, fee dynamics, and fallback regression scenarios.

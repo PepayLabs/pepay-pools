@@ -5,6 +5,7 @@ import "forge-std/Vm.sol";
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {IQuoteRFQ} from "../../contracts/interfaces/IQuoteRFQ.sol";
 import {FixedPointMath} from "../../contracts/lib/FixedPointMath.sol";
+import {Errors} from "../../contracts/lib/Errors.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {QuoteRFQ} from "../../contracts/quotes/QuoteRFQ.sol";
 import {EventRecorder} from "../utils/EventRecorder.sol";
@@ -188,6 +189,69 @@ contract PreviewParityTest is BaseTest {
         assertEq(swapDbg.feeTotalBps, preview.feeBpsUsed, "rfq fee total parity");
         assertEq(swapEvt.reason, preview.reason, "rfq reason parity");
         assertEq(swapEvt.isPartial, preview.partialFillAmountIn > 0, "rfq partial parity");
+    }
+
+    function test_rfq_blocks_and_resumes_through_divergence_gate() public {
+        (,,,, uint16 divergenceCap,,,,,) = pool.oracleConfig();
+
+        updateSpot(1_000_000_000_000_000_000, 2, true);
+        updateBidAsk(998_000_000_000_000_000, 1_002_000_000_000_000_000, 40, true);
+        updateEma(1_000_000_000_000_000_000, 3, true);
+        updatePyth(1_120_000_000_000_000_000, 1e18, 2, 2, 40, 40);
+
+        IQuoteRFQ.QuoteParams memory params = IQuoteRFQ.QuoteParams({
+            taker: alice,
+            amountIn: 18 ether,
+            minAmountOut: 0,
+            isBaseIn: true,
+            expiry: block.timestamp + 120,
+            salt: 99
+        });
+        bytes memory sig = _signQuote(params);
+
+        vm.expectRevert(bytes(Errors.ORACLE_DIVERGENCE));
+        quote(params.amountIn, params.isBaseIn, IDnmPool.OracleMode.Spot);
+
+        vm.prank(params.taker);
+        vm.expectRevert(bytes(Errors.ORACLE_DIVERGENCE));
+        rfq.verifyAndSwap(sig, params, bytes(""));
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+        uint256 resolvedMid = 1_004_000_000_000_000_000;
+        updateSpot(resolvedMid, 1, true);
+        updateBidAsk(resolvedMid - 2_000_000_000_000_000, resolvedMid + 2_000_000_000_000_000, 40, true);
+        updateEma(resolvedMid, 2, true);
+        updatePyth(resolvedMid, 1e18, 2, 2, 35, 35);
+
+        uint256 snapshot = vm.snapshotState();
+        vm.recordLogs();
+        DnmPool.QuoteResult memory preview = quote(params.amountIn, params.isBaseIn, IDnmPool.OracleMode.Spot);
+        Vm.Log[] memory previewLogs = vm.getRecordedLogs();
+        EventRecorder.ConfidenceDebugEvent[] memory previewDebug = EventRecorder.decodeConfidenceDebug(previewLogs);
+        require(previewDebug.length == 1, "preview debug recalc");
+        require(previewDebug[0].confPythBps == 0, "preview pyth zero");
+        require(previewDebug[0].confBlendedBps <= divergenceCap, "preview conf bounded");
+
+        vm.revertToState(snapshot);
+
+        vm.recordLogs();
+        vm.prank(params.taker);
+        uint256 amountOut = rfq.verifyAndSwap(sig, params, bytes(""));
+        Vm.Log[] memory swapLogs = vm.getRecordedLogs();
+        EventRecorder.SwapEvent[] memory swaps = EventRecorder.decodeSwapEvents(swapLogs);
+        EventRecorder.ConfidenceDebugEvent[] memory swapDebug = EventRecorder.decodeConfidenceDebug(swapLogs);
+        require(swaps.length == 1, "rfq swap count");
+        require(swapDebug.length == 1, "rfq debug count");
+
+        EventRecorder.SwapEvent memory swapEvt = swaps[0];
+        EventRecorder.ConfidenceDebugEvent memory swapDbg = swapDebug[0];
+
+        assertEq(amountOut, preview.amountOut, "rfq resumed amount");
+        assertEq(swapEvt.mid, preview.midUsed, "rfq resumed mid");
+        assertEq(swapEvt.feeBps, preview.feeBpsUsed, "rfq resumed fee");
+        assertEq(swapDbg.confBlendedBps, previewDebug[0].confBlendedBps, "rfq conf match");
+        assertEq(swapDbg.confPythBps, previewDebug[0].confPythBps, "rfq pyth match");
     }
 
     function _signQuote(IQuoteRFQ.QuoteParams memory params) internal view returns (bytes memory) {

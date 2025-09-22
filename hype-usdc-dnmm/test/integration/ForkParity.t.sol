@@ -13,7 +13,7 @@ contract ForkParityTest is BaseTest {
     bytes32 private constant REASON_NONE = bytes32(0);
     bytes32 private constant REASON_EMA = bytes32("EMA");
     bytes32 private constant REASON_PYTH = bytes32("PYTH");
-    uint256 private constant EVENT_COUNT = 4;
+    uint256 private constant EVENT_COUNT = 5;
 
     function setUp() public {
         setUpBase();
@@ -23,6 +23,13 @@ contract ForkParityTest is BaseTest {
     }
 
     function test_fork_parity_paths_and_metrics() public {
+        uint32 maxAgeSec;
+        uint32 stallWindowSec;
+        uint16 capSpot;
+        uint16 capStrict;
+        uint16 divergenceCap;
+        (maxAgeSec, stallWindowSec, capSpot, capStrict, divergenceCap,,,,,) = pool.oracleConfig();
+        assertGt(divergenceCap, 0, "divergence cap configured");
         string[] memory labels = new string[](EVENT_COUNT);
         bytes32[] memory sources = new bytes32[](EVENT_COUNT);
         uint256[] memory expectedMids = new uint256[](EVENT_COUNT);
@@ -117,6 +124,25 @@ contract ForkParityTest is BaseTest {
             ++idx;
         }
 
+        // FP5: Spot stale but Pyth fresh -> strict-cap fallback
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+        oracleHC.clearResponseModes();
+        updateSpot(1_028_000_000_000_000_000, maxAgeSec + 5, true);
+        updateBidAsk(1_024_000_000_000_000_000, 1_032_000_000_000_000_000, 40, true);
+        updateEma(1_025_000_000_000_000_000, stallWindowSec + 5, true);
+        updatePyth(1_029_000_000_000_000_000, 1e18, 3, 3, 60, 58);
+
+        labels[idx] = "pyth_stale_hc";
+        sources[idx] = REASON_PYTH;
+        expectedMids[idx] = 1_029_000_000_000_000_000;
+        expectedAges[idx] = _pythAge();
+        blockNumbers[idx] = block.number;
+        swap(bob, 7 ether, 0, true, IDnmPool.OracleMode.Spot, block.timestamp + 5);
+        unchecked {
+            ++idx;
+        }
+
         // Divergence guard: HC fresh but deviates from Pyth beyond epsilon
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 1);
@@ -168,7 +194,6 @@ contract ForkParityTest is BaseTest {
 
         string[] memory parityRows = new string[](EVENT_COUNT);
         string[] memory ageRows = new string[](EVENT_COUNT);
-        (, , uint16 capSpot, , , , , , ,) = pool.oracleConfig();
         uint256 hcCount;
         uint256 emaCount;
         uint256 pythCount;
@@ -180,6 +205,8 @@ contract ForkParityTest is BaseTest {
 
             uint256 deltaBps = _deltaBps(evt.mid, expectedMids[i]);
             require(deltaBps == 0, "mid divergence");
+
+            uint256 capCheck = evt.reason == REASON_PYTH ? capStrict : capSpot;
 
             string memory sourceLabel = _sourceLabel(evt.reason);
             parityRows[i] = _formatParityRow(
@@ -194,7 +221,7 @@ contract ForkParityTest is BaseTest {
             ageRows[i] = _formatAgeRow(labels[i], sourceLabel, expectedAges[i]);
 
             EventRecorder.ConfidenceDebugEvent memory dbg = debugEvents[i];
-            require(dbg.confBlendedBps <= capSpot, "conf cap");
+            require(dbg.confBlendedBps <= capCheck, "conf cap");
             if (evt.reason == REASON_NONE) {
                 unchecked {
                     ++hcCount;
@@ -209,7 +236,8 @@ contract ForkParityTest is BaseTest {
                 unchecked {
                     ++pythCount;
                 }
-                require(dbg.confPythBps <= capSpot, "pyth conf cap");
+                require(dbg.confPythBps > 0, "pyth conf missing");
+                require(dbg.confPythBps <= capStrict, "pyth conf cap");
             }
         }
 

@@ -15,6 +15,21 @@ ffi = true
 [profile.ci]
 verbosity = 3
 
+[profile.default.invariant]
+runs = 2000
+depth = 64
+fail_on_revert = false
+
+[profile.ci.invariant]
+runs = 2000
+depth = 64
+fail_on_revert = false
+
+[profile.long.invariant]
+runs = 20000
+depth = 64
+fail_on_revert = false
+
 [fuzz]
 max_tests = 256
 runs = 256

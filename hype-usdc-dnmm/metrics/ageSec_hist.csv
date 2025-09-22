@@ -3,3 +3,4 @@ hc_fresh,hc,3
 ema_stall,ema,5
 ema_precompile_revert,ema,4
 pyth_precompile_empty,pyth,4
+pyth_stale_hc,pyth,3

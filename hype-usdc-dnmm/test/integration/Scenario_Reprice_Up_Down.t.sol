@@ -168,6 +168,16 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         );
 
         EventRecorder.writeJSON(vm, "metrics/reprice_up_down.json", json);
+
+        string[] memory comparisonRows = new string[](2);
+        comparisonRows[0] = _formatComparisonRow("up", metricsUp.executedVwap, dexVwapUp);
+        comparisonRows[1] = _formatComparisonRow("down", metricsDown.executedVwap, dexVwapDown);
+        EventRecorder.writeCSV(
+            vm,
+            "metrics/reprice_vwap_comparison.csv",
+            "phase,dnmm_vwap,cpamm_vwap,diff_vs_cpamm_bps",
+            comparisonRows
+        );
     }
 
     function _baseToQuote(uint256 baseAmount, uint256 baseScale, uint256 quoteScale) internal pure returns (uint256) {
@@ -222,5 +232,32 @@ contract ScenarioRepriceUpDownTest is BaseTest {
             ",",
             EventRecorder.uintToString(metrics.totalQuoteVolume)
         );
+    }
+
+    function _formatComparisonRow(string memory label, uint256 dnmmVwap, uint256 cpammVwap)
+        private
+        pure
+        returns (string memory)
+    {
+        int256 diffBps = _diffBps(dnmmVwap, cpammVwap);
+        return string.concat(
+            label,
+            ",",
+            EventRecorder.uintToString(dnmmVwap),
+            ",",
+            EventRecorder.uintToString(cpammVwap),
+            ",",
+            EventRecorder.intToString(diffBps)
+        );
+    }
+
+    function _diffBps(uint256 actual, uint256 refValue) private pure returns (int256) {
+        if (refValue == 0 || actual == refValue) {
+            return 0;
+        }
+        if (actual > refValue) {
+            return int256(((actual - refValue) * 10_000) / refValue);
+        }
+        return -int256(((refValue - actual) * 10_000) / refValue);
     }
 }

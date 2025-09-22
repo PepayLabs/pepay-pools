@@ -18,6 +18,7 @@ End-to-end research and engineering drop for a Lifinity v2–style dynamic no-ma
 3. Configure HyperCore + Pyth identifiers under `config/oracle.ids.json` and token metadata under `config/tokens.hyper.json`.
 4. Execute `terragon-forge.sh test` for the default suite or `terragon-forge.sh test --match-path test/perf` to capture gas/load artefacts in `metrics/` and `gas-snapshots.txt` alongside component-focused runs like `--match-test testFeeDecay`.
 5. Review `RUNBOOK.md`, `SECURITY.md`, and `docs/CONFIG.md` ahead of any deployment for operational expectations.
+6. For invariants, run the PR smoke sweep with `FOUNDRY_INVARIANT_RUNS=2000 forge test --profile ci --match-path test/invariants/Invariant_NoRunDry.t.sol`; for adaptive 20k runs use `script/run_invariants.sh` (sampler + shard/idle guards) from the repo root.
 
 > ℹ️  HyperCore precompile addresses and asset identifiers are placeholders; confirm before stage deployments.
 

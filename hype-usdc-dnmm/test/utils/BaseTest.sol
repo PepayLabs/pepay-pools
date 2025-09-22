@@ -168,7 +168,7 @@ abstract contract BaseTest is MathAsserts {
     }
 
     function defaultFeatureFlags() internal pure returns (DnmPool.FeatureFlags memory) {
-        return DnmPool.FeatureFlags({blendOn: false, parityCiOn: false, debugEmit: true});
+        return DnmPool.FeatureFlags({blendOn: true, parityCiOn: true, debugEmit: true});
     }
 
     function getFeatureFlags() internal view returns (DnmPool.FeatureFlags memory flags) {

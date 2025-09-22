@@ -14,6 +14,8 @@ library EventRecorder {
     bytes32 internal constant TARGET_XSTAR_SIG = keccak256("TargetBaseXstarUpdated(uint128,uint128,uint256,uint64)");
     bytes32 internal constant CONF_DEBUG_SIG =
         keccak256("ConfidenceDebug(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)");
+    bytes32 internal constant ORACLE_SNAPSHOT_SIG =
+        keccak256("OracleSnapshot(bytes32,uint256,uint256,uint256,uint256,uint256,bool,bool,bool)");
 
     bytes32 internal constant REASON_NONE = bytes32(0);
     bytes32 internal constant REASON_FLOOR = bytes32("FLOOR");
@@ -78,6 +80,18 @@ library EventRecorder {
         uint256 feeTotalBps;
     }
 
+    struct OracleSnapshotEvent {
+        bytes32 label;
+        uint256 mid;
+        uint256 ageSec;
+        uint256 spreadBps;
+        uint256 pythMid;
+        uint256 deltaBps;
+        bool hcSuccess;
+        bool bookSuccess;
+        bool pythSuccess;
+    }
+
     function decodeSwapEvents(Vm.Log[] memory entries) internal pure returns (SwapEvent[] memory swaps) {
         uint256 count;
         for (uint256 i = 0; i < entries.length; ++i) {
@@ -108,6 +122,50 @@ library EventRecorder {
                 feeBps: feeBps,
                 isPartial: isPartial,
                 reason: reason
+            });
+        }
+    }
+
+    function decodeOracleSnapshots(Vm.Log[] memory logs) internal pure returns (OracleSnapshotEvent[] memory events) {
+        uint256 count;
+        for (uint256 i = 0; i < logs.length; ++i) {
+            if (logs[i].topics.length > 0 && logs[i].topics[0] == ORACLE_SNAPSHOT_SIG) {
+                count += 1;
+            }
+        }
+
+        events = new OracleSnapshotEvent[](count);
+        uint256 ptr;
+        for (uint256 i = 0; i < logs.length; ++i) {
+            Vm.Log memory logEntry = logs[i];
+            if (logEntry.topics.length == 0 || logEntry.topics[0] != ORACLE_SNAPSHOT_SIG) {
+                continue;
+            }
+
+            require(logEntry.data.length == 32 * 9, "snapshot data");
+
+            (
+                bytes32 label,
+                uint256 mid,
+                uint256 ageSec,
+                uint256 spreadBps,
+                uint256 pythMid,
+                uint256 deltaBps,
+                bool hcSuccess,
+                bool bookSuccess,
+                bool pythSuccess
+            ) = abi.decode(logEntry.data, (bytes32, uint256, uint256, uint256, uint256, uint256, bool, bool, bool));
+
+            events[ptr++] = OracleSnapshotEvent({
+                label: label,
+                mid: mid,
+                ageSec: ageSec,
+                spreadBps: spreadBps,
+                pythMid: pythMid,
+                deltaBps: deltaBps,
+                hcSuccess: hcSuccess,
+                bookSuccess: bookSuccess,
+                pythSuccess: pythSuccess
             });
         }
     }

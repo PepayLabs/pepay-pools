@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import "forge-std/Vm.sol";
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
+import {DnmPool} from "../../contracts/DnmPool.sol";
 import {Errors} from "../../contracts/lib/Errors.sol";
+import {MockOracleHC} from "../../contracts/mocks/MockOracleHC.sol";
 import {EventRecorder} from "../utils/EventRecorder.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 
@@ -10,7 +13,7 @@ contract ForkParityTest is BaseTest {
     bytes32 private constant REASON_NONE = bytes32(0);
     bytes32 private constant REASON_EMA = bytes32("EMA");
     bytes32 private constant REASON_PYTH = bytes32("PYTH");
-    uint256 private constant EVENT_COUNT = 3;
+    uint256 private constant EVENT_COUNT = 4;
 
     function setUp() public {
         setUpBase();
@@ -74,20 +77,45 @@ contract ForkParityTest is BaseTest {
             ++idx;
         }
 
-        // FP3: Pyth fallback when HC path unavailable and EMA stale
+        // FP3: Precompile revert -> EMA fallback (stall window)
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 1);
-        updateSpot(0, 0, false);
-        updateBidAsk(0, 0, 0, false);
-        updateEma(0, 40, false);
-        updatePyth(1_030_000_000_000_000_000, 1e18, 4, 6, 30, 28);
+        oracleHC.setResponseMode(MockOracleHC.ReadKind.Spot, MockOracleHC.ResponseMode.RevertCall);
+        oracleHC.setResponseMode(MockOracleHC.ReadKind.Book, MockOracleHC.ResponseMode.RevertCall);
+        updateEma(1_005_000_000_000_000_000, 4, true);
+        updatePyth(1_000_000_000_000_000_000, 1e18, 20, 20, 50, 50); // stale Pyth to force EMA
 
-        labels[idx] = "pyth_fallback";
+        labels[idx] = "ema_precompile_revert";
+        sources[idx] = REASON_EMA;
+        (uint256 emaFallbackMid, uint256 emaFallbackAge,) = oracleHC.ema();
+        expectedMids[idx] = emaFallbackMid;
+        expectedAges[idx] = emaFallbackAge;
+        blockNumbers[idx] = block.number;
+        swap(carol, 8 ether, 0, true, IDnmPool.OracleMode.Spot, block.timestamp + 5);
+        oracleHC.clearResponseModes();
+        unchecked {
+            ++idx;
+        }
+
+        // FP4: Precompile empty -> Pyth fallback
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+        oracleHC.setResponseMode(MockOracleHC.ReadKind.Spot, MockOracleHC.ResponseMode.Empty);
+        oracleHC.setResponseMode(MockOracleHC.ReadKind.Book, MockOracleHC.ResponseMode.Empty);
+        oracleHC.setResponseMode(MockOracleHC.ReadKind.Ema, MockOracleHC.ResponseMode.Empty);
+        updateEma(0, 50, false);
+        updatePyth(1_030_000_000_000_000_000, 1e18, 4, 4, 30, 28);
+
+        labels[idx] = "pyth_precompile_empty";
         sources[idx] = REASON_PYTH;
         expectedMids[idx] = 1_030_000_000_000_000_000;
         expectedAges[idx] = _pythAge();
         blockNumbers[idx] = block.number;
-        swap(carol, 8 ether, 0, true, IDnmPool.OracleMode.Spot, block.timestamp + 5);
+        swap(alice, 6 ether, 0, true, IDnmPool.OracleMode.Spot, block.timestamp + 5);
+        oracleHC.clearResponseModes();
+        unchecked {
+            ++idx;
+        }
 
         // Divergence guard: HC fresh but deviates from Pyth beyond epsilon
         vm.roll(block.number + 1);
@@ -121,11 +149,26 @@ contract ForkParityTest is BaseTest {
             ++staleRejections;
         }
 
-        EventRecorder.SwapEvent[] memory swaps = drainLogsToSwapEvents();
+        // Invalid orderbook garbage data should fail closed
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+        oracleHC.clearResponseModes();
+        updateSpot(1_005e18, 3, true);
+        updateBidAsk(995e15, 1_005e15, 15, true);
+        oracleHC.setResponseMode(MockOracleHC.ReadKind.Book, MockOracleHC.ResponseMode.Garbage);
+        vm.expectRevert(bytes(Errors.INVALID_OB));
+        quote(5 ether, true, IDnmPool.OracleMode.Spot);
+        oracleHC.clearResponseModes();
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        EventRecorder.SwapEvent[] memory swaps = EventRecorder.decodeSwapEvents(logs);
+        EventRecorder.ConfidenceDebugEvent[] memory debugEvents = EventRecorder.decodeConfidenceDebug(logs);
         require(swaps.length == EVENT_COUNT, "swap count");
+        require(debugEvents.length == EVENT_COUNT, "debug count");
 
         string[] memory parityRows = new string[](EVENT_COUNT);
         string[] memory ageRows = new string[](EVENT_COUNT);
+        (, , uint16 capSpot, , , , , , ,) = pool.oracleConfig();
         uint256 hcCount;
         uint256 emaCount;
         uint256 pythCount;
@@ -150,18 +193,23 @@ contract ForkParityTest is BaseTest {
 
             ageRows[i] = _formatAgeRow(labels[i], sourceLabel, expectedAges[i]);
 
+            EventRecorder.ConfidenceDebugEvent memory dbg = debugEvents[i];
+            require(dbg.confBlendedBps <= capSpot, "conf cap");
             if (evt.reason == REASON_NONE) {
                 unchecked {
                     ++hcCount;
                 }
+                require(dbg.confPythBps == 0, "hc pyth conf");
             } else if (evt.reason == REASON_EMA) {
                 unchecked {
                     ++emaCount;
                 }
+                require(dbg.confPythBps == 0, "ema pyth conf");
             } else if (evt.reason == REASON_PYTH) {
                 unchecked {
                     ++pythCount;
                 }
+                require(dbg.confPythBps <= capSpot, "pyth conf cap");
             }
         }
 

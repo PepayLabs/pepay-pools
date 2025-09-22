@@ -269,6 +269,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         IOracleAdapterHC.MidResult memory midRes = oracleHC.readMidAndAge();
         require(midRes.success && midRes.ageSec <= cfg.maxAgeSec, Errors.ORACLE_STALE);
         IOracleAdapterHC.BidAskResult memory baRes = oracleHC.readBidAsk();
+        require(!baRes.success || (baRes.bid > 0 && baRes.ask > baRes.bid), Errors.INVALID_OB);
 
         uint256 confBps =
             _previewConfidenceView(cfg, OracleMode.Spot, midRes.mid, baRes.spreadBps, baRes.success, false, 0);
@@ -375,6 +376,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         bool shouldSettleFee
     ) internal returns (QuoteResult memory result) {
         require(amountIn > 0, Errors.ZERO_AMOUNT);
+        require(block.timestamp >= lastMidTimestamp, Errors.INVALID_TS);
 
         OracleOutcome memory outcome = _readOracle(mode, oracleData);
 
@@ -469,8 +471,23 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
     function _readOracle(OracleMode mode, bytes calldata oracleData) internal returns (OracleOutcome memory outcome) {
         OracleConfig memory cfg = oracleConfig;
-        IOracleAdapterHC.MidResult memory midRes = oracleHC.readMidAndAge();
-        IOracleAdapterHC.BidAskResult memory baRes = oracleHC.readBidAsk();
+        IOracleAdapterHC.MidResult memory midRes;
+        IOracleAdapterHC.BidAskResult memory baRes;
+
+        try oracleHC.readMidAndAge() returns (IOracleAdapterHC.MidResult memory res) {
+            midRes = res;
+        } catch {
+            midRes = IOracleAdapterHC.MidResult({mid: 0, ageSec: type(uint256).max, success: false});
+        }
+
+        try oracleHC.readBidAsk() returns (IOracleAdapterHC.BidAskResult memory res) {
+            baRes = res;
+        } catch {
+            baRes = IOracleAdapterHC.BidAskResult({bid: 0, ask: 0, spreadBps: 0, success: false});
+        }
+
+        bool bookInvalid = baRes.success && (baRes.bid == 0 || baRes.ask == 0 || baRes.ask <= baRes.bid);
+        require(!bookInvalid, Errors.INVALID_OB);
 
         uint256 pythMid;
         uint256 pythAge;
@@ -488,25 +505,33 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             }
         }
 
-        bool spotEligible = midRes.success && baRes.success && midRes.ageSec <= cfg.maxAgeSec;
+        bool midFresh = midRes.success && midRes.mid > 0 && midRes.ageSec <= cfg.maxAgeSec;
         bool spreadAvailable = baRes.success;
         bool spreadAcceptable = baRes.spreadBps <= cfg.confCapBpsSpot;
+        bool spreadRejected = midFresh && spreadAvailable && !spreadAcceptable;
+        IOracleAdapterHC.MidResult memory emaRes;
+        bool emaFresh;
+        if (cfg.allowEmaFallback) {
+            try oracleHC.readMidEmaFallback() returns (IOracleAdapterHC.MidResult memory res) {
+                emaRes = res;
+            } catch {
+                emaRes = IOracleAdapterHC.MidResult({mid: 0, ageSec: type(uint256).max, success: false});
+            }
+            emaFresh = emaRes.success && emaRes.mid > 0 && emaRes.ageSec <= cfg.maxAgeSec
+                && emaRes.ageSec <= cfg.stallWindowSec;
+        }
 
-        if (spotEligible && spreadAcceptable) {
+        if (midFresh && spreadAvailable && spreadAcceptable) {
             outcome.mid = midRes.mid;
             outcome.spreadBps = baRes.spreadBps;
             outcome.ageSec = midRes.ageSec;
             outcome.reason = REASON_NONE;
-        } else if (spotEligible && cfg.allowEmaFallback) {
-            IOracleAdapterHC.MidResult memory emaRes = oracleHC.readMidEmaFallback();
-            bool emaFresh = emaRes.success && emaRes.ageSec <= cfg.maxAgeSec && emaRes.ageSec <= cfg.stallWindowSec;
-            if (emaFresh) {
-                outcome.mid = emaRes.mid;
-                outcome.spreadBps = baRes.success ? baRes.spreadBps : 0;
-                outcome.ageSec = emaRes.ageSec;
-                outcome.usedFallback = true;
-                outcome.reason = REASON_EMA;
-            }
+        } else if (emaFresh) {
+            outcome.mid = emaRes.mid;
+            outcome.spreadBps = spreadAvailable ? baRes.spreadBps : 0;
+            outcome.ageSec = emaRes.ageSec;
+            outcome.usedFallback = true;
+            outcome.reason = REASON_EMA;
         }
 
         if (outcome.mid == 0 && pythFresh) {
@@ -516,12 +541,26 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             outcome.usedFallback = true;
             outcome.reason = REASON_PYTH;
             spreadAvailable = false;
+        } else {
+            spreadAvailable = spreadAvailable && (outcome.reason != REASON_PYTH);
         }
 
-        require(outcome.mid > 0, Errors.ORACLE_STALE);
+        if (outcome.mid == 0) {
+            if (spreadRejected) revert(Errors.ORACLE_SPREAD);
+            revert(Errors.ORACLE_STALE);
+        }
 
         (outcome.confBps, outcome.confSpreadBps, outcome.confSigmaBps, outcome.confPythBps, outcome.sigmaBps) =
-            _computeConfidence(cfg, mode, outcome.mid, outcome.spreadBps, spreadAvailable, pythFresh, pythConf);
+            _computeConfidence(
+                cfg,
+                mode,
+                outcome.mid,
+                outcome.spreadBps,
+                spreadAvailable,
+                pythFresh,
+                pythConf,
+                outcome.reason == REASON_PYTH
+            );
 
         if (!outcome.usedFallback && pythFresh && cfg.divergenceBps > 0) {
             uint256 divergenceBps = OracleUtils.computeDivergenceBps(outcome.mid, pythMid);
@@ -538,13 +577,14 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 spreadBps,
         bool spreadAvailable,
         bool pythFresh,
-        uint256 pythConf
+        uint256 pythConf,
+        bool pythUsed
     )
         internal
         returns (uint256 confBps, uint256 confSpreadBps, uint256 confSigmaBps, uint256 confPythBps, uint256 sigmaBps)
     {
         uint256 cap = mode == OracleMode.Strict ? cfg.confCapBpsStrict : cfg.confCapBpsSpot;
-        uint256 fallbackConf = pythFresh ? pythConf : 0;
+        uint256 fallbackConf = pythFresh && pythUsed ? pythConf : 0;
 
         if (!featureFlags.blendOn) {
             uint256 primary = spreadAvailable ? spreadBps : 0;

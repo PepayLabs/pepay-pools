@@ -9,6 +9,8 @@ library Errors {
     string internal constant ORACLE_STALE = "ORACLE_STALE";
     string internal constant ORACLE_SPREAD = "ORACLE_SPREAD";
     string internal constant ORACLE_DIVERGENCE = "ORACLE_DIVERGENCE";
+    string internal constant INVALID_OB = "INVALID_OB";
+    string internal constant INVALID_TS = "INVALID_TS";
     string internal constant FLOOR_BREACH = "FLOOR_BREACH";
     string internal constant ZERO_AMOUNT = "ZERO_AMOUNT";
     string internal constant INVALID_CONFIG = "INVALID_CONFIG";

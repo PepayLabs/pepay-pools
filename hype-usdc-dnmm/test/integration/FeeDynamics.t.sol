@@ -424,6 +424,9 @@ contract FeeDynamicsTest is BaseTest {
         uint256 delta = (mid * spreadBps) / (2 * BPS);
         uint256 bid = mid > delta ? mid - delta : 1;
         uint256 ask = mid + delta;
+        if (ask <= bid) {
+            ask = bid + 1;
+        }
         updateSpot(mid, 0, true);
         updateBidAsk(bid, ask, spreadBps, true);
         uint64 conf = uint64(spreadBps);

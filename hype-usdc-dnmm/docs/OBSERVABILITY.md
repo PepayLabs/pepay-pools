@@ -13,6 +13,7 @@
 ## Logs & Events
 - `SwapExecuted(user, isBaseIn, amountIn, amountOut, mid, feeBps, partial, reason)` – Primary execution telemetry.
 - `QuoteServed(bid, ask, s0, ttlMs, mid, feeBps)` – Top-of-book quoting for RFQ/aggregators.
+- `QuoteRFQ.verifyQuoteSignature(maker, params, sig)` / `hashQuote(params)` – View helpers to confirm RFQ EIP-712 signatures and present the digest to off-chain monitors.
 - `ParamsUpdated(kind, oldVal, newVal)` – Governance changes (Oracle/Fee/Inventory/Maker).
 - `Paused(pauser)` / `Unpaused(pauser)` – Lifecycle controls.
 - `ConfidenceDebug(confSpreadBps, confSigmaBps, confPythBps, confBps, sigmaBps, feeBaseBps, feeVolBps, feeInvBps, feeTotalBps)` – Optional diagnostic log gated by `DEBUG_EMIT`; surfaces confidence blend and fee decomposition per quote/swap.

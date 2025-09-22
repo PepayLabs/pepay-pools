@@ -10,9 +10,24 @@ import {ReentrancyGuard} from "../lib/ReentrancyGuard.sol";
 contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
     using SafeTransferLib for address;
 
+    string public constant NAME = "DNMM QuoteRFQ";
+    string public constant VERSION = "1";
+
+    bytes32 private constant EIP712_DOMAIN_TYPEHASH = keccak256(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
+    bytes32 private constant QUOTE_TYPEHASH = keccak256(
+        "Quote(address taker,uint256 amountIn,uint256 minAmountOut,bool isBaseIn,uint256 expiry,uint256 salt)"
+    );
+
     IDnmPool public immutable pool;
     address public makerKey;
     address public owner;
+
+    bytes32 private immutable _hashedName;
+    bytes32 private immutable _hashedVersion;
+    uint256 private immutable _domainChainId;
+    bytes32 private immutable _domainSeparator;
 
     mapping(uint256 => bool) public consumedSalts;
 
@@ -31,6 +46,10 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         pool = IDnmPool(pool_);
         makerKey = makerKey_;
         owner = msg.sender;
+        _hashedName = keccak256(bytes(NAME));
+        _hashedVersion = keccak256(bytes(VERSION));
+        _domainChainId = block.chainid;
+        _domainSeparator = _buildDomainSeparator(_hashedName, _hashedVersion);
     }
 
     function verifyAndSwap(bytes calldata makerSignature, QuoteParams calldata params, bytes calldata oracleData)
@@ -44,7 +63,7 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         require(!consumedSalts[params.salt], "RFQ_USED");
         consumedSalts[params.salt] = true;
 
-        bytes32 digest = _hashQuote(params);
+        bytes32 digest = hashQuote(params);
         require(_recoverSigner(digest, makerSignature) == makerKey, "BAD_SIG");
 
         (address baseToken, address quoteToken,,,,) = pool.tokens();
@@ -87,23 +106,41 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         owner = newOwner;
     }
 
-    function _hashQuote(QuoteParams calldata params) internal view returns (bytes32) {
+    function hashQuote(QuoteParams calldata params) public view override returns (bytes32) {
         bytes32 structHash = keccak256(
             abi.encode(
-                keccak256(
-                    "Quote(address taker,uint256 amountIn,uint256 minAmountOut,bool isBaseIn,uint256 expiry,uint256 salt,address pool,uint256 chainId)"
-                ),
+                QUOTE_TYPEHASH,
                 params.taker,
                 params.amountIn,
                 params.minAmountOut,
                 params.isBaseIn,
                 params.expiry,
-                params.salt,
-                address(pool),
-                block.chainid
+                params.salt
             )
         );
-        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", structHash));
+        return keccak256(abi.encodePacked("\x19\x01", _domainSeparatorV4(), structHash));
+    }
+
+    function verifyQuoteSignature(address signer, QuoteParams calldata params, bytes calldata signature)
+        external
+        view
+        override
+        returns (bool)
+    {
+        return _recoverSigner(hashQuote(params), signature) == signer;
+    }
+
+    function _domainSeparatorV4() internal view returns (bytes32) {
+        if (block.chainid == _domainChainId) {
+            return _domainSeparator;
+        }
+        return _buildDomainSeparator(_hashedName, _hashedVersion);
+    }
+
+    function _buildDomainSeparator(bytes32 hashedName, bytes32 hashedVersion) private view returns (bytes32) {
+        return keccak256(
+            abi.encode(EIP712_DOMAIN_TYPEHASH, hashedName, hashedVersion, block.chainid, address(this))
+        );
     }
 
     function _recoverSigner(bytes32 digest, bytes calldata signature) internal pure returns (address) {

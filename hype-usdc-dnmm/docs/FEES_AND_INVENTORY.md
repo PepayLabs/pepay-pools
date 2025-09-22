@@ -28,5 +28,6 @@
 - All math uses `FixedPointMath` (wad + bps) to match Solana big-int semantics.
 - `Errors.FLOOR_BREACH` protects against attempts that would empty the vault.
 - Governance may tune α/β/cap/decay via `updateParams(ParamKind.Fee, ...)`; bounds checks ensure cap ≥ base and decay ≤ 100.
+- Fee-on-transfer tokens are not supported: inbound transfers must deliver the full requested notional or the swap reverts with `Errors.TOKEN_FEE_UNSUPPORTED`.
 
 Refer to `test/unit/FeePolicy.t.sol` and `test/unit/Inventory.t.sol` for coverage of these behaviours.

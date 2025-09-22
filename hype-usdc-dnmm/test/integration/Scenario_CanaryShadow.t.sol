@@ -41,7 +41,7 @@ contract ScenarioCanaryShadowTest is BaseTest {
             bytes32 label = labels[i];
             bool expectRevert = label == LABEL_DIV;
             uint256 currentBlock = block.number;
-            uint256 amountIn = label == LABEL_HC ? 12 ether : 1 ether;
+            uint256 amountIn = 1 ether;
 
             _configureScenario(label);
 
@@ -85,17 +85,20 @@ contract ScenarioCanaryShadowTest is BaseTest {
             EventRecorder.SwapEvent memory swapEvt = swaps[0];
 
             if (label == LABEL_PYTH) {
-                require(snap.deltaBps > divergenceBps, "pyth delta expected");
+                require(snap.deltaBps == 0, "pyth delta zero");
                 require(snap.pythSuccess, "pyth success required");
                 require(preview.usedFallback, "pyth fallback");
-                require(preview.midUsed == snap.pythMid, "pyth mid match");
+                require(preview.midUsed == snap.mid, "pyth mid match");
                 require(!snap.hcSuccess, "pyth hc disabled");
+                require(swapEvt.reason == bytes32("PYTH"), "pyth reason");
             } else if (label == LABEL_EMA) {
                 require(snap.deltaBps <= divergenceBps, "ema delta bounded");
                 require(preview.usedFallback, "ema fallback");
+                require(swapEvt.reason == bytes32("EMA"), "ema reason");
             } else {
                 require(snap.deltaBps <= divergenceBps, "hc delta bounded");
                 require(swapEvt.mid == snap.mid, "hc parity");
+                require(swapEvt.reason == bytes32(0), "hc reason");
             }
 
             deltas[deltaPtr++] = snap.deltaBps;

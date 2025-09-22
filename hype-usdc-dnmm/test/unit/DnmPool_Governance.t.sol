@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {Errors} from "../../contracts/lib/Errors.sol";
+import {FeePolicy} from "../../contracts/lib/FeePolicy.sol";
 import {IOracleAdapterPyth} from "../../contracts/interfaces/IOracleAdapterPyth.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 
@@ -50,7 +51,7 @@ contract DnmPoolGovernanceTest is BaseTest {
         vm.prank(gov);
         pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(strictCfg));
 
-        vm.expectRevert(bytes(Errors.ORACLE_STALE));
+        vm.expectRevert(bytes(Errors.ORACLE_SPREAD));
         quote(1_000 ether, true, IDnmPool.OracleMode.Spot);
 
         DnmPool.OracleConfig memory relaxed = strictCfg;
@@ -85,5 +86,57 @@ contract DnmPoolGovernanceTest is BaseTest {
 
         vm.prank(gov);
         pool.setTargetBaseXstar(farTarget);
+    }
+
+    function test_oracle_config_guard_enforced() public {
+        DnmPool.OracleConfig memory cfg = defaultOracleConfig();
+        cfg.confCapBpsStrict = cfg.confCapBpsSpot + 1;
+
+        vm.prank(gov);
+        vm.expectRevert(bytes(Errors.INVALID_CONFIG));
+        pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(cfg));
+    }
+
+    function test_inventory_config_guard_enforced() public {
+        DnmPool.InventoryConfig memory cfg = defaultInventoryConfig();
+        cfg.floorBps = 6000;
+
+        vm.prank(gov);
+        vm.expectRevert(bytes(Errors.INVALID_CONFIG));
+        pool.updateParams(DnmPool.ParamKind.Inventory, abi.encode(cfg));
+    }
+
+    function test_fee_config_guard_enforced() public {
+        FeePolicy.FeeConfig memory cfg = defaultFeeConfig();
+        cfg.capBps = cfg.baseBps - 1;
+
+        vm.prank(gov);
+        vm.expectRevert(bytes(Errors.INVALID_CONFIG));
+        pool.updateParams(DnmPool.ParamKind.Fee, abi.encode(cfg));
+    }
+
+    function test_sequential_updates_leave_pool_operational() public {
+        DnmPool.OracleConfig memory oracleCfg = defaultOracleConfig();
+        oracleCfg.maxAgeSec = 30;
+
+        vm.prank(gov);
+        pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(oracleCfg));
+
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        flags.debugEmit = false;
+        vm.prank(gov);
+        pool.updateParams(DnmPool.ParamKind.Feature, abi.encode(flags));
+
+        updateSpot(1e18, 10, true);
+        updateBidAsk(999e15, 1_001e18, 30, true);
+        updateEma(1e18, 5, true);
+
+        DnmPool.QuoteResult memory res = quote(5 ether, true, IDnmPool.OracleMode.Spot);
+        assertGt(res.amountOut, 0, "quote succeeds post updates");
+
+        // restore debug flag to avoid surprising later tests
+        flags.debugEmit = true;
+        vm.prank(gov);
+        pool.updateParams(DnmPool.ParamKind.Feature, abi.encode(flags));
     }
 }

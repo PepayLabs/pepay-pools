@@ -34,5 +34,5 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2025-09-22: Hardened oracle handling with precompile failure fallbacks, invalid orderbook guardrails, Pyth-only confidence blending + strict caps, and timestamp regression checks in `DnmPool`.
+- 2025-09-22: Hardened oracle handling with precompile failure fallbacks, invalid orderbook guardrails, Pyth-only confidence blending + strict caps, timestamp regression checks, and explicit fee-on-transfer rejection in `DnmPool`.
 - 2024-07-12: Added confidence-blend feature flags, EWMA sigma state, and `ConfidenceDebug` emission across quoting/swap paths.

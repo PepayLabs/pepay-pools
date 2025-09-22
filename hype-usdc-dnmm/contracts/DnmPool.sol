@@ -236,14 +236,20 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         require(amountOut >= minAmountOut, "SLIPPAGE");
 
         if (isBaseIn) {
+            uint256 beforeBal = IERC20(tokenConfig.baseToken).balanceOf(address(this));
             tokenConfig.baseToken.safeTransferFrom(msg.sender, address(this), actualAmountIn);
+            uint256 received = IERC20(tokenConfig.baseToken).balanceOf(address(this)) - beforeBal;
+            require(received == actualAmountIn, Errors.TOKEN_FEE_UNSUPPORTED);
             tokenConfig.quoteToken.safeTransfer(msg.sender, amountOut);
             require(uint256(reserves.baseReserves) + actualAmountIn <= type(uint128).max, "BASE_OOB");
             require(uint256(reserves.quoteReserves) >= amountOut, "INSUFFICIENT_QUOTE");
             reserves.baseReserves = uint128(uint256(reserves.baseReserves) + actualAmountIn);
             reserves.quoteReserves = uint128(uint256(reserves.quoteReserves) - amountOut);
         } else {
+            uint256 beforeBal = IERC20(tokenConfig.quoteToken).balanceOf(address(this));
             tokenConfig.quoteToken.safeTransferFrom(msg.sender, address(this), actualAmountIn);
+            uint256 received = IERC20(tokenConfig.quoteToken).balanceOf(address(this)) - beforeBal;
+            require(received == actualAmountIn, Errors.TOKEN_FEE_UNSUPPORTED);
             tokenConfig.baseToken.safeTransfer(msg.sender, amountOut);
             require(uint256(reserves.quoteReserves) + actualAmountIn <= type(uint128).max, "QUOTE_OOB");
             require(uint256(reserves.baseReserves) >= amountOut, "INSUFFICIENT_BASE");

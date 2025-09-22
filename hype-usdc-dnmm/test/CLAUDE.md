@@ -34,5 +34,5 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2025-09-22: Added fork parity regression suite (incl. full precompile matrix), preview↔settlement parity (base, quote, RFQ), Pyth hygiene/divergence flap suites, timestamp guard, DoS gas campaign, and 5k-load metrics exports.
+- 2025-09-22: Added fork parity regression suite (incl. full precompile matrix), preview↔settlement parity (base, quote, RFQ), Pyth hygiene/divergence flap suites, canary observer shadow tests, timestamp guard, DoS gas campaign, and 5k-load metrics exports.
 - 2024-07-12: Added FeeDynamics_B5/B6 correlation & cap-edge suites plus ConfidenceDebug decoding helpers.

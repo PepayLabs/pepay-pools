@@ -8,7 +8,7 @@ import {IOracleAdapterPyth} from "../../contracts/interfaces/IOracleAdapterPyth.
 import {Inventory} from "../../contracts/lib/Inventory.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 import {EventRecorder} from "../utils/EventRecorder.sol";
-import {ReentrantERC20, MaliciousReceiver} from "../utils/Mocks.sol";
+import {ReentrantERC20, MaliciousReceiver, FeeOnTransferERC20} from "../utils/Mocks.sol";
 import {MockOracleHC} from "../../contracts/mocks/MockOracleHC.sol";
 import {MockOraclePyth} from "../../contracts/mocks/MockOraclePyth.sol";
 import {MockERC20} from "../../contracts/mocks/MockERC20.sol";
@@ -48,7 +48,7 @@ contract DnmPoolSwapTest is BaseTest {
 
     function test_swap_partial_fill_floor_protection() public {
         uint256 largeAmount = 400_000 ether;
-        (uint128 baseBefore, uint128 quoteBefore) = pool.reserves();
+        (, uint128 quoteBefore) = pool.reserves();
         (, uint16 floorBps,) = pool.inventoryConfig();
         uint256 expectedFloor = Inventory.floorAmount(uint256(quoteBefore), floorBps);
 
@@ -132,5 +132,75 @@ contract DnmPoolSwapTest is BaseTest {
         vm.prank(address(attacker));
         vm.expectRevert();
         attacker.executeAttack(1_000 ether);
+    }
+
+    function test_fee_on_transfer_tokens_unsupported() public {
+        FeeOnTransferERC20 feeBase = new FeeOnTransferERC20("HYPE", "HYPE", 18, 100, address(0xFEE));
+        FeeOnTransferERC20 feeQuote = new FeeOnTransferERC20("USDC", "USDC", 6, 100, address(0xFEE1));
+        feeBase.mint(address(this), 2_000_000 ether);
+        feeQuote.mint(address(this), 2_000_000_000000);
+
+        MockOracleHC hc = new MockOracleHC();
+        MockOraclePyth pyth = new MockOraclePyth();
+        hc.setSpot(1e18, 0, true);
+        hc.setBidAsk(9995e14, 10005e14, 20, true);
+        hc.setEma(1e18, 0, true);
+        IOracleAdapterPyth.PythResult memory result = IOracleAdapterPyth.PythResult({
+            hypeUsd: 1e18,
+            usdcUsd: 1e18,
+            ageSecHype: 0,
+            ageSecUsdc: 0,
+            confBpsHype: 20,
+            confBpsUsdc: 20,
+            success: true
+        });
+        pyth.setResult(result);
+
+        DnmPool poolLocal = new DnmPool(
+            address(feeBase),
+            address(feeQuote),
+            18,
+            6,
+            address(hc),
+            address(pyth),
+            defaultInventoryConfig(),
+            defaultOracleConfig(),
+            defaultFeeConfig(),
+            defaultMakerConfig(),
+            defaultFeatureFlags(),
+            DnmPool.Guardians({governance: gov, pauser: pauser})
+        );
+
+        feeBase.mint(address(poolLocal), 100_000 ether);
+        feeQuote.mint(address(poolLocal), 10_000_000000);
+        poolLocal.sync();
+
+        vm.prank(gov);
+        poolLocal.updateParams(
+            DnmPool.ParamKind.Inventory,
+            abi.encode(
+                DnmPool.InventoryConfig({
+                    targetBaseXstar: 100_000 ether,
+                    floorBps: defaultInventoryConfig().floorBps,
+                    recenterThresholdPct: defaultInventoryConfig().recenterThresholdPct
+                })
+            )
+        );
+
+        feeBase.mint(alice, 10_000 ether);
+        feeQuote.mint(bob, 5_000_000000);
+
+        vm.prank(alice);
+        feeBase.approve(address(poolLocal), type(uint256).max);
+        vm.prank(bob);
+        feeQuote.approve(address(poolLocal), type(uint256).max);
+
+        vm.prank(alice);
+        vm.expectRevert(bytes(Errors.TOKEN_FEE_UNSUPPORTED));
+        poolLocal.swapExactIn(10 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 10);
+
+        vm.prank(bob);
+        vm.expectRevert(bytes(Errors.TOKEN_FEE_UNSUPPORTED));
+        poolLocal.swapExactIn(500_000000, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 10);
     }
 }

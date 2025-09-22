@@ -46,7 +46,7 @@ contract MockERC20 is IERC20 {
         return true;
     }
 
-    function _transfer(address from, address to, uint256 value) internal {
+    function _transfer(address from, address to, uint256 value) internal virtual {
         require(balanceOf[from] >= value, "BALANCE");
         balanceOf[from] -= value;
         balanceOf[to] += value;

@@ -34,5 +34,5 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2025-09-22: Added fork parity matrix (FP1–FP5), Pyth hygiene/delta flap scenarios, preview↔settlement parity (base, quote, RFQ), and timestamp guard coverage.
+- 2025-09-22: Added fork parity matrix (FP1–FP5), Pyth hygiene/delta flap scenarios, preview↔settlement parity (base, quote, RFQ), canary shadow observer coverage, and timestamp guard tests.
 - 2024-07-12: Established Phase-8 confidence blend, fee dynamics, and fallback regression scenarios.

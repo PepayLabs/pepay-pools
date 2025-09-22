@@ -57,13 +57,19 @@ contract DnmOracleObserver {
         uint256 spreadBps = bookRes.success ? bookRes.spreadBps : 0;
 
         IOracleAdapterPyth.PythResult memory pythRes = oraclePyth.readPythUsdMid(pythUpdateData);
-        (uint256 pythMid,,) = oraclePyth.computePairMid(pythRes);
+        (uint256 pythMid, uint256 pythAge,) = oraclePyth.computePairMid(pythRes);
 
-        uint256 deltaBps = OracleUtils.computeDivergenceBps(midRes.mid, pythMid);
+        uint256 effectiveMid = midRes.success ? midRes.mid : (pythRes.success ? pythMid : 0);
+        uint256 effectiveAge = midRes.success ? midRes.ageSec : (pythRes.success ? pythAge : type(uint256).max);
+
+        uint256 deltaBps = 0;
+        if (midRes.success && pythRes.success && midRes.mid > 0 && pythMid > 0) {
+            deltaBps = OracleUtils.computeDivergenceBps(midRes.mid, pythMid);
+        }
 
         snap = Snapshot({
-            mid: midRes.mid,
-            ageSec: midRes.ageSec,
+            mid: effectiveMid,
+            ageSec: effectiveAge,
             spreadBps: spreadBps,
             pythMid: pythMid,
             deltaBps: deltaBps,

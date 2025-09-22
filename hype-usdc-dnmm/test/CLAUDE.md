@@ -34,4 +34,5 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-09-22: Added fork parity regression suite, preview↔settlement parity checks, and associated metrics exports.
 - 2024-07-12: Added FeeDynamics_B5/B6 correlation & cap-edge suites plus ConfidenceDebug decoding helpers.

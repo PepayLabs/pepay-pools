@@ -34,5 +34,6 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2024-05-27: Directory initialized for Phase 3 metrics exports and dashboards.
+- 2025-09-22: Added fork parity artifacts (`mid_event_vs_precompile_mid_bps.csv`, `ageSec_hist.csv`, `source_counts.csv`, `divergence_rate.csv`).
 - 2024-07-12: Added Phase 8 confidence blend outputs (`fee_correlation.csv`, `fee_cap_edge.csv`) and cap-edge validations.
+- 2024-05-27: Directory initialized for Phase 3 metrics exports and dashboards.

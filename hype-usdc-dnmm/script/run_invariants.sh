@@ -20,7 +20,7 @@ forge build >/dev/null
 
 info "⏱️  Sampling ${SAMPLE_RUNS} runs"
 start=$(date +%s)
-FOUNDRY_INVARIANT_RUNS="$SAMPLE_RUNS" forge test \
+FOUNDRY_PROFILE="$PROFILE_SHORT" FOUNDRY_INVARIANT_RUNS="$SAMPLE_RUNS" forge test \
   --profile "$PROFILE_SHORT" \
   --match-path "$TEST_PATH" \
   -vv >/tmp/invariant_sample.log 2>&1 || true
@@ -34,7 +34,7 @@ info "📈 Sample ${sample_secs}s ⇒ ~${per_run_ms}ms/run ⇒ est ${est_secs}s 
 
 if (( est_secs > BUDGET_SECS )); then
   warn "⚠️  Skipping long run: estimate ${est_secs}s exceeds budget ${BUDGET_SECS}s"
-  FOUNDRY_INVARIANT_RUNS=2000 forge test --profile "$PROFILE_SHORT" --match-path "$TEST_PATH" -vv
+  FOUNDRY_PROFILE="$PROFILE_SHORT" FOUNDRY_INVARIANT_RUNS=2000 forge test --profile "$PROFILE_SHORT" --match-path "$TEST_PATH" -vv
   exit 0
 fi
 
@@ -48,8 +48,10 @@ for shard in $(seq 1 "$SHARDS"); do
   shard_budget=$(( BUDGET_SECS / SHARDS + 120 ))
   info "▶️  Shard ${shard}/${SHARDS} seed=${seed}"
   (
+    FOUNDRY_PROFILE="$PROFILE_LONG" \
+    FOUNDRY_INVARIANT_RUNS="$runs_per_shard" \
     timeout --signal=SIGINT --kill-after=30 "$shard_budget" \
-      stdbuf -oL -eL FOUNDRY_INVARIANT_RUNS="$runs_per_shard" forge test \
+      stdbuf -oL -eL forge test \
         --profile "$PROFILE_LONG" \
         --match-path "$TEST_PATH" \
         --fuzz-seed "$seed" -vv 2>&1 \

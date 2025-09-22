@@ -107,7 +107,7 @@ contract TupleSweepTest is Test {
             oracleCfg,
             feeCfg,
             makerCfg,
-            DnmPool.FeatureFlags({blendOn: false, parityCiOn: false, debugEmit: true}),
+            DnmPool.FeatureFlags({blendOn: true, parityCiOn: true, debugEmit: true}),
             guardians
         );
 

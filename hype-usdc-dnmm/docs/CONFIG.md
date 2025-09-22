@@ -23,6 +23,15 @@ Derived from Lifinity's SOL/USDC configuration (see `lifinity-contract/CONFIGURA
 | `inventory.recenterThresholdPct` | Price move threshold for `x*` updates. | `750` (7.5%) |
 | `maker.*` | On-chain S0 + TTL for RFQ quotes. | S0=`5000`, ttl=`200ms` |
 
+### Feature Flags
+`FeatureFlags` are configured at deployment and may be toggled via `updateParams(ParamKind.Feature, ...)`.
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `blendOn` | Enables the confidence blend (spread ⊕ σ ⊕ Pyth). | `true` |
+| `parityCiOn` | Enables CI blocking on parity mismatches/metrics. | `true` |
+| `debugEmit` | Emits `ConfidenceDebug`/telemetry events for observability. | `true` (tests only; disable in prod if noisy) |
+
 ### `tokens.hyper.json`
 Holds production token metadata for HYPE and USDC. Replace placeholder addresses with HyperEVM deployments.
 

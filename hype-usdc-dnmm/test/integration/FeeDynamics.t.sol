@@ -5,6 +5,7 @@ import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {FeePolicy} from "../../contracts/lib/FeePolicy.sol";
 import {Inventory} from "../../contracts/lib/Inventory.sol";
+import {FixedPointMath} from "../../contracts/lib/FixedPointMath.sol";
 
 import {BaseTest} from "../utils/BaseTest.sol";
 import {EventRecorder} from "../utils/EventRecorder.sol";
@@ -140,18 +141,33 @@ contract FeeDynamicsTest is BaseTest {
 
         string[] memory rows = new string[](6);
         uint64 spikeBlock = uint64(block.number);
+        (uint128 targetBase,,) = pool.inventoryConfig();
+        (,,,, uint256 baseScale, uint256 quoteScale) = pool.tokenConfig();
+        Inventory.Tokens memory tokens = Inventory.Tokens({baseScale: baseScale, quoteScale: quoteScale});
+        FeePolicy.FeeState memory state =
+            FeePolicy.FeeState({lastBlock: spikeBlock, lastFeeBps: uint16(spikeQuote.feeBpsUsed)});
 
         for (uint256 offset = 1; offset <= 6; ++offset) {
             vm.roll(block.number + 1);
             vm.warp(block.timestamp + 1);
-            FeePolicy.FeeState memory state =
-                FeePolicy.FeeState({lastBlock: spikeBlock, lastFeeBps: uint16(spikeQuote.feeBpsUsed)});
-            (uint16 expectedFee,) = FeePolicy.preview(state, cfg, 25, 0, block.number);
             DnmPool.QuoteResult memory q = quote(1 ether, true, IDnmPool.OracleMode.Spot);
-            emit log_named_uint("offset", offset);
-            emit log_named_uint("fee", q.feeBpsUsed);
-            emit log_named_uint("expected", expectedFee);
-            require(_withinTolerance(q.feeBpsUsed, expectedFee, 3), "fee should follow decay curve");
+            (uint128 baseRes, uint128 quoteRes) = pool.reserves();
+            uint256 invDev = Inventory.deviationBps(
+                uint256(baseRes), uint256(quoteRes), targetBase, q.midUsed, tokens
+            );
+            uint256 invComponent = cfg.betaInvDevDenominator == 0
+                ? 0
+                : FixedPointMath.mulDivDown(invDev, cfg.betaInvDevNumerator, cfg.betaInvDevDenominator);
+            uint256 confComponent = q.feeBpsUsed > cfg.baseBps + invComponent
+                ? q.feeBpsUsed - cfg.baseBps - invComponent
+                : 0;
+            uint256 confBps = cfg.alphaConfNumerator == 0
+                ? 0
+                : FixedPointMath.mulDivDown(confComponent, cfg.alphaConfDenominator, cfg.alphaConfNumerator);
+            (uint16 expectedFee, FeePolicy.FeeState memory newState) =
+                FeePolicy.preview(state, cfg, confBps, invDev, block.number);
+            require(_withinTolerance(q.feeBpsUsed, expectedFee, 1), "fee should follow decay curve");
+            state = newState;
             rows[offset - 1] = _formatDecayRow(offset, q.feeBpsUsed, expectedFee);
         }
 

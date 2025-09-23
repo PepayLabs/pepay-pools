@@ -1,0 +1,6 @@
+{
+  "generated_at": "2025-09-23T02:10:27.952285+00:00",
+  "status": "not_run",
+  "reason": "slither binary not found in environment",
+  "recommendation": "Install slither>=0.10 or run via CI container"
+}

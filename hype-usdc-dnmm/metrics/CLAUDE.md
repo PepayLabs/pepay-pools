@@ -34,7 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2025-09-23: Added divergence histogram sweep (`divergence_histogram.csv`) alongside refreshed parity CSV gating reports.
+- 2025-09-23: Added divergence histogram sweep (`divergence_histogram.csv`) and refreshed load series to track `fee_cap_bps` alongside parity gating reports.
 - 2025-09-22: Added fork parity artifacts (`mid_event_vs_precompile_mid_bps.csv`, `ageSec_hist.csv`, `source_counts.csv`, `divergence_rate.csv`), canary shadow deltas (`canary_deltas.csv`), DoS gas study (`gas_dos_failures.csv`), high-load exports (`load_burst_summary.csv`, `load_fee_decay_series.csv`), and CPAMM comparison (`reprice_vwap_comparison.csv`).
 - 2024-07-12: Added Phase 8 confidence blend outputs (`fee_correlation.csv`, `fee_cap_edge.csv`) and cap-edge validations.
 - 2024-05-27: Directory initialized for Phase 3 metrics exports and dashboards.

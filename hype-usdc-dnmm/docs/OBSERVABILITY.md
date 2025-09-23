@@ -10,6 +10,7 @@
 - `reject_reason` – Count occurrences of `Errors.ORACLE_*`, `Errors.FLOOR_BREACH` via revert tracking.
 - `fee_state_decay` – Monitor gap between `feeConfig.baseBps` and emitted `feeBps` across blocks for decay health.
 - Parity exports (`mid_event_vs_precompile_mid_bps.csv`, `canary_deltas.csv`, `divergence_rate.csv`, `divergence_histogram.csv`) – snapshot oracle parity, fallback reasons, and divergence guard hit-rates per Δ bucket.
+- Load test artefacts (`load_burst_summary.csv`, `load_fee_decay_series.csv`) – failure-rate, average fee, and recorded `fee_cap_bps` for the stress harness.
 
 ## Logs & Events
 - `SwapExecuted(user, isBaseIn, amountIn, amountOut, mid, feeBps, partial, reason)` – Primary execution telemetry.

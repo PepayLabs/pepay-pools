@@ -40,4 +40,4 @@
 - 2025-09-22: Patched invariant runner shards to export Foundry profile/run env vars, removed deprecated `--profile` flags for Foundry 1.3.x, and confirmed parity gating is ready to block CI.
 - 2025-09-22: Migrated QuoteRFQ signing to EIP-712 with verification helpers, updated docs, and hardened RFQ secret handling guidance.
 - 2025-09-22: Extended invariant runner for multi-suite sharding, added parity metric gating/report scripts, enforced gas budgets, and instrumented Telemetry/Event docs (TokenFeeUnsupported, EMA/Pyth sequencing).
-- 2025-09-23: Added remainder-aware shard planning, enhanced invariant reporting (parallel ETA, per-suite revert rates), and expanded parity/divergence tests with histogram exports.
+- 2025-09-23: Added remainder-aware shard planning, enhanced invariant reporting (parallel ETA, per-suite revert rates), enforced parity refresh + revert-rate gating, and expanded divergence tests with histogram exports.

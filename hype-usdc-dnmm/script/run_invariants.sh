@@ -11,11 +11,17 @@ SHARDS="${SHARDS:-4}"
 PROFILE_SHORT="${PROFILE_SHORT:-ci}"
 PROFILE_LONG="${PROFILE_LONG:-long}"
 SEED_BASE="${SEED_BASE:-123456}"
+PARITY_REFRESH="${PARITY_REFRESH:-1}"
+PARITY_TEST_PATH="${PARITY_TEST_PATH:-test/integration/ForkParity.t.sol}"
+PARITY_TEST_NAME="${PARITY_TEST_NAME:-test_fork_parity_paths_and_metrics}"
+CANARY_TEST_PATH="${CANARY_TEST_PATH:-test/integration/Scenario_CanaryShadow.t.sol}"
 
 shopt -s nullglob
 
 info() { printf '\033[1;34m%s\033[0m\n' "$1"; }
 warn() { printf '\033[1;33m%s\033[0m\n' "$1"; }
+
+ANY_LONG_RUN=0
 
 collect_tests() {
   if (( $# == 0 )); then
@@ -68,6 +74,7 @@ run_single_test() {
   local depth
   depth=$(resolve_depth "$PROFILE_LONG")
   info "📋 Config ⇒ sample_profile=${PROFILE_SHORT} long_profile=${PROFILE_LONG} depth=${depth:-unknown} target_runs=${TARGET_RUNS} shards=${SHARDS} idle_secs=${IDLE_SECS}"
+  info "🧾 Plan ⇒ profile_short=${PROFILE_SHORT} profile_long=${PROFILE_LONG} depth=${depth:-unknown} sample_runs=${sample_runs} seed_base=${SEED_BASE}"
 
   local sample_runs=$SAMPLE_RUNS
   if (( sample_runs < 1 )); then
@@ -98,6 +105,8 @@ run_single_test() {
     return 0
   fi
 
+  ANY_LONG_RUN=1
+
   local shard_count=$SHARDS
   if (( shard_count < 1 )); then
     warn "⚠️  SHARDS < 1 supplied; coerce to 1"
@@ -118,7 +127,8 @@ run_single_test() {
   info "🚀 Running ${TARGET_RUNS} runs across ${shard_count} shard(s) (~${base_runs} base, remainder ${remainder})"
   info "📊 Parallel ETA ≈ ${est_parallel_secs}s (sequential ${est_secs}s)"
 
-  local pids=()
+  local -a shard_pids=()
+  local -a shard_start=()
   local planned_runs
   for shard in $(seq 1 "$shard_count"); do
     local seed=$(( SEED_BASE + shard ))
@@ -132,6 +142,7 @@ run_single_test() {
     fi
     local shard_budget=$(( BUDGET_SECS / shard_count + 120 ))
     info "▶️  Shard ${shard}/${shard_count} seed=${seed} runs_planned=${planned_runs}"
+    shard_start[$shard]=$(date +%s)
     (
       FOUNDRY_PROFILE="$PROFILE_LONG" \
       FOUNDRY_INVARIANT_RUNS="$planned_runs" \
@@ -141,17 +152,63 @@ run_single_test() {
           --fuzz-seed "$seed" -vv 2>&1 \
         | awk -v idle="$IDLE_SECS" 'BEGIN { last = systime(); } { print; fflush(); last = systime(); } (systime() - last) > idle { print "## idle timeout"; fflush(); exit 124 }'
     ) &
-    pids+=($!)
+    shard_pids[$shard]=$!
   done
 
   local status=0
-  for pid in "${pids[@]}"; do
+  for shard in $(seq 1 "$shard_count"); do
+    local pid="${shard_pids[$shard]:-}"
+    if [[ -z "$pid" ]]; then
+      continue
+    fi
+    local exit_code=0
     if ! wait "$pid"; then
+      exit_code=$?
       status=1
     fi
+    local end_ts
+    end_ts=$(date +%s)
+    local start_ts=${shard_start[$shard]:-0}
+    local duration=$(( end_ts - start_ts ))
+    if (( duration < 0 )); then duration=0; fi
+    info "✅ Shard ${shard}/${shard_count} finished status=${exit_code} duration=${duration}s"
   done
 
   return "$status"
+}
+
+refresh_parity() {
+  if [[ "$PARITY_REFRESH" == "0" ]]; then
+    info "ℹ️  Parity refresh disabled"
+    return
+  fi
+
+  local parity_log
+  parity_log="${PARITY_LOG_PATH:-/tmp/parity_refresh_$(date +%s).log}"
+  info "🧮 Refreshing parity metrics (${PARITY_TEST_PATH} :: ${PARITY_TEST_NAME})"
+  : >"$parity_log"
+
+  if ! FOUNDRY_PROFILE="$PROFILE_SHORT" forge test \
+    --match-path "$PARITY_TEST_PATH" \
+    --match-test "$PARITY_TEST_NAME" \
+    -vv | tee -a "$parity_log"; then
+    warn "⚠️  Parity refresh failed"
+    return 1
+  fi
+
+  if ! FOUNDRY_PROFILE="$PROFILE_SHORT" forge test \
+    --match-path "$CANARY_TEST_PATH" \
+    -vv | tee -a "$parity_log"; then
+    warn "⚠️  Parity refresh failed"
+    return 1
+  fi
+
+  if ! script/check_parity_metrics.sh --log "$parity_log"; then
+    warn "⚠️  Parity freshness check failed"
+    return 1
+  fi
+
+  info "✅ Parity metrics refreshed"
 }
 
 main() {
@@ -162,6 +219,13 @@ main() {
       overall=1
     fi
   done
+
+  if (( ANY_LONG_RUN == 1 )); then
+    refresh_parity || overall=1
+  else
+    info "ℹ️  No long-run suites executed; parity refresh skipped"
+  fi
+
   exit "$overall"
 }
 

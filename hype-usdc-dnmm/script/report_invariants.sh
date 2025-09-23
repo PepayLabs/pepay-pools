@@ -35,6 +35,11 @@ def parse_log(log_path: Path) -> dict:
         "target_runs": None,
         "eta_parallel_secs": None,
         "eta_sequential_secs": None,
+        "profile_short": None,
+        "profile_long": None,
+        "depth": None,
+        "seed_base": None,
+        "sample_runs": None,
         "shards": [],
         "suite_runs": [],
         "durations": [],
@@ -44,6 +49,20 @@ def parse_log(log_path: Path) -> dict:
         report["decision"] = "skip"
     elif any("🚀 Running" in line or re.search(r"Running\\s+\\d+\\s+runs", line) for line in lines):
         report["decision"] = "run"
+
+    plan_line = next((line for line in lines if "🧾 Plan" in line), None)
+    if plan_line:
+        plan_match = re.search(
+            r"profile_short=(\S+)\s+profile_long=(\S+)\s+depth=(\S+)\s+sample_runs=(\d+)\s+seed_base=(\d+)",
+            plan_line,
+        )
+        if plan_match:
+            profile_short, profile_long, depth_raw, sample_runs, seed_base = plan_match.groups()
+            report["profile_short"] = profile_short
+            report["profile_long"] = profile_long
+            report["sample_runs"] = int(sample_runs)
+            report["seed_base"] = int(seed_base)
+            report["depth"] = None if depth_raw == "unknown" else int(depth_raw)
 
     sample_line = next((line for line in lines if "Sample" in line and "ms/run" in line), None)
     if sample_line:
@@ -66,7 +85,10 @@ def parse_log(log_path: Path) -> dict:
 
     shard_lines = [line for line in lines if line.startswith("▶️  Shard")]
     for line in shard_lines:
-        match = re.search(r"Shard\s+(\d+)/(\d+)\s+seed=(\d+)\s+runs_planned=(\d+)(?:\s+\(skipped\))?", line)
+        match = re.search(
+            r"Shard\s+(\d+)/(\d+)\s+seed=(\d+)\s+runs_planned=(\d+)(?:\s+\(skipped\))?",
+            line,
+        )
         bool_skipped = "(skipped)" in line
         if match:
             shard_idx, shard_total, seed, planned = match.groups()
@@ -78,16 +100,36 @@ def parse_log(log_path: Path) -> dict:
             shard_idx, shard_total, seed, planned = legacy.groups()
             planned_int = int(planned)
             bool_skipped = planned_int == 0
-        report["shards"].append({
-            "index": int(shard_idx),
-            "total": int(shard_total),
-            "seed": int(seed),
-            "planned_runs": planned_int,
-            "skipped": bool_skipped,
-        })
+        report["shards"].append(
+            {
+                "index": int(shard_idx),
+                "total": int(shard_total),
+                "seed": int(seed),
+                "planned_runs": planned_int,
+                "skipped": bool_skipped,
+                "duration_secs": None,
+                "status": None,
+            }
+        )
 
-    suite_stats: dict[str, dict[str, int]] = {}
+    shard_complete_lines = [line for line in lines if line.startswith("✅ Shard")]
+    for line in shard_complete_lines:
+        complete_match = re.search(
+            r"Shard\s+(\d+)/(\d+).*status=(\d+).*duration=(\d+)s",
+            line,
+        )
+        if not complete_match:
+            continue
+        shard_idx, shard_total, status_val, duration_sec = complete_match.groups()
+        for shard_entry in report["shards"]:
+            if shard_entry.get("index") == int(shard_idx) and shard_entry.get("total") == int(shard_total):
+                shard_entry["status"] = int(status_val)
+                shard_entry["duration_secs"] = int(duration_sec)
+                break
+
+    suite_stats: dict[str, dict[str, float]] = {}
     current_test_path: str | None = None
+    last_suite_path: str | None = None
     shard_results_iter = iter([s for s in report["shards"] if not s.get("skipped") and s.get("planned_runs", 0) > 0])
 
     for line in lines:
@@ -95,6 +137,7 @@ def parse_log(log_path: Path) -> dict:
             match = re.search(r"Ran 1 test for\s+([^:]+):", line)
             if match:
                 current_test_path = match.group(1)
+                last_suite_path = current_test_path
             continue
 
         if "[PASS]" in line and "runs:" in line and "reverts:" in line:
@@ -114,7 +157,7 @@ def parse_log(log_path: Path) -> dict:
             if current_test_path:
                 stats = suite_stats.setdefault(
                     current_test_path,
-                    {"executions": 0, "runs": 0, "reverts": 0},
+                    {"executions": 0, "runs": 0, "reverts": 0, "duration_secs": 0.0},
                 )
                 stats["executions"] += 1
                 stats["runs"] += runs_int
@@ -124,7 +167,14 @@ def parse_log(log_path: Path) -> dict:
         if "Suite result" in line and "finished in" in line:
             match = re.search(r"finished in\s+([0-9.]+)s", line)
             if match:
-                report["durations"].append(float(match.group(1)))
+                duration_val = float(match.group(1))
+                report["durations"].append(duration_val)
+                if last_suite_path:
+                    stats = suite_stats.setdefault(
+                        last_suite_path,
+                        {"executions": 0, "runs": 0, "reverts": 0, "duration_secs": 0.0},
+                    )
+                    stats["duration_secs"] += duration_val
 
     suite_summary = []
     for path, stats in suite_stats.items():
@@ -140,6 +190,7 @@ def parse_log(log_path: Path) -> dict:
                 "runs": runs,
                 "reverts": reverts,
                 "revert_rate_bps": rate_bps,
+                "duration_secs": stats["duration_secs"],
             }
         )
 
@@ -180,6 +231,7 @@ def main() -> int:
     parser.add_argument("log", type=Path, help="Invariant run log file")
     parser.add_argument("--output", type=Path, default=Path("reports/invariants_run.json"))
     parser.add_argument("--fresh-minutes", type=int, default=int(os.getenv("FRESHNESS_MINUTES", "30")))
+    parser.add_argument("--max-revert-rate-bps", type=int, default=None)
     args = parser.parse_args()
 
     try:
@@ -213,6 +265,13 @@ def main() -> int:
         "eta_parallel_secs": report["eta_parallel_secs"],
         "eta_sequential_secs": report["eta_sequential_secs"],
         "target_runs": report["target_runs"],
+        "plan": {
+            "profile_short": report["profile_short"],
+            "profile_long": report["profile_long"],
+            "depth": report["depth"],
+            "sample_runs": report["sample_runs"],
+            "seed_base": report["seed_base"],
+        },
         "shards": report["shards"],
         "suite_runs": report["suite_runs"],
         "durations_secs": report["durations"],
@@ -234,6 +293,24 @@ def main() -> int:
         handle.write("\n")
 
     print(f"Wrote {output_path} ({output_path.stat().st_size} bytes)")
+    if args.max_revert_rate_bps is not None and revert_rate_bps > args.max_revert_rate_bps:
+        print(
+            f"revert rate {revert_rate_bps} bps exceeds threshold {args.max_revert_rate_bps}",
+            file=sys.stderr,
+        )
+        return 2
+
+    per_suite_over = [
+        suite for suite in output["suite_runs"] if args.max_revert_rate_bps is not None and suite["revert_rate_bps"] > args.max_revert_rate_bps
+    ]
+    if per_suite_over:
+        for suite in per_suite_over:
+            print(
+                f"suite {suite['path']} revert rate {suite['revert_rate_bps']} bps exceeds threshold",
+                file=sys.stderr,
+            )
+        return 3
+
     return 0
 
 

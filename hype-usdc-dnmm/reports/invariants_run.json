@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-09-23T01:31:17Z",
+  "generated_at": "2025-09-23T01:55:02Z",
   "log_path": "metrics/invariant_long_run_2025-09-23.log",
   "decision": "run",
   "sample": {
@@ -11,11 +11,11 @@
   "eta_sequential_secs": 140,
   "target_runs": 20000,
   "plan": {
-    "profile_short": null,
-    "profile_long": null,
-    "depth": null,
-    "sample_runs": null,
-    "seed_base": null
+    "profile_short": "ci",
+    "profile_long": "long",
+    "depth": 64,
+    "sample_runs": 400,
+    "seed_base": 123456
   },
   "shards": [
     {
@@ -24,6 +24,84 @@
       "seed": 123457,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": 359,
+      "status": 0,
+      "result": {
+        "runs": 3334,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 2,
+      "total": 6,
+      "seed": 123458,
+      "planned_runs": 3334,
+      "skipped": false,
+      "duration_secs": 359,
+      "status": 0,
+      "result": {
+        "runs": 3333,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 3,
+      "total": 6,
+      "seed": 123459,
+      "planned_runs": 3333,
+      "skipped": false,
+      "duration_secs": 359,
+      "status": 0,
+      "result": {
+        "runs": 3333,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 4,
+      "total": 6,
+      "seed": 123460,
+      "planned_runs": 3333,
+      "skipped": false,
+      "duration_secs": 367,
+      "status": 0,
+      "result": {
+        "runs": 3333,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 5,
+      "total": 6,
+      "seed": 123461,
+      "planned_runs": 3333,
+      "skipped": false,
+      "duration_secs": 367,
+      "status": 0,
+      "result": {
+        "runs": 3333,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 6,
+      "total": 6,
+      "seed": 123462,
+      "planned_runs": 3333,
+      "skipped": false,
+      "duration_secs": 367,
+      "status": 0,
+      "result": {
+        "runs": 3334,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 1,
+      "total": 6,
+      "seed": 123457,
+      "planned_runs": 3334,
+      "skipped": false,
       "duration_secs": null,
       "status": null,
       "result": {
@@ -40,7 +118,7 @@
       "duration_secs": null,
       "status": null,
       "result": {
-        "runs": 3334,
+        "runs": 3333,
         "reverts": 0
       }
     },
@@ -92,7 +170,7 @@
       "duration_secs": null,
       "status": null,
       "result": {
-        "runs": 3333,
+        "runs": 3334,
         "reverts": 0
       }
     },
@@ -118,7 +196,7 @@
       "duration_secs": null,
       "status": null,
       "result": {
-        "runs": 3333,
+        "runs": 3334,
         "reverts": 0
       }
     },
@@ -131,7 +209,7 @@
       "duration_secs": null,
       "status": null,
       "result": {
-        "runs": 3333,
+        "runs": 3334,
         "reverts": 0
       }
     },
@@ -144,7 +222,7 @@
       "duration_secs": null,
       "status": null,
       "result": {
-        "runs": 3334,
+        "runs": 3333,
         "reverts": 0
       }
     },
@@ -157,7 +235,7 @@
       "duration_secs": null,
       "status": null,
       "result": {
-        "runs": 3334,
+        "runs": 3333,
         "reverts": 0
       }
     },
@@ -172,84 +250,6 @@
       "result": {
         "runs": 3333,
         "reverts": 0
-      }
-    },
-    {
-      "index": 1,
-      "total": 6,
-      "seed": 123457,
-      "planned_runs": 3334,
-      "skipped": false,
-      "duration_secs": null,
-      "status": null,
-      "result": {
-        "runs": 3334,
-        "reverts": 401
-      }
-    },
-    {
-      "index": 2,
-      "total": 6,
-      "seed": 123458,
-      "planned_runs": 3334,
-      "skipped": false,
-      "duration_secs": null,
-      "status": null,
-      "result": {
-        "runs": 3333,
-        "reverts": 521
-      }
-    },
-    {
-      "index": 3,
-      "total": 6,
-      "seed": 123459,
-      "planned_runs": 3333,
-      "skipped": false,
-      "duration_secs": null,
-      "status": null,
-      "result": {
-        "runs": 3333,
-        "reverts": 523
-      }
-    },
-    {
-      "index": 4,
-      "total": 6,
-      "seed": 123460,
-      "planned_runs": 3333,
-      "skipped": false,
-      "duration_secs": null,
-      "status": null,
-      "result": {
-        "runs": 3334,
-        "reverts": 536
-      }
-    },
-    {
-      "index": 5,
-      "total": 6,
-      "seed": 123461,
-      "planned_runs": 3333,
-      "skipped": false,
-      "duration_secs": null,
-      "status": null,
-      "result": {
-        "runs": 3333,
-        "reverts": 474
-      }
-    },
-    {
-      "index": 6,
-      "total": 6,
-      "seed": 123462,
-      "planned_runs": 3333,
-      "skipped": false,
-      "duration_secs": null,
-      "status": null,
-      "result": {
-        "runs": 3333,
-        "reverts": 498
       }
     }
   ],
@@ -260,7 +260,7 @@
       "runs": 20000,
       "reverts": 0,
       "revert_rate_bps": 0,
-      "duration_secs": 332.8
+      "duration_secs": 299.44
     },
     {
       "path": "test/invariants/Invariant_MidSelectionGates.t.sol",
@@ -268,60 +268,60 @@
       "runs": 20000,
       "reverts": 0,
       "revert_rate_bps": 0,
-      "duration_secs": 1350.14
+      "duration_secs": 1567.87
     },
     {
       "path": "test/invariants/Invariant_NoRunDry.t.sol",
       "executions": 6,
       "runs": 20000,
-      "reverts": 2953,
-      "revert_rate_bps": 1476,
-      "duration_secs": 1155.2299999999998
+      "reverts": 0,
+      "revert_rate_bps": 0,
+      "duration_secs": 2152.62
     }
   ],
   "durations_secs": [
-    54.9,
-    55.23,
-    55.41,
-    55.55,
-    55.78,
-    55.93,
-    224.01,
-    224.32,
-    224.84,
-    225.08,
-    225.67,
-    226.22,
-    189.99,
-    192.5,
-    192.56,
-    192.91,
-    193.04,
-    194.23
+    48.22,
+    49.11,
+    49.61,
+    50.6,
+    50.89,
+    51.01,
+    258.88,
+    261.05,
+    261.27,
+    261.34,
+    261.96,
+    263.37,
+    354.23,
+    356.59,
+    357.1,
+    357.16,
+    362.83,
+    364.71
   ],
   "csv": {
     "metrics/mid_event_vs_precompile_mid_bps.csv": {
       "exists": true,
       "rows": 6,
       "data_rows": 5,
-      "age_minutes": 1406,
+      "age_minutes": 4,
       "min_rows": 2,
-      "fresh": false
+      "fresh": true
     },
     "metrics/canary_deltas.csv": {
       "exists": true,
       "rows": 5,
       "data_rows": 4,
-      "age_minutes": 507,
+      "age_minutes": 4,
       "min_rows": 2,
-      "fresh": false
+      "fresh": true
     }
   },
   "freshness_minutes": 30,
   "totals": {
     "runs_planned": 60000,
     "runs_executed": 60000,
-    "reverts": 2953,
-    "revert_rate_bps": 492
+    "reverts": 0,
+    "revert_rate_bps": 0
   }
 }

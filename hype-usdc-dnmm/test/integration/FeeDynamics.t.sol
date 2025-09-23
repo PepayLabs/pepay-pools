@@ -148,6 +148,9 @@ contract FeeDynamicsTest is BaseTest {
                 FeePolicy.FeeState({lastBlock: spikeBlock, lastFeeBps: uint16(spikeQuote.feeBpsUsed)});
             (uint16 expectedFee,) = FeePolicy.preview(state, cfg, 25, 0, block.number);
             DnmPool.QuoteResult memory q = quote(1 ether, true, IDnmPool.OracleMode.Spot);
+            emit log_named_uint("offset", offset);
+            emit log_named_uint("fee", q.feeBpsUsed);
+            emit log_named_uint("expected", expectedFee);
             require(_withinTolerance(q.feeBpsUsed, expectedFee, 3), "fee should follow decay curve");
             rows[offset - 1] = _formatDecayRow(offset, q.feeBpsUsed, expectedFee);
         }

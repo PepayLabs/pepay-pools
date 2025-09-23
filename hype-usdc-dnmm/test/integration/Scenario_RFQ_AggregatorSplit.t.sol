@@ -164,6 +164,8 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
         updatePyth(10998e14, 1e18, 0, 0, 20, 20);
         _rebalanceInventory(carol, alice);
         updateBidAsk(10998e14, 11002e14, 4, true);
+        rollBlocks(1);
+        vm.warp(block.timestamp + 1);
         DnmPool.QuoteResult memory calmQuote = quote(orderSize, true, IDnmPool.OracleMode.Spot);
         assertLt(calmQuote.feeBpsUsed, poolQuote.feeBpsUsed, "fee decays");
         assertLe(calmQuote.feeBpsUsed, poolQuote.feeBpsUsed, "fee remained controlled");

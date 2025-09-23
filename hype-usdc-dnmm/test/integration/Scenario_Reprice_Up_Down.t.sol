@@ -91,6 +91,8 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         updateBidAsk(10998e14, 11002e14, 4, true);
         _rebalanceInventory(carol, alice);
         updateBidAsk(10998e14, 11002e14, 4, true);
+        rollBlocks(1);
+        vm.warp(block.timestamp + 1);
         DnmPool.QuoteResult memory cooled = quote(tradeSize, true, IDnmPool.OracleMode.Spot);
         assertLt(cooled.feeBpsUsed, dnmmQuote.feeBpsUsed, "fee decayed");
 
@@ -125,6 +127,8 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         updateBidAsk(8998e14, 9002e14, 4, true);
         _rebalanceInventory(alice, carol);
         updateBidAsk(8998e14, 9002e14, 4, true);
+        rollBlocks(1);
+        vm.warp(block.timestamp + 1);
         DnmPool.QuoteResult memory cooledDown = quote(quoteTrade, false, IDnmPool.OracleMode.Spot);
         assertLt(cooledDown.feeBpsUsed, dnmmQuoteDown.feeBpsUsed, "fee decayed after drop");
 

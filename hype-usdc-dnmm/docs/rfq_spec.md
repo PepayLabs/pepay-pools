@@ -31,7 +31,7 @@ Quote(
 5. `QuoteFilled` event emitted with consumed input/output and salt.
 
 ## Signing Guidance
-- Maker services should derive the digest via the on-chain helper `QuoteRFQ.hashQuote(params)` or mirror the domain/struct hashes above.
+- Maker services should derive the struct hash via `QuoteRFQ.hashQuote(params)` and the signable digest via `QuoteRFQ.hashTypedDataV4(params)` (or mirror the domain/struct hashes above).
 - Set `RFQ_SIGNER_PK` / `RFQ_SIGNER_ADDR` in CI or Terragon env vars; unit tests automatically pick up the values and assert key/address alignment.
 - Never persist raw private keys in config files. Load via runtime env only. Tests fall back to deterministic dev key `0xA11ce` if env vars are absent.
 

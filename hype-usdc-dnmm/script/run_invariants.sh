@@ -66,8 +66,13 @@ slugify() {
 run_single_test() {
   local test_path="$1"
 
-  info "═▶ Processing invariant suite: ${test_path}"
+  local sample_runs=$SAMPLE_RUNS
+  if (( sample_runs < 1 )); then
+    warn "⚠️  SAMPLE_RUNS < 1 supplied; coerce to 1"
+    sample_runs=1
+  fi
 
+  info "═▶ Processing invariant suite: ${test_path}"
   info "🔧 Building (forge build)"
   FOUNDRY_PROFILE="$PROFILE_SHORT" forge build >/dev/null
 

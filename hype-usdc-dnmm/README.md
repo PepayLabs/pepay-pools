@@ -30,7 +30,7 @@ This folder is self-contained and does not yet wire into CI/CD. After review, li
 ## RFQ Signing Secrets
 - Set `RFQ_SIGNER_PK` and `RFQ_SIGNER_ADDR` through Terragon env vars or your CI secrets store; unit tests read them with `vm.envUint` / `vm.envAddress`.
 - If the variables are absent, tests fall back to a deterministic dev key (`0xA11ce`) and derived address.
-- The helpers `QuoteRFQ.hashQuote` and `verifyQuoteSignature` expose the EIP-712 digest + verification path so dashboards can validate maker signatures without replaying swaps.
+- The helpers `QuoteRFQ.hashQuote`, `QuoteRFQ.hashTypedDataV4`, and `verifyQuoteSignature` expose the struct hash and EIP-712 digest so dashboards can validate maker signatures without replaying swaps.
 
 ## Documentation Map
 

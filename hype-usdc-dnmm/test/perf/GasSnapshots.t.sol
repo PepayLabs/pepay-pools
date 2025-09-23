@@ -170,7 +170,7 @@ contract GasSnapshotsTest is BaseTest {
     }
 
     function _sign(QuoteRFQ target, IQuoteRFQ.QuoteParams memory params) internal view returns (bytes memory) {
-        bytes32 digest = target.hashQuote(params);
+        bytes32 digest = target.hashTypedDataV4(params);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(makerKey, digest);
         return abi.encodePacked(r, s, v);
     }

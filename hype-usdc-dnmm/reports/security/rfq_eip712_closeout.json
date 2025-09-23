@@ -1,0 +1,43 @@
+{
+  "generated_at": "2025-09-23T01:47:14.686375+00:00",
+  "contract": "QuoteRFQ",
+  "domain": {
+    "name": "DNMM QuoteRFQ",
+    "version": "1",
+    "chain_id_source": "block.chainid",
+    "verifying_contract": "runtime address"
+  },
+  "type_hashes": {
+    "domain_typehash": "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)",
+    "quote_typehash": "Quote(address taker,uint256 amountIn,uint256 minAmountOut,bool isBaseIn,uint256 expiry,uint256 salt)"
+  },
+  "helpers": {
+    "hashQuote": "struct hash",
+    "hashTypedDataV4": "domain-separated digest"
+  },
+  "custom_errors": [
+    "QuotePoolZero",
+    "QuoteNotOwner",
+    "QuoteNotTaker",
+    "QuoteExpired",
+    "QuoteAlreadyFilled",
+    "QuoteSignerMismatch",
+    "QuoteOutputBelowPool",
+    "QuoteSignatureLength",
+    "QuoteSignatureV"
+  ],
+  "verification": {
+    "commands": [
+      "forge build -q",
+      "forge test --match-path test/unit/QuoteRFQ.t.sol -vv"
+    ],
+    "test_suites_passed": [
+      "test/unit/QuoteRFQ.t.sol"
+    ]
+  },
+  "notes": {
+    "wrong_domain_revert": "QuoteSignerMismatch",
+    "wrong_chain_revert": "QuoteSignerMismatch",
+    "tamper_detection": "verifyQuoteSignature returns false"
+  }
+}

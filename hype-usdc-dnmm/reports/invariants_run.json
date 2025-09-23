@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-09-23T01:05:40Z",
+  "generated_at": "2025-09-23T01:31:17Z",
   "log_path": "metrics/invariant_long_run_2025-09-23.log",
   "decision": "run",
   "sample": {
@@ -11,11 +11,11 @@
   "eta_sequential_secs": 140,
   "target_runs": 20000,
   "plan": {
-    "profile_short": "ci",
-    "profile_long": "long",
-    "depth": 64,
-    "sample_runs": 400,
-    "seed_base": 123456
+    "profile_short": null,
+    "profile_long": null,
+    "depth": null,
+    "sample_runs": null,
+    "seed_base": null
   },
   "shards": [
     {
@@ -24,8 +24,8 @@
       "seed": 123457,
       "planned_runs": 3334,
       "skipped": false,
-      "duration_secs": 63,
-      "status": 0,
+      "duration_secs": null,
+      "status": null,
       "result": {
         "runs": 3334,
         "reverts": 0
@@ -37,8 +37,8 @@
       "seed": 123458,
       "planned_runs": 3334,
       "skipped": false,
-      "duration_secs": 63,
-      "status": 0,
+      "duration_secs": null,
+      "status": null,
       "result": {
         "runs": 3334,
         "reverts": 0
@@ -48,12 +48,12 @@
       "index": 3,
       "total": 6,
       "seed": 123459,
-      "planned_runs": 3334,
+      "planned_runs": 3333,
       "skipped": false,
-      "duration_secs": 63,
-      "status": 0,
+      "duration_secs": null,
+      "status": null,
       "result": {
-        "runs": 3334,
+        "runs": 3333,
         "reverts": 0
       }
     },
@@ -61,10 +61,88 @@
       "index": 4,
       "total": 6,
       "seed": 123460,
+      "planned_runs": 3333,
+      "skipped": false,
+      "duration_secs": null,
+      "status": null,
+      "result": {
+        "runs": 3333,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 5,
+      "total": 6,
+      "seed": 123461,
+      "planned_runs": 3333,
+      "skipped": false,
+      "duration_secs": null,
+      "status": null,
+      "result": {
+        "runs": 3333,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 6,
+      "total": 6,
+      "seed": 123462,
+      "planned_runs": 3333,
+      "skipped": false,
+      "duration_secs": null,
+      "status": null,
+      "result": {
+        "runs": 3333,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 1,
+      "total": 6,
+      "seed": 123457,
       "planned_runs": 3334,
       "skipped": false,
-      "duration_secs": 63,
-      "status": 0,
+      "duration_secs": null,
+      "status": null,
+      "result": {
+        "runs": 3333,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 2,
+      "total": 6,
+      "seed": 123458,
+      "planned_runs": 3334,
+      "skipped": false,
+      "duration_secs": null,
+      "status": null,
+      "result": {
+        "runs": 3333,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 3,
+      "total": 6,
+      "seed": 123459,
+      "planned_runs": 3333,
+      "skipped": false,
+      "duration_secs": null,
+      "status": null,
+      "result": {
+        "runs": 3333,
+        "reverts": 0
+      }
+    },
+    {
+      "index": 4,
+      "total": 6,
+      "seed": 123460,
+      "planned_runs": 3333,
+      "skipped": false,
+      "duration_secs": null,
+      "status": null,
       "result": {
         "runs": 3334,
         "reverts": 0
@@ -74,10 +152,10 @@
       "index": 5,
       "total": 6,
       "seed": 123461,
-      "planned_runs": 3334,
+      "planned_runs": 3333,
       "skipped": false,
-      "duration_secs": 63,
-      "status": 0,
+      "duration_secs": null,
+      "status": null,
       "result": {
         "runs": 3334,
         "reverts": 0
@@ -87,12 +165,12 @@
       "index": 6,
       "total": 6,
       "seed": 123462,
-      "planned_runs": 3334,
+      "planned_runs": 3333,
       "skipped": false,
-      "duration_secs": 63,
-      "status": 0,
+      "duration_secs": null,
+      "status": null,
       "result": {
-        "runs": 3334,
+        "runs": 3333,
         "reverts": 0
       }
     },
@@ -106,7 +184,7 @@
       "status": null,
       "result": {
         "runs": 3334,
-        "reverts": 0
+        "reverts": 401
       }
     },
     {
@@ -118,138 +196,60 @@
       "duration_secs": null,
       "status": null,
       "result": {
-        "runs": 3334,
-        "reverts": 0
+        "runs": 3333,
+        "reverts": 521
       }
     },
     {
       "index": 3,
       "total": 6,
       "seed": 123459,
-      "planned_runs": 3334,
+      "planned_runs": 3333,
       "skipped": false,
       "duration_secs": null,
       "status": null,
       "result": {
-        "runs": 3334,
-        "reverts": 0
+        "runs": 3333,
+        "reverts": 523
       }
     },
     {
       "index": 4,
       "total": 6,
       "seed": 123460,
-      "planned_runs": 3334,
+      "planned_runs": 3333,
       "skipped": false,
       "duration_secs": null,
       "status": null,
       "result": {
         "runs": 3334,
-        "reverts": 0
+        "reverts": 536
       }
     },
     {
       "index": 5,
       "total": 6,
       "seed": 123461,
-      "planned_runs": 3334,
+      "planned_runs": 3333,
       "skipped": false,
       "duration_secs": null,
       "status": null,
       "result": {
-        "runs": 3334,
-        "reverts": 0
+        "runs": 3333,
+        "reverts": 474
       }
     },
     {
       "index": 6,
       "total": 6,
       "seed": 123462,
-      "planned_runs": 3334,
+      "planned_runs": 3333,
       "skipped": false,
       "duration_secs": null,
       "status": null,
       "result": {
-        "runs": 3334,
-        "reverts": 0
-      }
-    },
-    {
-      "index": 1,
-      "total": 6,
-      "seed": 123457,
-      "planned_runs": 3334,
-      "skipped": false,
-      "duration_secs": null,
-      "status": null,
-      "result": {
-        "runs": 3334,
-        "reverts": 0
-      }
-    },
-    {
-      "index": 2,
-      "total": 6,
-      "seed": 123458,
-      "planned_runs": 3334,
-      "skipped": false,
-      "duration_secs": null,
-      "status": null,
-      "result": {
-        "runs": 3334,
-        "reverts": 0
-      }
-    },
-    {
-      "index": 3,
-      "total": 6,
-      "seed": 123459,
-      "planned_runs": 3334,
-      "skipped": false,
-      "duration_secs": null,
-      "status": null,
-      "result": {
-        "runs": 3334,
-        "reverts": 0
-      }
-    },
-    {
-      "index": 4,
-      "total": 6,
-      "seed": 123460,
-      "planned_runs": 3334,
-      "skipped": false,
-      "duration_secs": null,
-      "status": null,
-      "result": {
-        "runs": 3334,
-        "reverts": 0
-      }
-    },
-    {
-      "index": 5,
-      "total": 6,
-      "seed": 123461,
-      "planned_runs": 3334,
-      "skipped": false,
-      "duration_secs": null,
-      "status": null,
-      "result": {
-        "runs": 3334,
-        "reverts": 0
-      }
-    },
-    {
-      "index": 6,
-      "total": 6,
-      "seed": 123462,
-      "planned_runs": 3334,
-      "skipped": false,
-      "duration_secs": null,
-      "status": null,
-      "result": {
-        "runs": 3334,
-        "reverts": 0
+        "runs": 3333,
+        "reverts": 498
       }
     }
   ],
@@ -257,71 +257,71 @@
     {
       "path": "test/invariants/Invariant_FeeMonotonic.t.sol",
       "executions": 6,
-      "runs": 20004,
+      "runs": 20000,
       "reverts": 0,
       "revert_rate_bps": 0,
-      "duration_secs": 378.80999999999995
+      "duration_secs": 332.8
     },
     {
       "path": "test/invariants/Invariant_MidSelectionGates.t.sol",
       "executions": 6,
-      "runs": 20004,
+      "runs": 20000,
       "reverts": 0,
       "revert_rate_bps": 0,
-      "duration_secs": 1550.8
+      "duration_secs": 1350.14
     },
     {
       "path": "test/invariants/Invariant_NoRunDry.t.sol",
       "executions": 6,
-      "runs": 20004,
-      "reverts": 0,
-      "revert_rate_bps": 0,
-      "duration_secs": 1215.18
+      "runs": 20000,
+      "reverts": 2953,
+      "revert_rate_bps": 1476,
+      "duration_secs": 1155.2299999999998
     }
   ],
   "durations_secs": [
-    62.85,
-    63.03,
-    63.03,
-    63.09,
-    63.28,
-    63.53,
-    256.73,
-    258.14,
-    258.37,
-    258.95,
-    259.09,
-    259.52,
-    201.37,
-    201.6,
-    202.46,
-    202.66,
-    202.9,
-    204.19
+    54.9,
+    55.23,
+    55.41,
+    55.55,
+    55.78,
+    55.93,
+    224.01,
+    224.32,
+    224.84,
+    225.08,
+    225.67,
+    226.22,
+    189.99,
+    192.5,
+    192.56,
+    192.91,
+    193.04,
+    194.23
   ],
   "csv": {
     "metrics/mid_event_vs_precompile_mid_bps.csv": {
       "exists": true,
       "rows": 6,
       "data_rows": 5,
-      "age_minutes": 9,
+      "age_minutes": 1406,
       "min_rows": 2,
-      "fresh": true
+      "fresh": false
     },
     "metrics/canary_deltas.csv": {
       "exists": true,
       "rows": 5,
       "data_rows": 4,
-      "age_minutes": 8,
+      "age_minutes": 507,
       "min_rows": 2,
-      "fresh": true
+      "fresh": false
     }
   },
   "freshness_minutes": 30,
   "totals": {
-    "runs_planned": 60012,
-    "runs_executed": 60012,
-    "reverts": 0,
-    "revert_rate_bps": 0
+    "runs_planned": 60000,
+    "runs_executed": 60000,
+    "reverts": 2953,
+    "revert_rate_bps": 492
   }
 }

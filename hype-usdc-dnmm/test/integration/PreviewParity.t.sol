@@ -255,23 +255,7 @@ contract PreviewParityTest is BaseTest {
     }
 
     function _signQuote(IQuoteRFQ.QuoteParams memory params) internal view returns (bytes memory) {
-        bytes32 typeHash = keccak256(
-            "Quote(address taker,uint256 amountIn,uint256 minAmountOut,bool isBaseIn,uint256 expiry,uint256 salt,address pool,uint256 chainId)"
-        );
-        bytes32 structHash = keccak256(
-            abi.encode(
-                typeHash,
-                params.taker,
-                params.amountIn,
-                params.minAmountOut,
-                params.isBaseIn,
-                params.expiry,
-                params.salt,
-                address(pool),
-                block.chainid
-            )
-        );
-        bytes32 digest = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", structHash));
+        bytes32 digest = rfq.hashTypedDataV4(params);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(makerKey, digest);
         return abi.encodePacked(r, s, v);
     }

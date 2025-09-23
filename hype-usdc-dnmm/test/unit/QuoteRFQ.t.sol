@@ -58,8 +58,27 @@ contract QuoteRFQTest is BaseTest {
             salt: 10
         });
 
-        bytes memory sig = _sign(params);
+        bytes32 structHash = rfq.hashQuote(params);
+        bytes32 digest = rfq.hashTypedDataV4(params);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(makerKey, digest);
+        bytes memory sig = abi.encodePacked(r, s, v);
 
+        bytes32 typeHash = keccak256(
+            "Quote(address taker,uint256 amountIn,uint256 minAmountOut,bool isBaseIn,uint256 expiry,uint256 salt)"
+        );
+        bytes32 expectedStruct = keccak256(
+            abi.encode(
+                typeHash,
+                params.taker,
+                params.amountIn,
+                params.minAmountOut,
+                params.isBaseIn,
+                params.expiry,
+                params.salt
+            )
+        );
+        assertEq(structHash, expectedStruct, "struct hash");
+        assertEq(digest, rfq.hashTypedDataV4(params), "digest stable");
         assertTrue(rfq.verifyQuoteSignature(makerAddr, params, sig), "signature should verify");
     }
 
@@ -91,7 +110,7 @@ contract QuoteRFQTest is BaseTest {
         bytes memory sig = _sign(params);
 
         vm.prank(alice);
-        vm.expectRevert("RFQ_EXPIRED");
+        vm.expectRevert(QuoteRFQ.QuoteExpired.selector);
         rfq.verifyAndSwap(sig, params, bytes(""));
     }
 
@@ -106,12 +125,12 @@ contract QuoteRFQTest is BaseTest {
         });
 
         uint256 badKey = 0xBEEF;
-        bytes32 digest = rfq.hashQuote(params);
+        bytes32 digest = rfq.hashTypedDataV4(params);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(badKey, digest);
         bytes memory sig = abi.encodePacked(r, s, v);
 
         vm.prank(alice);
-        vm.expectRevert("BAD_SIG");
+        vm.expectRevert(QuoteRFQ.QuoteSignerMismatch.selector);
         rfq.verifyAndSwap(sig, params, bytes(""));
     }
 
@@ -129,8 +148,29 @@ contract QuoteRFQTest is BaseTest {
         bytes memory sig = _signWith(params, other);
 
         vm.prank(alice);
-        vm.expectRevert("BAD_SIG");
+        vm.expectRevert(QuoteRFQ.QuoteSignerMismatch.selector);
         rfq.verifyAndSwap(sig, params, bytes(""));
+    }
+
+    function test_rfq_wrong_chain_reverts() public {
+        IQuoteRFQ.QuoteParams memory params = IQuoteRFQ.QuoteParams({
+            taker: alice,
+            amountIn: 80 ether,
+            minAmountOut: 0,
+            isBaseIn: true,
+            expiry: block.timestamp + 120,
+            salt: 7
+        });
+        bytes memory sig = _sign(params);
+
+        uint256 originalChainId = block.chainid;
+        vm.chainId(originalChainId + 10);
+
+        vm.prank(alice);
+        vm.expectRevert(QuoteRFQ.QuoteSignerMismatch.selector);
+        rfq.verifyAndSwap(sig, params, bytes(""));
+
+        vm.chainId(originalChainId);
     }
 
     function test_rfq_replay_protection() public {
@@ -148,7 +188,7 @@ contract QuoteRFQTest is BaseTest {
         rfq.verifyAndSwap(sig, params, bytes(""));
 
         vm.prank(alice);
-        vm.expectRevert("RFQ_USED");
+        vm.expectRevert(QuoteRFQ.QuoteAlreadyFilled.selector);
         rfq.verifyAndSwap(sig, params, bytes(""));
     }
 
@@ -169,13 +209,13 @@ contract QuoteRFQTest is BaseTest {
     }
 
     function _sign(IQuoteRFQ.QuoteParams memory params) internal view returns (bytes memory) {
-        bytes32 digest = rfq.hashQuote(params);
+        bytes32 digest = rfq.hashTypedDataV4(params);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(makerKey, digest);
         return abi.encodePacked(r, s, v);
     }
 
     function _signWith(IQuoteRFQ.QuoteParams memory params, QuoteRFQ target) internal view returns (bytes memory) {
-        bytes32 digest = target.hashQuote(params);
+        bytes32 digest = target.hashTypedDataV4(params);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(makerKey, digest);
         return abi.encodePacked(r, s, v);
     }

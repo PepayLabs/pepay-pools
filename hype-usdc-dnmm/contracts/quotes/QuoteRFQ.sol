@@ -13,6 +13,16 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
     string public constant NAME = "DNMM QuoteRFQ";
     string public constant VERSION = "1";
 
+    error QuotePoolZero();
+    error QuoteNotOwner();
+    error QuoteNotTaker();
+    error QuoteExpired();
+    error QuoteAlreadyFilled();
+    error QuoteSignerMismatch();
+    error QuoteOutputBelowPool();
+    error QuoteSignatureLength();
+    error QuoteSignatureV();
+
     bytes32 private constant EIP712_DOMAIN_TYPEHASH = keccak256(
         "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
     );
@@ -37,12 +47,12 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
     );
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "NOT_OWNER");
+        if (msg.sender != owner) revert QuoteNotOwner();
         _;
     }
 
     constructor(address pool_, address makerKey_) {
-        require(pool_ != address(0), "POOL_ZERO");
+        if (pool_ == address(0)) revert QuotePoolZero();
         pool = IDnmPool(pool_);
         makerKey = makerKey_;
         owner = msg.sender;
@@ -58,13 +68,13 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         nonReentrant
         returns (uint256 amountOut)
     {
-        require(params.taker == msg.sender, "NOT_TAKER");
-        require(block.timestamp <= params.expiry, "RFQ_EXPIRED");
-        require(!consumedSalts[params.salt], "RFQ_USED");
+        if (params.taker != msg.sender) revert QuoteNotTaker();
+        if (block.timestamp > params.expiry) revert QuoteExpired();
+        if (consumedSalts[params.salt]) revert QuoteAlreadyFilled();
         consumedSalts[params.salt] = true;
 
-        bytes32 digest = hashQuote(params);
-        require(_recoverSigner(digest, makerSignature) == makerKey, "BAD_SIG");
+        bytes32 digest = hashTypedDataV4(params);
+        if (_recoverSigner(digest, makerSignature) != makerKey) revert QuoteSignerMismatch();
 
         (address baseToken, address quoteToken,,,,) = pool.tokens();
         address inputToken = params.isBaseIn ? baseToken : quoteToken;
@@ -90,7 +100,7 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         }
 
         amountOut = outputBalanceAfter - outputBalanceBefore;
-        require(amountOut >= poolAmountOut, "BAD_OUT");
+        if (amountOut < poolAmountOut) revert QuoteOutputBelowPool();
 
         outputToken.safeTransfer(params.taker, amountOut);
 
@@ -106,8 +116,8 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         owner = newOwner;
     }
 
-    function hashQuote(QuoteParams calldata params) public view override returns (bytes32) {
-        bytes32 structHash = keccak256(
+    function hashQuote(QuoteParams calldata params) public pure override returns (bytes32) {
+        return keccak256(
             abi.encode(
                 QUOTE_TYPEHASH,
                 params.taker,
@@ -118,7 +128,10 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
                 params.salt
             )
         );
-        return keccak256(abi.encodePacked("\x19\x01", _domainSeparatorV4(), structHash));
+    }
+
+    function hashTypedDataV4(QuoteParams calldata params) public view override returns (bytes32) {
+        return keccak256(abi.encodePacked("\x19\x01", _domainSeparatorV4(), hashQuote(params)));
     }
 
     function verifyQuoteSignature(address signer, QuoteParams calldata params, bytes calldata signature)
@@ -127,7 +140,7 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         override
         returns (bool)
     {
-        return _recoverSigner(hashQuote(params), signature) == signer;
+        return _recoverSigner(hashTypedDataV4(params), signature) == signer;
     }
 
     function _domainSeparatorV4() internal view returns (bytes32) {
@@ -144,7 +157,7 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
     }
 
     function _recoverSigner(bytes32 digest, bytes calldata signature) internal pure returns (address) {
-        require(signature.length == 65, "SIG_LEN");
+        if (signature.length != 65) revert QuoteSignatureLength();
         bytes32 r;
         bytes32 s;
         uint8 v;
@@ -154,7 +167,7 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
             v := byte(0, calldataload(add(signature.offset, 64)))
         }
         if (v < 27) v += 27;
-        require(v == 27 || v == 28, "SIG_V");
+        if (v != 27 && v != 28) revert QuoteSignatureV();
         return ecrecover(digest, v, r, s);
     }
 }

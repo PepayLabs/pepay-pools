@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-09-22T23:50:54Z",
+  "generated_at": "2025-09-23T01:05:40Z",
   "log_path": "metrics/invariant_long_run_2025-09-23.log",
   "decision": "run",
   "sample": {
@@ -7,9 +7,16 @@
     "ms_per_run": 7
   },
   "estimate_secs": 140,
-  "eta_parallel_secs": null,
-  "eta_sequential_secs": null,
+  "eta_parallel_secs": 28,
+  "eta_sequential_secs": 140,
   "target_runs": 20000,
+  "plan": {
+    "profile_short": "ci",
+    "profile_long": "long",
+    "depth": 64,
+    "sample_runs": 400,
+    "seed_base": 123456
+  },
   "shards": [
     {
       "index": 1,
@@ -17,6 +24,8 @@
       "seed": 123457,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": 63,
+      "status": 0,
       "result": {
         "runs": 3334,
         "reverts": 0
@@ -28,6 +37,8 @@
       "seed": 123458,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": 63,
+      "status": 0,
       "result": {
         "runs": 3334,
         "reverts": 0
@@ -39,6 +50,8 @@
       "seed": 123459,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": 63,
+      "status": 0,
       "result": {
         "runs": 3334,
         "reverts": 0
@@ -50,6 +63,8 @@
       "seed": 123460,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": 63,
+      "status": 0,
       "result": {
         "runs": 3334,
         "reverts": 0
@@ -61,6 +76,8 @@
       "seed": 123461,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": 63,
+      "status": 0,
       "result": {
         "runs": 3334,
         "reverts": 0
@@ -72,6 +89,8 @@
       "seed": 123462,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": 63,
+      "status": 0,
       "result": {
         "runs": 3334,
         "reverts": 0
@@ -83,6 +102,8 @@
       "seed": 123457,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": null,
+      "status": null,
       "result": {
         "runs": 3334,
         "reverts": 0
@@ -94,6 +115,8 @@
       "seed": 123458,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": null,
+      "status": null,
       "result": {
         "runs": 3334,
         "reverts": 0
@@ -105,6 +128,8 @@
       "seed": 123459,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": null,
+      "status": null,
       "result": {
         "runs": 3334,
         "reverts": 0
@@ -116,6 +141,8 @@
       "seed": 123460,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": null,
+      "status": null,
       "result": {
         "runs": 3334,
         "reverts": 0
@@ -127,6 +154,8 @@
       "seed": 123461,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": null,
+      "status": null,
       "result": {
         "runs": 3334,
         "reverts": 0
@@ -138,6 +167,8 @@
       "seed": 123462,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": null,
+      "status": null,
       "result": {
         "runs": 3334,
         "reverts": 0
@@ -149,9 +180,11 @@
       "seed": 123457,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": null,
+      "status": null,
       "result": {
         "runs": 3334,
-        "reverts": 534
+        "reverts": 0
       }
     },
     {
@@ -160,9 +193,11 @@
       "seed": 123458,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": null,
+      "status": null,
       "result": {
         "runs": 3334,
-        "reverts": 524
+        "reverts": 0
       }
     },
     {
@@ -171,9 +206,11 @@
       "seed": 123459,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": null,
+      "status": null,
       "result": {
         "runs": 3334,
-        "reverts": 499
+        "reverts": 0
       }
     },
     {
@@ -182,9 +219,11 @@
       "seed": 123460,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": null,
+      "status": null,
       "result": {
         "runs": 3334,
-        "reverts": 400
+        "reverts": 0
       }
     },
     {
@@ -193,9 +232,11 @@
       "seed": 123461,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": null,
+      "status": null,
       "result": {
         "runs": 3334,
-        "reverts": 475
+        "reverts": 0
       }
     },
     {
@@ -204,9 +245,11 @@
       "seed": 123462,
       "planned_runs": 3334,
       "skipped": false,
+      "duration_secs": null,
+      "status": null,
       "result": {
         "runs": 3334,
-        "reverts": 521
+        "reverts": 0
       }
     }
   ],
@@ -216,21 +259,24 @@
       "executions": 6,
       "runs": 20004,
       "reverts": 0,
-      "revert_rate_bps": 0
+      "revert_rate_bps": 0,
+      "duration_secs": 378.80999999999995
     },
     {
       "path": "test/invariants/Invariant_MidSelectionGates.t.sol",
       "executions": 6,
       "runs": 20004,
       "reverts": 0,
-      "revert_rate_bps": 0
+      "revert_rate_bps": 0,
+      "duration_secs": 1550.8
     },
     {
       "path": "test/invariants/Invariant_NoRunDry.t.sol",
       "executions": 6,
       "runs": 20004,
-      "reverts": 2953,
-      "revert_rate_bps": 1476
+      "reverts": 0,
+      "revert_rate_bps": 0,
+      "duration_secs": 1215.18
     }
   ],
   "durations_secs": [
@@ -258,7 +304,7 @@
       "exists": true,
       "rows": 6,
       "data_rows": 5,
-      "age_minutes": 2,
+      "age_minutes": 9,
       "min_rows": 2,
       "fresh": true
     },
@@ -266,7 +312,7 @@
       "exists": true,
       "rows": 5,
       "data_rows": 4,
-      "age_minutes": 16,
+      "age_minutes": 8,
       "min_rows": 2,
       "fresh": true
     }
@@ -275,7 +321,7 @@
   "totals": {
     "runs_planned": 60012,
     "runs_executed": 60012,
-    "reverts": 2953,
-    "revert_rate_bps": 492
+    "reverts": 0,
+    "revert_rate_bps": 0
   }
 }

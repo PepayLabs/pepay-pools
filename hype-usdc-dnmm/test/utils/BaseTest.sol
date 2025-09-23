@@ -146,7 +146,7 @@ abstract contract BaseTest is MathAsserts {
             alphaConfDenominator: 100,
             betaInvDevNumerator: 12,
             betaInvDevDenominator: 100,
-            capBps: 250,
+            capBps: 150,
             decayPctPerBlock: 20
         });
     }

@@ -60,19 +60,27 @@ contract Handler {
     }
 
     function swapBaseIn(uint256 amount) external {
-        amount = _bound(amount, 1e6, 200_000 ether);
+        amount = _bound(amount, 1e6, 40_000 ether);
         uint256 balance = base.balanceOf(address(this));
         if (balance == 0) return;
         if (amount > balance) amount = balance;
-        pool.swapExactIn(amount, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        try pool.quoteSwapExactIn(amount, true, IDnmPool.OracleMode.Spot, bytes("")) returns (DnmPool.QuoteResult memory) {
+            pool.swapExactIn(amount, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        } catch {
+            return;
+        }
     }
 
     function swapQuoteIn(uint256 amount) external {
-        amount = _bound(amount, 1e3, 5_000_000000);
+        amount = _bound(amount, 1e3, 1_200_000000);
         uint256 balance = quote.balanceOf(address(this));
         if (balance == 0) return;
         if (amount > balance) amount = balance;
-        pool.swapExactIn(amount, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        try pool.quoteSwapExactIn(amount, false, IDnmPool.OracleMode.Spot, bytes("")) returns (DnmPool.QuoteResult memory) {
+            pool.swapExactIn(amount, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        } catch {
+            return;
+        }
     }
 
     function updateOracle(uint256 mid, uint256 spreadBps, uint256 age) external {

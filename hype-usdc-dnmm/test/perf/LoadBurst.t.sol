@@ -96,6 +96,7 @@ contract LoadBurstPerfTest is BaseTest {
         summaryRows[4] = string.concat("divergence_rejects,", EventRecorder.uintToString(divergenceRejects));
         summaryRows[5] = string.concat("failure_rate_bps,", EventRecorder.uintToString(failureRateBps));
         summaryRows = _append(summaryRows, "avg_fee_bps", avgFeeBps);
+        summaryRows = _append(summaryRows, "fee_cap_bps", defaultFeeConfig().capBps);
 
         EventRecorder.writeCSV(vm, "metrics/load_burst_summary.csv", "metric,value", summaryRows);
         EventRecorder.writeCSV(vm, "metrics/load_fee_decay_series.csv", "iteration,fee_bps,reason", feeRows);

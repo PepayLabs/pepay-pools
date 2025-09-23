@@ -9,6 +9,7 @@
 - `oracle_mode` – Spot/EMA/Pyth fallback; use `reason` field (`"EMA"`, `"PYTH"`, etc.).
 - `reject_reason` – Count occurrences of `Errors.ORACLE_*`, `Errors.FLOOR_BREACH` via revert tracking.
 - `fee_state_decay` – Monitor gap between `feeConfig.baseBps` and emitted `feeBps` across blocks for decay health.
+- Parity exports (`mid_event_vs_precompile_mid_bps.csv`, `canary_deltas.csv`, `divergence_rate.csv`, `divergence_histogram.csv`) – snapshot oracle parity, fallback reasons, and divergence guard hit-rates per Δ bucket.
 
 ## Logs & Events
 - `SwapExecuted(user, isBaseIn, amountIn, amountOut, mid, feeBps, partial, reason)` – Primary execution telemetry.

@@ -103,17 +103,38 @@ run_single_test() {
     warn "⚠️  SHARDS < 1 supplied; coerce to 1"
     shard_count=1
   fi
-  local runs_per_shard=$(( (TARGET_RUNS + shard_count - 1) / shard_count ))
-  info "🚀 Running ${TARGET_RUNS} runs across ${shard_count} shard(s) (~${runs_per_shard} each)"
+  local base_runs=$(( TARGET_RUNS / shard_count ))
+  local remainder=$(( TARGET_RUNS % shard_count ))
+  local max_runs_per_shard=$base_runs
+  if (( remainder > 0 )); then
+    max_runs_per_shard=$(( max_runs_per_shard + 1 ))
+  fi
+  local est_parallel_ms=$(( per_run_ms * max_runs_per_shard ))
+  est_parallel_ms=$(( est_parallel_ms * 12 / 10 ))
+  local est_parallel_secs=$(( est_parallel_ms / 1000 ))
+  if (( est_parallel_secs == 0 && est_parallel_ms > 0 )); then
+    est_parallel_secs=1
+  fi
+  info "🚀 Running ${TARGET_RUNS} runs across ${shard_count} shard(s) (~${base_runs} base, remainder ${remainder})"
+  info "📊 Parallel ETA ≈ ${est_parallel_secs}s (sequential ${est_secs}s)"
 
   local pids=()
+  local planned_runs
   for shard in $(seq 1 "$shard_count"); do
     local seed=$(( SEED_BASE + shard ))
+    planned_runs=$base_runs
+    if (( shard <= remainder )); then
+      planned_runs=$(( planned_runs + 1 ))
+    fi
+    if (( planned_runs == 0 )); then
+      info "▶️  Shard ${shard}/${shard_count} seed=${seed} runs_planned=0 (skipped)"
+      continue
+    fi
     local shard_budget=$(( BUDGET_SECS / shard_count + 120 ))
-    info "▶️  Shard ${shard}/${shard_count} seed=${seed} runs=${runs_per_shard}"
+    info "▶️  Shard ${shard}/${shard_count} seed=${seed} runs_planned=${planned_runs}"
     (
       FOUNDRY_PROFILE="$PROFILE_LONG" \
-      FOUNDRY_INVARIANT_RUNS="$runs_per_shard" \
+      FOUNDRY_INVARIANT_RUNS="$planned_runs" \
       timeout --signal=SIGINT --kill-after=30 "$shard_budget" \
         stdbuf -oL -eL forge test \
           --match-path "$test_path" \

@@ -1,0 +1,35 @@
+{
+  "generated_at": "2025-09-23T02:52:08.681191+00:00",
+  "gates": {
+    "build": {
+      "command": "forge build -q",
+      "status": "pass"
+    },
+    "unit_tests": {
+      "command": "forge test --match-path 'test/unit/*.t.sol' -vv",
+      "status": "pass"
+    },
+    "integration_tests": {
+      "command": "forge test --match-path 'test/integration/*.t.sol' -vv",
+      "status": "pass"
+    },
+    "perf_gas": {
+      "command": "forge test --match-path test/perf/GasSnapshots.t.sol -vv",
+      "status": "pass"
+    },
+    "parity_refresh": {
+      "command": "FOUNDRY_PROFILE=ci FOUNDRY_INVARIANT_RUNS=200 script/run_invariants.sh test/invariants/Invariant_NoRunDry.t.sol",
+      "status": "not_run",
+      "reason": "pending rerun after latest optimizations"
+    },
+    "metrics_freshness": {
+      "status": "pass",
+      "report": "reports/metrics/freshness_report.json"
+    },
+    "slither": {
+      "status": "not_run",
+      "reason": "slither binary missing",
+      "report": "reports/security/slither_findings.json"
+    }
+  }
+}

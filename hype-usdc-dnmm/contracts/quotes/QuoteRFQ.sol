@@ -30,14 +30,14 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         "Quote(address taker,uint256 amountIn,uint256 minAmountOut,bool isBaseIn,uint256 expiry,uint256 salt)"
     );
 
-    IDnmPool public immutable pool;
+    IDnmPool internal immutable POOL_;
     address public makerKey;
     address public owner;
 
-    bytes32 private immutable _hashedName;
-    bytes32 private immutable _hashedVersion;
-    uint256 private immutable _domainChainId;
-    bytes32 private immutable _domainSeparator;
+    bytes32 private immutable _HASHED_NAME;
+    bytes32 private immutable _HASHED_VERSION;
+    uint256 private immutable _DOMAIN_CHAIN_ID;
+    bytes32 private immutable _DOMAIN_SEPARATOR;
 
     mapping(uint256 => bool) public consumedSalts;
 
@@ -53,13 +53,17 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
 
     constructor(address pool_, address makerKey_) {
         if (pool_ == address(0)) revert QuotePoolZero();
-        pool = IDnmPool(pool_);
+        POOL_ = IDnmPool(pool_);
         makerKey = makerKey_;
         owner = msg.sender;
-        _hashedName = keccak256(bytes(NAME));
-        _hashedVersion = keccak256(bytes(VERSION));
-        _domainChainId = block.chainid;
-        _domainSeparator = _buildDomainSeparator(_hashedName, _hashedVersion);
+        _HASHED_NAME = keccak256(bytes(NAME));
+        _HASHED_VERSION = keccak256(bytes(VERSION));
+        _DOMAIN_CHAIN_ID = block.chainid;
+        _DOMAIN_SEPARATOR = _buildDomainSeparator(_HASHED_NAME, _HASHED_VERSION);
+    }
+
+    function pool() public view returns (IDnmPool) {
+        return POOL_;
     }
 
     function verifyAndSwap(bytes calldata makerSignature, QuoteParams calldata params, bytes calldata oracleData)
@@ -76,7 +80,7 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         bytes32 digest = hashTypedDataV4(params);
         if (_recoverSigner(digest, makerSignature) != makerKey) revert QuoteSignerMismatch();
 
-        (address baseToken, address quoteToken,,,,) = pool.tokens();
+        (address baseToken, address quoteToken,,,,) = POOL_.tokens();
         address inputToken = params.isBaseIn ? baseToken : quoteToken;
         address outputToken = params.isBaseIn ? quoteToken : baseToken;
 
@@ -85,11 +89,11 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         uint256 inputBalanceBefore = IERC20(inputToken).balanceOf(address(this));
         uint256 outputBalanceBefore = IERC20(outputToken).balanceOf(address(this));
 
-        inputToken.safeApprove(address(pool), params.amountIn);
-        uint256 poolAmountOut = pool.swapExactIn(
+        inputToken.safeApprove(address(POOL_), params.amountIn);
+        uint256 poolAmountOut = POOL_.swapExactIn(
             params.amountIn, params.minAmountOut, params.isBaseIn, IDnmPool.OracleMode.Spot, oracleData, params.expiry
         );
-        inputToken.safeApprove(address(pool), 0);
+        inputToken.safeApprove(address(POOL_), 0);
 
         uint256 inputBalanceAfter = IERC20(inputToken).balanceOf(address(this));
         uint256 outputBalanceAfter = IERC20(outputToken).balanceOf(address(this));
@@ -144,10 +148,10 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
     }
 
     function _domainSeparatorV4() internal view returns (bytes32) {
-        if (block.chainid == _domainChainId) {
-            return _domainSeparator;
+        if (block.chainid == _DOMAIN_CHAIN_ID) {
+            return _DOMAIN_SEPARATOR;
         }
-        return _buildDomainSeparator(_hashedName, _hashedVersion);
+        return _buildDomainSeparator(_HASHED_NAME, _HASHED_VERSION);
     }
 
     function _buildDomainSeparator(bytes32 hashedName, bytes32 hashedVersion) private view returns (bytes32) {

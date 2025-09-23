@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-09-23T01:47:14.686375+00:00",
+  "generated_at": "2025-09-23T02:52:33.987974+00:00",
   "contract": "QuoteRFQ",
   "domain": {
     "name": "DNMM QuoteRFQ",
@@ -13,7 +13,8 @@
   },
   "helpers": {
     "hashQuote": "struct hash",
-    "hashTypedDataV4": "domain-separated digest"
+    "hashTypedDataV4": "domain-separated digest",
+    "pool_getter": "public getter preserves ABI via internal immutable"
   },
   "custom_errors": [
     "QuotePoolZero",
@@ -29,7 +30,7 @@
   "verification": {
     "commands": [
       "forge build -q",
-      "forge test --match-path test/unit/QuoteRFQ.t.sol -vv"
+      "forge test --match-path 'test/unit/QuoteRFQ.t.sol' -vv"
     ],
     "test_suites_passed": [
       "test/unit/QuoteRFQ.t.sol"

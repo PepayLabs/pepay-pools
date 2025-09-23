@@ -1,0 +1,47 @@
+{
+  "generated_at": "2025-09-23T02:51:18.734068+00:00",
+  "entries": [
+    {
+      "operation": "quote_hc",
+      "gas_used": 115225,
+      "budget": 130000,
+      "headroom": 14775,
+      "status": "pass"
+    },
+    {
+      "operation": "quote_ema",
+      "gas_used": 110422,
+      "budget": 130000,
+      "headroom": 19578,
+      "status": "pass"
+    },
+    {
+      "operation": "quote_pyth",
+      "gas_used": 107965,
+      "budget": 130000,
+      "headroom": 22035,
+      "status": "pass"
+    },
+    {
+      "operation": "swap_base_hc",
+      "gas_used": 212512,
+      "budget": 225000,
+      "headroom": 12488,
+      "status": "pass"
+    },
+    {
+      "operation": "swap_quote_hc",
+      "gas_used": 212542,
+      "budget": 225000,
+      "headroom": 12458,
+      "status": "pass"
+    },
+    {
+      "operation": "rfq_verify_swap",
+      "gas_used": 366446,
+      "budget": 400000,
+      "headroom": 33554,
+      "status": "pass"
+    }
+  ]
+}

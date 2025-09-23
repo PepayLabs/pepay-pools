@@ -36,6 +36,8 @@
 - Connect indexer to `SwapExecuted`, `QuoteServed`, `ParamsUpdated`, `Paused`, `Unpaused`.
 - Publish Grafana dashboard using metrics defined in `docs/OBSERVABILITY.md`.
 - Persist test artifacts from `metrics/` (CSV/JSON) and `gas-snapshots.txt` into the monitoring pipeline for historical comparisons.
+- Wire the parity freshness check after any long invariant run: execute `script/run_invariants.sh` (or `scripts/check_parity_metrics.sh`) and verify `reports/metrics/freshness_report.json` reports `status=pass` for all parity CSVs.
+- (Planned) Deploy the lightweight `OracleWatcher` once merged; subscribe the ops daemon to `OracleAlert` events and page when `critical=true`.
 
 ## 7. Incident Response
 - Use `pause()` to halt swaps on oracle divergence or vault issues.
@@ -45,7 +47,9 @@
 ## 8. Performance & Metric Validation
 - Execute `forge test --match-path test/perf` to capture gas profiles (`metrics/gas_snapshots.csv`, `gas-snapshots.txt`) and burst reliability metrics (`metrics/load_burst_summary.csv`).
 - Ensure tuple/decimal sweep outputs (`metrics/tuple_decimal_sweep.csv`) and fee dynamics series (`metrics/fee_B*.csv`) are reviewed before deployment to detect scaling regressions.
+- After each perf sweep update `reports/gas/gas_report.json` and compare against budgets (quote ≤ 90k, swap ≤ 200k, rfq ≤ 400k) before committing.
 - Run invariant suites with `script/run_invariants.sh` (defaults to an adaptive 20k run with sampling + idle guards) after cleaning `cache/invariant`; fall back to `FOUNDRY_INVARIANT_RUNS=2000 forge test --profile ci --match-path test/invariants` for quick smoke checks.
+- When the long run executes, confirm `reports/invariants_run.json` shows planned vs executed parity and revert-rate ≤ 10%; escalate per `reports/ci/quality_gates_summary.json` if thresholds are breached.
 
 ## Appendices
 - `docs/ORACLE.md` – HyperCore/Pyth wiring details.

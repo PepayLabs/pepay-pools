@@ -9,8 +9,8 @@ import {OracleUtils} from "../lib/OracleUtils.sol";
 contract DnmOracleObserver {
     using OracleUtils for uint256;
 
-    IOracleAdapterHC public immutable oracleHc;
-    IOracleAdapterPyth public immutable oraclePyth;
+    IOracleAdapterHC internal immutable ORACLE_HC_;
+    IOracleAdapterPyth internal immutable ORACLE_PYTH_;
 
     struct Snapshot {
         uint256 mid;
@@ -36,8 +36,16 @@ contract DnmOracleObserver {
     );
 
     constructor(IOracleAdapterHC oracleHc_, IOracleAdapterPyth oraclePyth_) {
-        oracleHc = oracleHc_;
-        oraclePyth = oraclePyth_;
+        ORACLE_HC_ = oracleHc_;
+        ORACLE_PYTH_ = oraclePyth_;
+    }
+
+    function oracleHc() public view returns (IOracleAdapterHC) {
+        return ORACLE_HC_;
+    }
+
+    function oraclePyth() public view returns (IOracleAdapterPyth) {
+        return ORACLE_PYTH_;
     }
 
     /// @notice Capture the current oracle state and emit an `OracleSnapshot` event for downstream analysis.
@@ -51,13 +59,13 @@ contract DnmOracleObserver {
     }
 
     function _snapshot(bytes32 label, bytes memory pythUpdateData) internal returns (Snapshot memory snap) {
-        IOracleAdapterHC.MidResult memory midRes = oracleHc.readMidAndAge();
-        IOracleAdapterHC.BidAskResult memory bookRes = oracleHc.readBidAsk();
+        IOracleAdapterHC.MidResult memory midRes = ORACLE_HC_.readMidAndAge();
+        IOracleAdapterHC.BidAskResult memory bookRes = ORACLE_HC_.readBidAsk();
 
         uint256 spreadBps = bookRes.success ? bookRes.spreadBps : 0;
 
-        IOracleAdapterPyth.PythResult memory pythRes = oraclePyth.readPythUsdMid(pythUpdateData);
-        (uint256 pythMid, uint256 pythAge,) = oraclePyth.computePairMid(pythRes);
+        IOracleAdapterPyth.PythResult memory pythRes = ORACLE_PYTH_.readPythUsdMid(pythUpdateData);
+        (uint256 pythMid, uint256 pythAge,) = ORACLE_PYTH_.computePairMid(pythRes);
 
         uint256 effectiveMid = midRes.success ? midRes.mid : (pythRes.success ? pythMid : 0);
         uint256 effectiveAge = midRes.success ? midRes.ageSec : (pythRes.success ? pythAge : type(uint256).max);

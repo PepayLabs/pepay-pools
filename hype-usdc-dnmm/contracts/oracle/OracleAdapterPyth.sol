@@ -21,24 +21,36 @@ interface IPyth {
 contract OracleAdapterPyth is IOracleAdapterPyth {
     uint256 private constant ONE = 1e18;
 
-    IPyth public immutable pyth;
-    bytes32 public immutable priceIdHypeUsd;
-    bytes32 public immutable priceIdUsdcUsd;
+    IPyth internal immutable PYTH_;
+    bytes32 internal immutable PRICE_ID_HYPE_USD_;
+    bytes32 internal immutable PRICE_ID_USDC_USD_;
 
     constructor(address _pyth, bytes32 _priceIdHypeUsd, bytes32 _priceIdUsdcUsd) {
-        pyth = IPyth(_pyth);
-        priceIdHypeUsd = _priceIdHypeUsd;
-        priceIdUsdcUsd = _priceIdUsdcUsd;
+        PYTH_ = IPyth(_pyth);
+        PRICE_ID_HYPE_USD_ = _priceIdHypeUsd;
+        PRICE_ID_USDC_USD_ = _priceIdUsdcUsd;
+    }
+
+    function pyth() public view returns (IPyth) {
+        return PYTH_;
+    }
+
+    function priceIdHypeUsd() public view returns (bytes32) {
+        return PRICE_ID_HYPE_USD_;
+    }
+
+    function priceIdUsdcUsd() public view returns (bytes32) {
+        return PRICE_ID_USDC_USD_;
     }
 
     function readPythUsdMid(bytes calldata updateData) external payable override returns (PythResult memory) {
         if (updateData.length > 0) {
             bytes[] memory updates = abi.decode(updateData, (bytes[]));
-            pyth.updatePriceFeeds{value: msg.value}(updates);
+            PYTH_.updatePriceFeeds{value: msg.value}(updates);
         }
 
-        IPyth.Price memory hype = pyth.getPriceUnsafe(priceIdHypeUsd);
-        IPyth.Price memory usdc = pyth.getPriceUnsafe(priceIdUsdcUsd);
+        IPyth.Price memory hype = PYTH_.getPriceUnsafe(PRICE_ID_HYPE_USD_);
+        IPyth.Price memory usdc = PYTH_.getPriceUnsafe(PRICE_ID_USDC_USD_);
 
         bool success = hype.price > 0 && usdc.price > 0;
         return PythResult({

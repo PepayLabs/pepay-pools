@@ -103,8 +103,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     MakerConfig public makerConfig;
     Guardians public guardians;
 
-    IOracleAdapterHC public oracleHC;
-    IOracleAdapterPyth public oraclePyth;
+    IOracleAdapterHC internal immutable ORACLE_HC_;
+    IOracleAdapterPyth internal immutable ORACLE_PYTH_;
 
     FeePolicy.FeeState private feeState;
     bool public paused;
@@ -170,7 +170,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         address quoteToken_,
         uint8 baseDecimals_,
         uint8 quoteDecimals_,
-        address oracleHC_,
+        address oracleHc_,
         address oraclePyth_,
         InventoryConfig memory inventoryConfig_,
         OracleConfig memory oracleConfig_,
@@ -195,14 +195,22 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             quoteScale: _pow10(quoteDecimals_)
         });
 
-        oracleHC = IOracleAdapterHC(oracleHC_);
-        oraclePyth = IOracleAdapterPyth(oraclePyth_);
+        ORACLE_HC_ = IOracleAdapterHC(oracleHc_);
+        ORACLE_PYTH_ = IOracleAdapterPyth(oraclePyth_);
         inventoryConfig = inventoryConfig_;
         oracleConfig = oracleConfig_;
         feeConfig = feeConfig_;
         makerConfig = makerConfig_;
         featureFlags = featureFlags_;
         guardians = guardians_;
+    }
+
+    function oracleHC() public view returns (IOracleAdapterHC) {
+        return ORACLE_HC_;
+    }
+
+    function oraclePyth() public view returns (IOracleAdapterPyth) {
+        return ORACLE_PYTH_;
     }
 
     // --- User actions ---
@@ -236,28 +244,33 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         amountOut = result.amountOut;
         require(amountOut >= minAmountOut, "SLIPPAGE");
 
+        address baseToken = tokenConfig.baseToken;
+        address quoteToken = tokenConfig.quoteToken;
+
         if (isBaseIn) {
-            uint256 beforeBal = IERC20(tokenConfig.baseToken).balanceOf(address(this));
-            tokenConfig.baseToken.safeTransferFrom(msg.sender, address(this), actualAmountIn);
-            uint256 received = IERC20(tokenConfig.baseToken).balanceOf(address(this)) - beforeBal;
+            IERC20 baseTokenErc = IERC20(baseToken);
+            uint256 beforeBal = baseTokenErc.balanceOf(address(this));
+            baseToken.safeTransferFrom(msg.sender, address(this), actualAmountIn);
+            uint256 received = baseTokenErc.balanceOf(address(this)) - beforeBal;
             if (received != actualAmountIn) {
                 emit TokenFeeUnsupported(msg.sender, true, actualAmountIn, received);
                 revert(Errors.TOKEN_FEE_UNSUPPORTED);
             }
-            tokenConfig.quoteToken.safeTransfer(msg.sender, amountOut);
+            quoteToken.safeTransfer(msg.sender, amountOut);
             require(uint256(reserves.baseReserves) + actualAmountIn <= type(uint128).max, "BASE_OOB");
             require(uint256(reserves.quoteReserves) >= amountOut, "INSUFFICIENT_QUOTE");
             reserves.baseReserves = uint128(uint256(reserves.baseReserves) + actualAmountIn);
             reserves.quoteReserves = uint128(uint256(reserves.quoteReserves) - amountOut);
         } else {
-            uint256 beforeBal = IERC20(tokenConfig.quoteToken).balanceOf(address(this));
-            tokenConfig.quoteToken.safeTransferFrom(msg.sender, address(this), actualAmountIn);
-            uint256 received = IERC20(tokenConfig.quoteToken).balanceOf(address(this)) - beforeBal;
+            IERC20 quoteTokenErc = IERC20(quoteToken);
+            uint256 beforeBal = quoteTokenErc.balanceOf(address(this));
+            quoteToken.safeTransferFrom(msg.sender, address(this), actualAmountIn);
+            uint256 received = quoteTokenErc.balanceOf(address(this)) - beforeBal;
             if (received != actualAmountIn) {
                 emit TokenFeeUnsupported(msg.sender, false, actualAmountIn, received);
                 revert(Errors.TOKEN_FEE_UNSUPPORTED);
             }
-            tokenConfig.baseToken.safeTransfer(msg.sender, amountOut);
+            baseToken.safeTransfer(msg.sender, amountOut);
             require(uint256(reserves.quoteReserves) + actualAmountIn <= type(uint128).max, "QUOTE_OOB");
             require(uint256(reserves.baseReserves) >= amountOut, "INSUFFICIENT_BASE");
             reserves.quoteReserves = uint128(uint256(reserves.quoteReserves) + actualAmountIn);
@@ -279,14 +292,22 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         returns (uint256 bidPx, uint256 askPx, uint256 ttlMs, bytes32 quoteId)
     {
         OracleConfig memory cfg = oracleConfig;
-        IOracleAdapterHC.MidResult memory midRes = oracleHC.readMidAndAge();
+        IOracleAdapterHC.MidResult memory midRes = ORACLE_HC_.readMidAndAge();
         require(midRes.success && midRes.ageSec <= cfg.maxAgeSec, Errors.ORACLE_STALE);
-        IOracleAdapterHC.BidAskResult memory baRes = oracleHC.readBidAsk();
+        IOracleAdapterHC.BidAskResult memory baRes = ORACLE_HC_.readBidAsk();
         require(!baRes.success || (baRes.bid > 0 && baRes.ask > baRes.bid), Errors.INVALID_OB);
 
         uint256 confBps =
             _previewConfidenceView(cfg, OracleMode.Spot, midRes.mid, baRes.spreadBps, baRes.success, false, 0, false);
-        uint256 invDev = _computeInventoryDeviationBps(midRes.mid);
+        InventoryConfig memory invCfg = inventoryConfig;
+        Inventory.Tokens memory invTokens = _inventoryTokens();
+        uint256 invDev = Inventory.deviationBps(
+            uint256(reserves.baseReserves),
+            uint256(reserves.quoteReserves),
+            invCfg.targetBaseXstar,
+            midRes.mid,
+            invTokens
+        );
         FeePolicy.FeeState memory state =
             FeePolicy.FeeState({lastBlock: feeState.lastBlock, lastFeeBps: feeState.lastFeeBps});
         (uint16 feeBps,) = FeePolicy.preview(state, feeConfig, confBps, invDev, block.number);
@@ -393,7 +414,14 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
         OracleOutcome memory outcome = _readOracle(mode, oracleData);
 
-        uint256 invDevBps = _computeInventoryDeviationBps(outcome.mid);
+        InventoryConfig memory invCfg = inventoryConfig;
+        Inventory.Tokens memory invTokens = _inventoryTokens();
+        uint256 baseReservesLocal = uint256(reserves.baseReserves);
+        uint256 quoteReservesLocal = uint256(reserves.quoteReserves);
+        uint256 invDevBps = Inventory.deviationBps(
+            baseReservesLocal, quoteReservesLocal, invCfg.targetBaseXstar, outcome.mid, invTokens
+        );
+
         FeePolicy.FeeConfig memory cfg = feeConfig;
         uint16 feeBps;
         if (shouldSettleFee) {
@@ -429,7 +457,16 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 amountOut;
         uint256 appliedAmountIn;
         bytes32 reason;
-        (amountOut, appliedAmountIn, reason) = _computeSwapAmounts(amountIn, isBaseIn, outcome.mid, feeBps);
+        (amountOut, appliedAmountIn, reason) = _computeSwapAmounts(
+            amountIn,
+            isBaseIn,
+            outcome.mid,
+            feeBps,
+            invTokens,
+            baseReservesLocal,
+            quoteReservesLocal,
+            invCfg.floorBps
+        );
 
         result = QuoteResult({
             amountOut: amountOut,
@@ -441,45 +478,36 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         });
     }
 
-    function _computeSwapAmounts(uint256 amountIn, bool isBaseIn, uint256 mid, uint256 feeBps)
-        internal
-        view
-        returns (uint256 amountOut, uint256 appliedAmountIn, bytes32 reason)
-    {
+    function _computeSwapAmounts(
+        uint256 amountIn,
+        bool isBaseIn,
+        uint256 mid,
+        uint256 feeBps,
+        Inventory.Tokens memory invTokens,
+        uint256 baseReservesLocal,
+        uint256 quoteReservesLocal,
+        uint16 floorBps
+    ) internal pure returns (uint256 amountOut, uint256 appliedAmountIn, bytes32 reason) {
         require(feeBps < BPS, "FEE_CAP");
-        Inventory.Tokens memory invTokens =
-            Inventory.Tokens({baseScale: tokenConfig.baseScale, quoteScale: tokenConfig.quoteScale});
 
         bool didPartial;
         if (isBaseIn) {
-            (amountOut, appliedAmountIn, didPartial) = Inventory.quoteBaseIn(
-                amountIn, mid, feeBps, uint256(reserves.quoteReserves), inventoryConfig.floorBps, invTokens
-            );
-            if (appliedAmountIn > amountIn) {
-                appliedAmountIn = amountIn;
-            }
-            reason = didPartial ? REASON_FLOOR : REASON_NONE;
+            (amountOut, appliedAmountIn, didPartial) =
+                Inventory.quoteBaseIn(amountIn, mid, feeBps, quoteReservesLocal, floorBps, invTokens);
         } else {
-            (amountOut, appliedAmountIn, didPartial) = Inventory.quoteQuoteIn(
-                amountIn, mid, feeBps, uint256(reserves.baseReserves), inventoryConfig.floorBps, invTokens
-            );
-            if (appliedAmountIn > amountIn) {
-                appliedAmountIn = amountIn;
-            }
-            reason = didPartial ? REASON_FLOOR : REASON_NONE;
+            (amountOut, appliedAmountIn, didPartial) =
+                Inventory.quoteQuoteIn(amountIn, mid, feeBps, baseReservesLocal, floorBps, invTokens);
         }
+
+        if (appliedAmountIn > amountIn) {
+            appliedAmountIn = amountIn;
+        }
+        reason = didPartial ? REASON_FLOOR : REASON_NONE;
     }
 
-    function _computeInventoryDeviationBps(uint256 mid) internal view returns (uint256) {
-        Inventory.Tokens memory invTokens =
-            Inventory.Tokens({baseScale: tokenConfig.baseScale, quoteScale: tokenConfig.quoteScale});
-        return Inventory.deviationBps(
-            uint256(reserves.baseReserves),
-            uint256(reserves.quoteReserves),
-            inventoryConfig.targetBaseXstar,
-            mid,
-            invTokens
-        );
+    function _inventoryTokens() internal view returns (Inventory.Tokens memory invTokens) {
+        invTokens.baseScale = tokenConfig.baseScale;
+        invTokens.quoteScale = tokenConfig.quoteScale;
     }
 
     function _readOracle(OracleMode mode, bytes calldata oracleData) internal returns (OracleOutcome memory outcome) {
@@ -487,13 +515,13 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         IOracleAdapterHC.MidResult memory midRes;
         IOracleAdapterHC.BidAskResult memory baRes;
 
-        try oracleHC.readMidAndAge() returns (IOracleAdapterHC.MidResult memory res) {
+        try ORACLE_HC_.readMidAndAge() returns (IOracleAdapterHC.MidResult memory res) {
             midRes = res;
         } catch {
             midRes = IOracleAdapterHC.MidResult({mid: 0, ageSec: type(uint256).max, success: false});
         }
 
-        try oracleHC.readBidAsk() returns (IOracleAdapterHC.BidAskResult memory res) {
+        try ORACLE_HC_.readBidAsk() returns (IOracleAdapterHC.BidAskResult memory res) {
             baRes = res;
         } catch {
             baRes = IOracleAdapterHC.BidAskResult({bid: 0, ask: 0, spreadBps: 0, success: false});
@@ -507,10 +535,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 pythConf;
         bool pythFresh;
 
-        if (address(oraclePyth) != address(0)) {
-            try oraclePyth.readPythUsdMid(oracleData) returns (IOracleAdapterPyth.PythResult memory res) {
+        if (address(ORACLE_PYTH_) != address(0)) {
+            try ORACLE_PYTH_.readPythUsdMid(oracleData) returns (IOracleAdapterPyth.PythResult memory res) {
                 if (res.success) {
-                    (pythMid, pythAge, pythConf) = oraclePyth.computePairMid(res);
+                    (pythMid, pythAge, pythConf) = ORACLE_PYTH_.computePairMid(res);
                     pythFresh = pythMid > 0 && pythAge <= cfg.maxAgeSec;
                 }
             } catch {
@@ -525,7 +553,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         IOracleAdapterHC.MidResult memory emaRes;
         bool emaFresh;
         if (cfg.allowEmaFallback) {
-            try oracleHC.readMidEmaFallback() returns (IOracleAdapterHC.MidResult memory res) {
+            try ORACLE_HC_.readMidEmaFallback() returns (IOracleAdapterHC.MidResult memory res) {
                 emaRes = res;
             } catch {
                 emaRes = IOracleAdapterHC.MidResult({mid: 0, ageSec: type(uint256).max, success: false});

@@ -1,0 +1,19 @@
+{
+  "generated_at": "2025-09-23T02:52:19.705012+00:00",
+  "contracts": {
+    "count": 20
+  },
+  "tests": {
+    "count": 34,
+    "unit": 10,
+    "integration": 14,
+    "perf": 3,
+    "invariant": 3
+  },
+  "docs": {
+    "count": 13
+  },
+  "metrics": {
+    "csv_count": 20
+  }
+}

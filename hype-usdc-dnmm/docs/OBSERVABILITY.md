@@ -21,7 +21,8 @@
 - `Paused(pauser)` / `Unpaused(pauser)` – Lifecycle controls.
 - `ConfidenceDebug(confSpreadBps, confSigmaBps, confPythBps, confBps, sigmaBps, feeBaseBps, feeVolBps, feeInvBps, feeTotalBps)` – Optional diagnostic log gated by `DEBUG_EMIT`; surfaces confidence blend and fee decomposition per quote/swap.
 - `OracleSnapshot(label, mid, ageSec, spreadBps, pythMid, deltaBps, hcSuccess, bookSuccess, pythSuccess)` – Emitted by the on-chain observer canary; mirrors pool oracle reads for block-synchronous parity dashboards.
-- *(Planned)* `OracleAlert(source, kind, value, threshold, critical)` – Raised by the forthcoming `OracleWatcher` contract when age/Δ/fallback usage cross configured limits; operators should subscribe via the off-chain daemon and page on `critical=true`.
+- `OracleAlert(source, kind, value, threshold, critical)` – Emitted by `OracleWatcher` when observed age, divergence, or fallback usage violates configured thresholds. `kind` enumerates `Age`, `Divergence`, `Fallback`.
+- `AutoPauseRequested(source, handlerCalled, handlerData)` – Fired by `OracleWatcher` whenever auto-pause is enabled and a critical alert is detected. The optional pause handler hook is invoked first; `handlerCalled` captures the call outcome, while `handlerData` surfaces revert payloads for debugging.
 
 ## Dashboards
 - **Liquidity Health** – Track inventory deviation, floor breaches, partial percentages.
@@ -42,5 +43,6 @@
 - Emit structured logs in keeper services including oracle payload metadata for replay.
 - Archive observer events alongside pool swaps to validate block-level parity (HC→EMA→PYTH) and drive automatic alerts when deltas exceed ε.
 - After invariant or parity refresh jobs, consume `reports/metrics/freshness_report.json` to ensure CSV exports are ≤ 30 minutes old and meet minimum row counts before promoting artefacts to dashboards.
+- Wire the daemon in `scripts/watch_oracles.ts` (see RUNBOOK) to ingest `OracleAlert`/`AutoPauseRequested` events, expose Prometheus metrics, and escalate on `critical=true`.
 
 See also `docs/CONFIG.md` for parameter traceability and `docs/rfq_spec.md` for RFQ-specific telemetry.

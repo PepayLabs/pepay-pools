@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-09-23T02:52:08.681191+00:00",
+  "generated_at": "2025-09-23T03:22:22.783255+00:00",
   "gates": {
     "build": {
       "command": "forge build -q",
@@ -19,8 +19,8 @@
     },
     "parity_refresh": {
       "command": "FOUNDRY_PROFILE=ci FOUNDRY_INVARIANT_RUNS=200 script/run_invariants.sh test/invariants/Invariant_NoRunDry.t.sol",
-      "status": "not_run",
-      "reason": "pending rerun after latest optimizations"
+      "status": "pass",
+      "report": "reports/invariants_run.json"
     },
     "metrics_freshness": {
       "status": "pass",

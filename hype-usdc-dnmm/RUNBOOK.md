@@ -36,8 +36,8 @@
 - Connect indexer to `SwapExecuted`, `QuoteServed`, `ParamsUpdated`, `Paused`, `Unpaused`.
 - Publish Grafana dashboard using metrics defined in `docs/OBSERVABILITY.md`.
 - Persist test artifacts from `metrics/` (CSV/JSON) and `gas-snapshots.txt` into the monitoring pipeline for historical comparisons.
-- Wire the parity freshness check after any long invariant run: execute `script/run_invariants.sh` (or `scripts/check_parity_metrics.sh`) and verify `reports/metrics/freshness_report.json` reports `status=pass` for all parity CSVs.
-- (Planned) Deploy the lightweight `OracleWatcher` once merged; subscribe the ops daemon to `OracleAlert` events and page when `critical=true`.
+- Wire the parity freshness check after any long invariant run: execute `script/run_invariants.sh` (or `script/check_invariants_and_parity.sh`) and verify `reports/metrics/freshness_report.json` reports `status=pass` for all parity CSVs.
+- Deploy `OracleWatcher` alongside the pool, configure thresholds, and run `scripts/watch_oracles.ts` to stream `OracleAlert` / `AutoPauseRequested`. Route `critical=true` alerts to on-call and wire the optional pause handler contract if using auto-pause.
 
 ## 7. Incident Response
 - Use `pause()` to halt swaps on oracle divergence or vault issues.

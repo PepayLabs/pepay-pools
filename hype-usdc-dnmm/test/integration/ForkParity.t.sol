@@ -307,28 +307,6 @@ contract ForkParityTest is BaseTest {
         divergenceRows[2] = _formatCountRow("divergence_reject_rate_bps", divergenceRateBps);
         EventRecorder.writeCSV(vm, "metrics/divergence_rate.csv", "metric,value", divergenceRows);
 
-        string[] memory divergenceHistogram = new string[](divergenceDeltasBps.length);
-        for (uint256 i = 0; i < divergenceDeltasBps.length; ++i) {
-            uint256 attemptsBin = divergenceAttemptsByDelta[i];
-            uint256 rejectsBin = divergenceRejectionsByDelta[i];
-            uint256 rateBps = attemptsBin == 0 ? 0 : (rejectsBin * 10_000) / attemptsBin;
-            divergenceHistogram[i] = string.concat(
-                EventRecorder.uintToString(divergenceDeltasBps[i]),
-                ",",
-                EventRecorder.uintToString(attemptsBin),
-                ",",
-                EventRecorder.uintToString(rejectsBin),
-                ",",
-                EventRecorder.uintToString(rateBps)
-            );
-        }
-        EventRecorder.writeCSV(
-            vm,
-            "metrics/divergence_histogram.csv",
-            "delta_bps,attempts,rejections,reject_rate_bps",
-            divergenceHistogram
-        );
-
         require(
             divergenceRejections == expectedDivergenceRejections,
             "divergence rejection count"

@@ -42,3 +42,4 @@
 - 2025-09-22: Extended invariant runner for multi-suite sharding, added parity metric gating/report scripts, enforced gas budgets, and instrumented Telemetry/Event docs (TokenFeeUnsupported, EMA/Pyth sequencing).
 - 2025-09-23: Added remainder-aware shard planning, enhanced invariant reporting (parallel ETA, per-suite revert rates), enforced parity refresh + revert-rate gating, and expanded divergence tests with histogram exports.
 - 2025-09-23: Normalized immutable naming with ABI-stable getters, cached swap/quote hot-path tokens for gas savings, refreshed gas reports, and documented parity freshness + planned oracle watcher workflow.
+- 2025-09-23: Introduced `OracleWatcher` (on-chain alerts + auto-pause handshake), TypeScript daemon scaffolding, parity/invariant gate script, and integration coverage for stale/divergence/fallback scenarios.

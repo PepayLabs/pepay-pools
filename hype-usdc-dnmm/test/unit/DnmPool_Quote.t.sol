@@ -40,6 +40,16 @@ contract DnmPoolQuoteTest is BaseTest {
         assertTrue(res.usedFallback, "ema fallback used");
     }
 
+    function test_quote_reverts_when_quote_reserves_zero() public {
+        uint256 quoteBal = usdc.balanceOf(address(pool));
+        vm.prank(address(pool));
+        usdc.transfer(address(0xdead), quoteBal);
+        pool.sync();
+
+        vm.expectRevert(Errors.FloorBreach.selector);
+        quote(1 ether, true, IDnmPool.OracleMode.Spot);
+    }
+
     function test_quote_rejects_when_gates_fail() public {
         updateSpot(1e18, 1_000, true); // stale vs maxAge 60
         updateEma(0, 0, false);
@@ -47,7 +57,7 @@ contract DnmPoolQuoteTest is BaseTest {
         py.success = false;
         oraclePyth.setResult(py);
 
-        vm.expectRevert(bytes(Errors.ORACLE_STALE));
+        vm.expectRevert(Errors.OracleStale.selector);
         quote(100 ether, true, IDnmPool.OracleMode.Spot);
     }
 

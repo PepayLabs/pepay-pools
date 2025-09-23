@@ -105,6 +105,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
     IOracleAdapterHC internal immutable ORACLE_HC_;
     IOracleAdapterPyth internal immutable ORACLE_PYTH_;
+    address internal immutable BASE_TOKEN_;
+    address internal immutable QUOTE_TOKEN_;
+    uint256 internal immutable BASE_SCALE_;
+    uint256 internal immutable QUOTE_SCALE_;
 
     FeePolicy.FeeState private feeState;
     bool public paused;
@@ -151,17 +155,17 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     );
 
     modifier onlyGovernance() {
-        require(msg.sender == guardians.governance, Errors.NOT_GOVERNANCE);
+        if (msg.sender != guardians.governance) revert Errors.NotGovernance();
         _;
     }
 
     modifier onlyPauser() {
-        require(msg.sender == guardians.pauser || msg.sender == guardians.governance, Errors.NOT_PAUSER);
+        if (msg.sender != guardians.pauser && msg.sender != guardians.governance) revert Errors.NotPauser();
         _;
     }
 
     modifier whenNotPaused() {
-        require(!paused, Errors.PAUSED);
+        if (paused) revert Errors.PoolPaused();
         _;
     }
 
@@ -179,24 +183,30 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         FeatureFlags memory featureFlags_,
         Guardians memory guardians_
     ) {
-        require(baseToken_ != address(0) && quoteToken_ != address(0), "TOKENS_ZERO");
-        require(guardians_.governance != address(0), "GOV_ZERO");
-        require(inventoryConfig_.floorBps <= 5000, Errors.INVALID_CONFIG);
-        require(feeConfig_.capBps >= feeConfig_.baseBps, Errors.INVALID_CONFIG);
-        require(oracleConfig_.confCapBpsStrict <= oracleConfig_.confCapBpsSpot, Errors.INVALID_CONFIG);
-        require(oracleConfig_.sigmaEwmaLambdaBps <= BPS, Errors.INVALID_CONFIG);
+        if (baseToken_ == address(0) || quoteToken_ == address(0)) revert Errors.TokensZero();
+        if (guardians_.governance == address(0)) revert Errors.GovernanceZero();
+        if (inventoryConfig_.floorBps > 5000) revert Errors.InvalidConfig();
+        if (feeConfig_.capBps < feeConfig_.baseBps) revert Errors.InvalidConfig();
+        if (oracleConfig_.confCapBpsStrict > oracleConfig_.confCapBpsSpot) revert Errors.InvalidConfig();
+        if (oracleConfig_.sigmaEwmaLambdaBps > BPS) revert Errors.InvalidConfig();
 
+        uint256 baseScale = _pow10(baseDecimals_);
+        uint256 quoteScale = _pow10(quoteDecimals_);
         tokenConfig = TokenConfig({
             baseToken: baseToken_,
             quoteToken: quoteToken_,
             baseDecimals: baseDecimals_,
             quoteDecimals: quoteDecimals_,
-            baseScale: _pow10(baseDecimals_),
-            quoteScale: _pow10(quoteDecimals_)
+            baseScale: baseScale,
+            quoteScale: quoteScale
         });
 
         ORACLE_HC_ = IOracleAdapterHC(oracleHc_);
         ORACLE_PYTH_ = IOracleAdapterPyth(oraclePyth_);
+        BASE_TOKEN_ = baseToken_;
+        QUOTE_TOKEN_ = quoteToken_;
+        BASE_SCALE_ = baseScale;
+        QUOTE_SCALE_ = quoteScale;
         inventoryConfig = inventoryConfig_;
         oracleConfig = oracleConfig_;
         feeConfigPacked = FeePolicy.pack(feeConfig_);
@@ -230,7 +240,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         bytes calldata oracleData,
         uint256 deadline
     ) external nonReentrant whenNotPaused returns (uint256 amountOut) {
-        require(block.timestamp <= deadline, Errors.DEADLINE_EXPIRED);
+        if (block.timestamp > deadline) revert Errors.DeadlineExpired();
 
         QuoteResult memory result = _quoteInternal(amountIn, isBaseIn, mode, oracleData, true);
 
@@ -242,10 +252,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         amountOut = result.amountOut;
-        require(amountOut >= minAmountOut, "SLIPPAGE");
+        if (amountOut < minAmountOut) revert Errors.Slippage();
 
-        address baseToken = tokenConfig.baseToken;
-        address quoteToken = tokenConfig.quoteToken;
+        address baseToken = BASE_TOKEN_;
+        address quoteToken = QUOTE_TOKEN_;
 
         if (isBaseIn) {
             IERC20 baseTokenErc = IERC20(baseToken);
@@ -254,11 +264,11 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             uint256 received = baseTokenErc.balanceOf(address(this)) - beforeBal;
             if (received != actualAmountIn) {
                 emit TokenFeeUnsupported(msg.sender, true, actualAmountIn, received);
-                revert(Errors.TOKEN_FEE_UNSUPPORTED);
+                revert Errors.TokenFeeUnsupported();
             }
             quoteToken.safeTransfer(msg.sender, amountOut);
-            require(uint256(reserves.baseReserves) + actualAmountIn <= type(uint128).max, "BASE_OOB");
-            require(uint256(reserves.quoteReserves) >= amountOut, "INSUFFICIENT_QUOTE");
+            if (uint256(reserves.baseReserves) + actualAmountIn > type(uint128).max) revert Errors.BaseOverflow();
+            if (uint256(reserves.quoteReserves) < amountOut) revert Errors.InsufficientQuoteReserves();
             reserves.baseReserves = uint128(uint256(reserves.baseReserves) + actualAmountIn);
             reserves.quoteReserves = uint128(uint256(reserves.quoteReserves) - amountOut);
         } else {
@@ -268,11 +278,11 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             uint256 received = quoteTokenErc.balanceOf(address(this)) - beforeBal;
             if (received != actualAmountIn) {
                 emit TokenFeeUnsupported(msg.sender, false, actualAmountIn, received);
-                revert(Errors.TOKEN_FEE_UNSUPPORTED);
+                revert Errors.TokenFeeUnsupported();
             }
             baseToken.safeTransfer(msg.sender, amountOut);
-            require(uint256(reserves.quoteReserves) + actualAmountIn <= type(uint128).max, "QUOTE_OOB");
-            require(uint256(reserves.baseReserves) >= amountOut, "INSUFFICIENT_BASE");
+            if (uint256(reserves.quoteReserves) + actualAmountIn > type(uint128).max) revert Errors.QuoteOverflow();
+            if (uint256(reserves.baseReserves) < amountOut) revert Errors.InsufficientBaseReserves();
             reserves.quoteReserves = uint128(uint256(reserves.quoteReserves) + actualAmountIn);
             reserves.baseReserves = uint128(uint256(reserves.baseReserves) - amountOut);
         }
@@ -293,9 +303,11 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     {
         OracleConfig memory cfg = oracleConfig;
         IOracleAdapterHC.MidResult memory midRes = ORACLE_HC_.readMidAndAge();
-        require(midRes.success && midRes.ageSec <= cfg.maxAgeSec, Errors.ORACLE_STALE);
+        if (!(midRes.success && midRes.ageSec <= cfg.maxAgeSec)) revert Errors.OracleStale();
         IOracleAdapterHC.BidAskResult memory baRes = ORACLE_HC_.readBidAsk();
-        require(!baRes.success || (baRes.bid > 0 && baRes.ask > baRes.bid), Errors.INVALID_OB);
+        if (baRes.success && (baRes.bid == 0 || baRes.ask == 0 || baRes.ask <= baRes.bid)) {
+            revert Errors.InvalidOrderbook();
+        }
 
         FeatureFlags memory flags = featureFlags;
         uint256 confBps =
@@ -358,19 +370,19 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         if (kind == ParamKind.Oracle) {
             OracleConfig memory oldCfg = oracleConfig;
             OracleConfig memory newCfg = abi.decode(data, (OracleConfig));
-            require(newCfg.confCapBpsStrict <= newCfg.confCapBpsSpot, Errors.INVALID_CONFIG);
+            if (newCfg.confCapBpsStrict > newCfg.confCapBpsSpot) revert Errors.InvalidConfig();
             oracleConfig = newCfg;
             emit ParamsUpdated("ORACLE", abi.encode(oldCfg), data);
         } else if (kind == ParamKind.Fee) {
             FeePolicy.FeeConfig memory oldCfg = FeePolicy.unpack(feeConfigPacked);
             FeePolicy.FeeConfig memory newCfg = abi.decode(data, (FeePolicy.FeeConfig));
-            require(newCfg.capBps >= newCfg.baseBps, Errors.INVALID_CONFIG);
+            if (newCfg.capBps < newCfg.baseBps) revert Errors.InvalidConfig();
             feeConfigPacked = FeePolicy.pack(newCfg);
             emit ParamsUpdated("FEE", abi.encode(oldCfg), data);
         } else if (kind == ParamKind.Inventory) {
             InventoryConfig memory oldCfg = inventoryConfig;
             InventoryConfig memory newCfg = abi.decode(data, (InventoryConfig));
-            require(newCfg.floorBps <= 5000, Errors.INVALID_CONFIG);
+            if (newCfg.floorBps > 5000) revert Errors.InvalidConfig();
             inventoryConfig = newCfg;
             emit ParamsUpdated("INVENTORY", abi.encode(oldCfg), data);
         } else if (kind == ParamKind.Maker) {
@@ -384,17 +396,17 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             featureFlags = newFlags;
             emit ParamsUpdated("FEATURE", abi.encode(oldFlags), data);
         } else {
-            revert("PARAM_KIND");
+            revert Errors.InvalidParamKind();
         }
     }
 
     function setTargetBaseXstar(uint128 newTarget) external onlyGovernance {
-        require(lastMid > 0, "MID_UNSET");
+        if (lastMid == 0) revert Errors.MidUnset();
         uint256 deviationBps = FixedPointMath.toBps(
             FixedPointMath.absDiff(uint256(newTarget), uint256(inventoryConfig.targetBaseXstar)),
             inventoryConfig.targetBaseXstar == 0 ? 1 : inventoryConfig.targetBaseXstar
         );
-        require(deviationBps >= inventoryConfig.recenterThresholdPct, "THRESHOLD");
+        if (deviationBps < inventoryConfig.recenterThresholdPct) revert Errors.RecenterThreshold();
         uint128 oldTarget = inventoryConfig.targetBaseXstar;
         inventoryConfig.targetBaseXstar = newTarget;
         emit TargetBaseXstarUpdated(oldTarget, newTarget, lastMid, uint64(block.timestamp));
@@ -411,8 +423,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     }
 
     function sync() external {
-        uint256 baseBal = IERC20(tokenConfig.baseToken).balanceOf(address(this));
-        uint256 quoteBal = IERC20(tokenConfig.quoteToken).balanceOf(address(this));
+        uint256 baseBal = IERC20(BASE_TOKEN_).balanceOf(address(this));
+        uint256 quoteBal = IERC20(QUOTE_TOKEN_).balanceOf(address(this));
         reserves.baseReserves = uint128(baseBal);
         reserves.quoteReserves = uint128(quoteBal);
     }
@@ -426,8 +438,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         bytes calldata oracleData,
         bool shouldSettleFee
     ) internal returns (QuoteResult memory result) {
-        require(amountIn > 0, Errors.ZERO_AMOUNT);
-        require(block.timestamp >= lastMidTimestamp, Errors.INVALID_TS);
+        if (amountIn == 0) revert Errors.ZeroAmount();
+        if (block.timestamp < lastMidTimestamp) revert Errors.InvalidTimestamp();
 
         FeatureFlags memory flags = featureFlags;
         OracleConfig memory oracleCfg = oracleConfig;
@@ -508,15 +520,15 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 quoteReservesLocal,
         uint16 floorBps
     ) internal pure returns (uint256 amountOut, uint256 appliedAmountIn, bytes32 reason) {
-        require(feeBps < BPS, "FEE_CAP");
+        if (feeBps >= BPS) revert Errors.FeeCapExceeded();
 
         bool didPartial;
         if (isBaseIn) {
-            if (quoteReservesLocal == 0) revert(Errors.FLOOR_BREACH);
+            if (quoteReservesLocal == 0) revert Errors.FloorBreach();
             (amountOut, appliedAmountIn, didPartial) =
                 Inventory.quoteBaseIn(amountIn, mid, feeBps, quoteReservesLocal, floorBps, invTokens);
         } else {
-            if (baseReservesLocal == 0) revert(Errors.FLOOR_BREACH);
+            if (baseReservesLocal == 0) revert Errors.FloorBreach();
             (amountOut, appliedAmountIn, didPartial) =
                 Inventory.quoteQuoteIn(amountIn, mid, feeBps, baseReservesLocal, floorBps, invTokens);
         }
@@ -528,8 +540,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     }
 
     function _inventoryTokens() internal view returns (Inventory.Tokens memory invTokens) {
-        invTokens.baseScale = tokenConfig.baseScale;
-        invTokens.quoteScale = tokenConfig.quoteScale;
+        invTokens.baseScale = BASE_SCALE_;
+        invTokens.quoteScale = QUOTE_SCALE_;
     }
 
     function _readOracle(
@@ -557,7 +569,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         bool bookInvalid = baRes.success && (baRes.bid == 0 || baRes.ask == 0 || baRes.ask <= baRes.bid);
-        require(!bookInvalid, Errors.INVALID_OB);
+        if (bookInvalid) revert Errors.InvalidOrderbook();
 
         uint256 pythMid;
         uint256 pythAge;
@@ -616,8 +628,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         if (outcome.mid == 0) {
-            if (spreadRejected) revert(Errors.ORACLE_SPREAD);
-            revert(Errors.ORACLE_STALE);
+            if (spreadRejected) revert Errors.OracleSpread();
+            revert Errors.OracleStale();
         }
 
         (outcome.confBps, outcome.confSpreadBps, outcome.confSigmaBps, outcome.confPythBps, outcome.sigmaBps) =
@@ -635,7 +647,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
         if (!outcome.usedFallback && pythFresh && cfg.divergenceBps > 0) {
             uint256 divergenceBps = OracleUtils.computeDivergenceBps(outcome.mid, pythMid);
-            require(divergenceBps <= cfg.divergenceBps, Errors.ORACLE_DIVERGENCE);
+            if (divergenceBps > cfg.divergenceBps) revert Errors.OracleDivergence();
         }
 
         return outcome;

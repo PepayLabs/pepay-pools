@@ -7,7 +7,7 @@
 - `inventory_deviation_bps` – Available from view helpers; track target vs actual inventory.
 - `partial_fill_ratio` – Partial fill notional vs. requested (from `SwapExecuted.partial` + `partialFillAmountIn`).
 - `oracle_mode` – Spot/EMA/Pyth fallback; use `reason` field (`"EMA"`, `"PYTH"`, etc.).
-- `reject_reason` – Count occurrences of `Errors.ORACLE_*`, `Errors.FLOOR_BREACH` via revert tracking.
+- `reject_reason` – Count occurrences of `Errors.Oracle*` and `Errors.FloorBreach()` via revert tracking.
 - `fee_state_decay` – Monitor gap between `feeConfig.baseBps` and emitted `feeBps` across blocks for decay health.
 - Parity exports (`mid_event_vs_precompile_mid_bps.csv`, `canary_deltas.csv`, `divergence_rate.csv`, `divergence_histogram.csv`) – snapshot oracle parity, fallback reasons, and divergence guard hit-rates per Δ bucket.
 - Load test artefacts (`load_burst_summary.csv`, `load_fee_decay_series.csv`) – failure-rate, average fee, and recorded `fee_cap_bps` for the stress harness.
@@ -26,7 +26,7 @@
 
 ## Dashboards
 - **Liquidity Health** – Track inventory deviation, floor breaches, partial percentages.
-- **Oracle Health** – Monitor fallback usage, divergence rejects (`Errors.ORACLE_DIVERGENCE`).
+- **Oracle Health** – Monitor fallback usage, divergence rejects (`Errors.OracleDivergence()`).
 - **Canary Shadow** – Track `canary_deltas.csv` median vs ε and ensure divergence rejections line up with observer deltas.
 - **Fee Dynamics** – Graph fee_bps vs time; overlay α/β contributions derived from oracle + inventory inputs.
 - **Revenue** – Aggregate LP fees per period (amountIn × fee_bps/BPS).

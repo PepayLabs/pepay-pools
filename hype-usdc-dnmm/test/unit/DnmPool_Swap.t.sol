@@ -70,13 +70,13 @@ contract DnmPoolSwapTest is BaseTest {
 
     function test_swap_deadline_reverts() public {
         vm.prank(alice);
-        vm.expectRevert(bytes(Errors.DEADLINE_EXPIRED));
+        vm.expectRevert(Errors.DeadlineExpired.selector);
         pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp - 1);
     }
 
     function test_swap_minOut_reverts() public {
         vm.prank(alice);
-        vm.expectRevert(bytes("SLIPPAGE"));
+        vm.expectRevert(Errors.Slippage.selector);
         pool.swapExactIn(1_000 ether, 2_000_000000, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
     }
 
@@ -200,7 +200,7 @@ contract DnmPoolSwapTest is BaseTest {
         vm.prank(alice);
         vm.expectEmit(true, false, false, true);
         emit DnmPool.TokenFeeUnsupported(alice, true, 10 ether, expectedBaseReceived);
-        vm.expectRevert(bytes(Errors.TOKEN_FEE_UNSUPPORTED));
+        vm.expectRevert(Errors.TokenFeeUnsupported.selector);
         poolLocal.swapExactIn(10 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 10);
 
         uint256 feeBpsQuote = feeQuote.feeBps();
@@ -208,7 +208,7 @@ contract DnmPoolSwapTest is BaseTest {
         vm.prank(bob);
         vm.expectEmit(true, false, false, true);
         emit DnmPool.TokenFeeUnsupported(bob, false, 500_000000, expectedQuoteReceived);
-        vm.expectRevert(bytes(Errors.TOKEN_FEE_UNSUPPORTED));
+        vm.expectRevert(Errors.TokenFeeUnsupported.selector);
         poolLocal.swapExactIn(500_000000, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 10);
     }
 }

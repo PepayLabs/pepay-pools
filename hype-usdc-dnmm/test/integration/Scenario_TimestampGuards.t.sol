@@ -23,7 +23,7 @@ contract ScenarioTimestampGuardsTest is BaseTest {
 
         uint256 currentTs = block.timestamp;
         vm.warp(currentTs - 1);
-        vm.expectRevert(bytes(Errors.INVALID_TS));
+        vm.expectRevert(Errors.InvalidTimestamp.selector);
         quote(1 ether, true, IDnmPool.OracleMode.Spot);
 
         vm.warp(currentTs + 2);

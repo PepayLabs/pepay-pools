@@ -8,18 +8,34 @@ import {OracleUtils} from "../lib/OracleUtils.sol";
 contract OracleAdapterHC is IOracleAdapterHC {
     using OracleUtils for uint256;
 
-    address public immutable hyperCorePrecompile;
-    bytes32 public immutable assetIdBase;
-    bytes32 public immutable assetIdQuote;
-    bytes32 public immutable marketId;
+    address internal immutable HYPER_CORE_PRECOMPILE_;
+    bytes32 internal immutable ASSET_ID_BASE_;
+    bytes32 internal immutable ASSET_ID_QUOTE_;
+    bytes32 internal immutable MARKET_ID_;
 
     error PrecompileCallFailed();
 
     constructor(address _precompile, bytes32 _assetIdBase, bytes32 _assetIdQuote, bytes32 _marketId) {
-        hyperCorePrecompile = _precompile;
-        assetIdBase = _assetIdBase;
-        assetIdQuote = _assetIdQuote;
-        marketId = _marketId;
+        HYPER_CORE_PRECOMPILE_ = _precompile;
+        ASSET_ID_BASE_ = _assetIdBase;
+        ASSET_ID_QUOTE_ = _assetIdQuote;
+        MARKET_ID_ = _marketId;
+    }
+
+    function hyperCorePrecompile() external view returns (address) {
+        return HYPER_CORE_PRECOMPILE_;
+    }
+
+    function assetIdBase() external view returns (bytes32) {
+        return ASSET_ID_BASE_;
+    }
+
+    function assetIdQuote() external view returns (bytes32) {
+        return ASSET_ID_QUOTE_;
+    }
+
+    function marketId() external view returns (bytes32) {
+        return MARKET_ID_;
     }
 
     // Hypothetical function selectors for demonstration; replace with canonical ones when confirmed.
@@ -28,8 +44,8 @@ contract OracleAdapterHC is IOracleAdapterHC {
     bytes4 private constant SELECTOR_EMA = 0x0e349d01; // getEmaOraclePrice(bytes32)
 
     function readMidAndAge() external view override returns (MidResult memory result) {
-        bytes memory callData = abi.encodeWithSelector(SELECTOR_SPOT, assetIdBase, assetIdQuote);
-        (bool ok, bytes memory data) = hyperCorePrecompile.staticcall(callData);
+        bytes memory callData = abi.encodeWithSelector(SELECTOR_SPOT, ASSET_ID_BASE_, ASSET_ID_QUOTE_);
+        (bool ok, bytes memory data) = HYPER_CORE_PRECOMPILE_.staticcall(callData);
         if (!ok || data.length < 64) {
             return MidResult(0, type(uint256).max, false);
         }
@@ -40,8 +56,8 @@ contract OracleAdapterHC is IOracleAdapterHC {
     }
 
     function readBidAsk() external view override returns (BidAskResult memory result) {
-        bytes memory callData = abi.encodeWithSelector(SELECTOR_ORDERBOOK, marketId);
-        (bool ok, bytes memory data) = hyperCorePrecompile.staticcall(callData);
+        bytes memory callData = abi.encodeWithSelector(SELECTOR_ORDERBOOK, MARKET_ID_);
+        (bool ok, bytes memory data) = HYPER_CORE_PRECOMPILE_.staticcall(callData);
         if (!ok || data.length < 64) {
             return BidAskResult(0, 0, type(uint256).max, false);
         }
@@ -52,8 +68,8 @@ contract OracleAdapterHC is IOracleAdapterHC {
     }
 
     function readMidEmaFallback() external view override returns (MidResult memory result) {
-        bytes memory callData = abi.encodeWithSelector(SELECTOR_EMA, assetIdBase, assetIdQuote);
-        (bool ok, bytes memory data) = hyperCorePrecompile.staticcall(callData);
+        bytes memory callData = abi.encodeWithSelector(SELECTOR_EMA, ASSET_ID_BASE_, ASSET_ID_QUOTE_);
+        (bool ok, bytes memory data) = HYPER_CORE_PRECOMPILE_.staticcall(callData);
         if (!ok || data.length < 64) {
             return MidResult(0, type(uint256).max, false);
         }

@@ -1,46 +1,46 @@
 {
-  "generated_at": "2025-09-23T03:43:06.638226+00:00",
+  "generated_at": "2025-09-23T06:39:40+00:00",
   "entries": [
     {
       "operation": "quote_hc",
-      "gas_used": 115225,
+      "gas_used": 115248,
       "budget": 130000,
-      "headroom": 14775,
+      "headroom": 14752,
       "status": "pass"
     },
     {
       "operation": "quote_ema",
-      "gas_used": 110422,
+      "gas_used": 110943,
       "budget": 130000,
-      "headroom": 19578,
+      "headroom": 19057,
       "status": "pass"
     },
     {
       "operation": "quote_pyth",
-      "gas_used": 107965,
+      "gas_used": 108503,
       "budget": 130000,
-      "headroom": 22035,
+      "headroom": 21497,
       "status": "pass"
     },
     {
       "operation": "swap_base_hc",
-      "gas_used": 212512,
+      "gas_used": 210893,
       "budget": 225000,
-      "headroom": 12488,
+      "headroom": 14107,
       "status": "pass"
     },
     {
       "operation": "swap_quote_hc",
-      "gas_used": 212542,
+      "gas_used": 210923,
       "budget": 225000,
-      "headroom": 12458,
+      "headroom": 14077,
       "status": "pass"
     },
     {
       "operation": "rfq_verify_swap",
-      "gas_used": 366446,
+      "gas_used": 364797,
       "budget": 400000,
-      "headroom": 33554,
+      "headroom": 35203,
       "status": "pass"
     }
   ]

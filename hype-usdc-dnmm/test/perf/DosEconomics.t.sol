@@ -22,9 +22,9 @@ contract DosEconomicsTest is BaseTest {
         string[] memory rows = new string[](3);
         uint256 rowIdx;
 
-        rowIdx = _recordBurst(rows, rowIdx, "STALE", Errors.ORACLE_STALE, _configureStaleScenario);
-        rowIdx = _recordBurst(rows, rowIdx, "SPREAD", Errors.ORACLE_SPREAD, _configureSpreadScenario);
-        rowIdx = _recordBurst(rows, rowIdx, "DIVERGENCE", Errors.ORACLE_DIVERGENCE, _configureDivergenceScenario);
+        rowIdx = _recordBurst(rows, rowIdx, "STALE", Errors.OracleStale.selector, _configureStaleScenario);
+        rowIdx = _recordBurst(rows, rowIdx, "SPREAD", Errors.OracleSpread.selector, _configureSpreadScenario);
+        rowIdx = _recordBurst(rows, rowIdx, "DIVERGENCE", Errors.OracleDivergence.selector, _configureDivergenceScenario);
 
         EventRecorder.writeCSV(
             vm,
@@ -42,7 +42,7 @@ contract DosEconomicsTest is BaseTest {
         string[] memory rows,
         uint256 startIdx,
         string memory label,
-        string memory expectedReason,
+        bytes4 expectedSelector,
         function() internal configure
     ) internal returns (uint256 nextIdx) {
         configure();
@@ -64,8 +64,8 @@ contract DosEconomicsTest is BaseTest {
             uint256 gasUsed = gasBefore - gasleft();
             require(!ok, "expected failure");
             require(gasUsed <= MAX_FAILURE_GAS, "failure gas too high");
-            string memory reason = _decodeRevert(data);
-            require(keccak256(bytes(reason)) == keccak256(bytes(expectedReason)), "unexpected revert reason");
+            bytes4 selector = _decodeRevertSelector(data);
+            require(selector == expectedSelector, "unexpected revert selector");
             totalGas += gasUsed;
             if (gasUsed > maxGas) {
                 maxGas = gasUsed;
@@ -105,22 +105,12 @@ contract DosEconomicsTest is BaseTest {
         updatePyth(1_120_000_000_000_000_000, 1e18, 1, 1, 30, 30);
     }
 
-    function _decodeRevert(bytes memory revertData) internal pure returns (string memory) {
-        if (revertData.length < 4) return "";
+    function _decodeRevertSelector(bytes memory revertData) internal pure returns (bytes4) {
+        if (revertData.length < 4) return bytes4(0);
         bytes4 selector;
         assembly {
             selector := mload(add(revertData, 32))
         }
-        if (selector != 0x08c379a0) {
-            return "";
-        }
-        if (revertData.length <= 4) {
-            return "";
-        }
-        bytes memory slice = new bytes(revertData.length - 4);
-        for (uint256 i = 4; i < revertData.length; ++i) {
-            slice[i - 4] = revertData[i];
-        }
-        return abi.decode(slice, (string));
+        return selector;
     }
 }

@@ -56,7 +56,7 @@ contract ScenarioCanaryShadowTest is BaseTest {
             if (expectRevert) {
                 rejectionCount += 1;
                 vm.prank(alice);
-                vm.expectRevert(bytes(Errors.ORACLE_DIVERGENCE));
+                vm.expectRevert(Errors.OracleDivergence.selector);
                 pool.swapExactIn(amountIn, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 10);
             } else {
                 swap(alice, amountIn, 0, true, IDnmPool.OracleMode.Spot, block.timestamp + 10);

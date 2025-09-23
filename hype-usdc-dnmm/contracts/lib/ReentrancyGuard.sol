@@ -7,12 +7,14 @@ abstract contract ReentrancyGuard {
 
     uint256 private _status;
 
+    error ReentrancyGuardEntered();
+
     constructor() {
         _status = _NOT_ENTERED;
     }
 
     modifier nonReentrant() {
-        require(_status != _ENTERED, "REENTRANCY");
+        if (_status == _ENTERED) revert ReentrancyGuardEntered();
         _status = _ENTERED;
         _;
         _status = _NOT_ENTERED;

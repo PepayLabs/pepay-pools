@@ -47,7 +47,7 @@ contract OracleWatcher {
     event AutoPauseToggled(bool enabled);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
-    DnmPool public immutable pool;
+    DnmPool internal immutable POOL_;
 
     address public owner;
     Config public config;
@@ -55,7 +55,7 @@ contract OracleWatcher {
     bool public autoPauseEnabled;
 
     constructor(DnmPool pool_, Config memory config_, address pauseHandler_, bool autoPauseEnabled_) {
-        pool = pool_;
+        POOL_ = pool_;
         owner = msg.sender;
         pauseHandler = pauseHandler_;
         autoPauseEnabled = autoPauseEnabled_;
@@ -69,11 +69,11 @@ contract OracleWatcher {
     function check(bytes32 label, bytes calldata oracleData) external payable returns (CheckResult memory result) {
         DnmPool.OracleConfig memory poolCfg = _pullOracleConfig();
 
-        IOracleAdapterHC oracleHc = pool.oracleHC();
+        IOracleAdapterHC oracleHc = POOL_.oracleHC();
         IOracleAdapterHC.MidResult memory midRes = oracleHc.readMidAndAge();
         IOracleAdapterHC.BidAskResult memory bookRes = oracleHc.readBidAsk();
 
-        IOracleAdapterPyth oraclePyth = pool.oraclePyth();
+        IOracleAdapterPyth oraclePyth = POOL_.oraclePyth();
         IOracleAdapterPyth.PythResult memory pythRes;
         bool pythSuccess;
         try oraclePyth.readPythUsdMid{value: msg.value}(oracleData) returns (IOracleAdapterPyth.PythResult memory res) {
@@ -176,7 +176,7 @@ contract OracleWatcher {
             uint16 confWeightSigmaBps,
             uint16 confWeightPythBps,
             uint16 sigmaEwmaLambdaBps
-        ) = pool.oracleConfig();
+        ) = POOL_.oracleConfig();
         cfg = DnmPool.OracleConfig({
             maxAgeSec: maxAgeSec,
             stallWindowSec: stallWindowSec,
@@ -189,6 +189,10 @@ contract OracleWatcher {
             confWeightPythBps: confWeightPythBps,
             sigmaEwmaLambdaBps: sigmaEwmaLambdaBps
         });
+    }
+
+    function pool() public view returns (DnmPool) {
+        return POOL_;
     }
 
     function _emitAndHandle(

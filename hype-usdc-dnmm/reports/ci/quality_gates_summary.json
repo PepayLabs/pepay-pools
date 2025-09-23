@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-09-23T03:22:22.783255+00:00",
+  "generated_at": "2025-09-23T06:53:58+00:00",
   "gates": {
     "build": {
       "command": "forge build -q",
@@ -27,8 +27,8 @@
       "report": "reports/metrics/freshness_report.json"
     },
     "slither": {
-      "status": "not_run",
-      "reason": "slither binary missing",
+      "status": "fail",
+      "reason": "57 findings detected; review reports/security/slither_findings.json",
       "report": "reports/security/slither_findings.json"
     }
   }

@@ -46,6 +46,7 @@
 
 ## 8. Performance & Metric Validation
 - Execute `forge test --match-path test/perf` to capture gas profiles (`metrics/gas_snapshots.csv`, `gas-snapshots.txt`) and burst reliability metrics (`metrics/load_burst_summary.csv`).
+- Run `script/run_slither_ci.sh` to emit `reports/security/slither_findings.json`; review and clear any Medium/High severity issues before promotion.
 - Ensure tuple/decimal sweep outputs (`metrics/tuple_decimal_sweep.csv`) and fee dynamics series (`metrics/fee_B*.csv`) are reviewed before deployment to detect scaling regressions.
 - After each perf sweep update `reports/gas/gas_report.json` and compare against budgets (quote ≤ 90k, swap ≤ 200k, rfq ≤ 400k) before committing.
 - Run invariant suites with `script/run_invariants.sh` (defaults to an adaptive 20k run with sampling + idle guards) after cleaning `cache/invariant`; fall back to `FOUNDRY_INVARIANT_RUNS=2000 forge test --profile ci --match-path test/invariants` for quick smoke checks.

@@ -59,7 +59,7 @@ library Inventory {
             return (amountOut, amountIn, false);
         }
 
-        require(availableQuote > 0, Errors.FLOOR_BREACH);
+        if (availableQuote == 0) revert Errors.FloorBreach();
         amountOut = availableQuote;
         isPartial = true;
 
@@ -90,7 +90,7 @@ library Inventory {
             return (amountOut, amountIn, false);
         }
 
-        require(availableBase > 0, Errors.FLOOR_BREACH);
+        if (availableBase == 0) revert Errors.FloorBreach();
         amountOut = availableBase;
         isPartial = true;
 

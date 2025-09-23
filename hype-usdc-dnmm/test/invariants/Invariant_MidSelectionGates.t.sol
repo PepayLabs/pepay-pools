@@ -24,9 +24,15 @@ contract InvariantMidSelectionGates is StdInvariant, BaseTest {
         (DnmPool.OracleConfig memory cfg, DnmPool.QuoteResult memory result, bool lastErrored, bytes memory err) =
             handler.snapshot();
         if (lastErrored) {
-            bytes memory stale = abi.encodeWithSignature("Error(string)", Errors.ORACLE_STALE);
-            bytes memory div = abi.encodeWithSignature("Error(string)", Errors.ORACLE_DIVERGENCE);
-            assertTrue(keccak256(err) == keccak256(stale) || keccak256(err) == keccak256(div), "unexpected error");
+            if (err.length < 4) revert("missing selector");
+            bytes4 selector;
+            assembly {
+                selector := mload(add(err, 32))
+            }
+            assertTrue(
+                selector == Errors.OracleStale.selector || selector == Errors.OracleDivergence.selector,
+                "unexpected error"
+            );
         } else {
             if (result.usedFallback) {
                 bool ema = result.reason == bytes32("EMA");

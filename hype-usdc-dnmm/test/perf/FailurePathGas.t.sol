@@ -67,7 +67,7 @@ contract FailurePathGasTest is BaseTest {
         );
         (uint256 used, bool success, bytes memory ret) = _call(address(pool), callData);
         require(!success, "floor breach should revert");
-        require(_revertMatches(ret, Errors.FLOOR_BREACH), "floor breach reason");
+        require(_revertMatches(ret, Errors.FloorBreach.selector), "floor breach reason");
         return used;
     }
 
@@ -103,7 +103,7 @@ contract FailurePathGasTest is BaseTest {
         );
         (uint256 used, bool success, bytes memory ret) = _call(address(pool), callData);
         require(!success, "stale oracle should revert");
-        require(_revertMatches(ret, Errors.ORACLE_STALE), "stale oracle reason");
+        require(_revertMatches(ret, Errors.OracleStale.selector), "stale oracle reason");
         return used;
     }
 
@@ -130,7 +130,7 @@ contract FailurePathGasTest is BaseTest {
         );
         (uint256 used, bool success, bytes memory ret) = _call(address(pool), callData);
         require(!success, "divergence should revert");
-        require(_revertMatches(ret, Errors.ORACLE_DIVERGENCE), "divergence reason");
+        require(_revertMatches(ret, Errors.OracleDivergence.selector), "divergence reason");
         return used;
     }
 
@@ -163,21 +163,13 @@ contract FailurePathGasTest is BaseTest {
         gasUsed = gasBefore - gasAfter;
     }
 
-    function _revertMatches(bytes memory ret, string memory expected) internal pure returns (bool) {
+    function _revertMatches(bytes memory ret, bytes4 expectedSelector) internal pure returns (bool) {
         if (ret.length < 4) return false;
         bytes4 selector;
         assembly {
             selector := mload(add(ret, 0x20))
         }
-        if (selector != 0x08c379a0) {
-            return false;
-        }
-        bytes memory reasonData = new bytes(ret.length - 4);
-        for (uint256 i = 0; i < reasonData.length; ++i) {
-            reasonData[i] = ret[i + 4];
-        }
-        string memory reason = abi.decode(reasonData, (string));
-        return keccak256(bytes(reason)) == keccak256(bytes(expected));
+        return selector == expectedSelector;
     }
 
     function _formatRow(string memory label, uint256 gasUsed, uint256 cap) internal pure returns (string memory) {

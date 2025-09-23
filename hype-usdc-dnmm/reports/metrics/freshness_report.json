@@ -1,23 +1,23 @@
 {
-  "generated_at": "2025-09-23T03:46:18.722322+00:00",
+  "generated_at": "2025-09-23T07:09:06+00:00",
   "entries": [
     {
       "path": "metrics/mid_event_vs_precompile_mid_bps.csv",
-      "age_minutes": 0.40384445,
+      "age_minutes": 0.5,
       "row_count": 5,
       "min_rows_required": 2,
       "status": "pass"
     },
     {
       "path": "metrics/canary_deltas.csv",
-      "age_minutes": 0.40466243333333335,
+      "age_minutes": 0.5,
       "row_count": 4,
       "min_rows_required": 2,
       "status": "pass"
     },
     {
       "path": "metrics/divergence_histogram.csv",
-      "age_minutes": 0.40493510000000005,
+      "age_minutes": 0.5,
       "row_count": 7,
       "min_rows_required": 4,
       "status": "pass"

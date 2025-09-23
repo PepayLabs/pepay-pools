@@ -1,3 +1,4 @@
-- contracts/lib/FeePolicy.sol: consolidate `FeeConfig` fields (base/cap/decay/alpha/beta) into a packed `uint256` and unpack into stack locals in `preview/settle` to reduce SLOADs on hot paths.
-- contracts/DnmPool.sol: reuse cached fee/inventory configs across `_readOracle` and `_quoteInternal` to avoid re-decoding when multiple swaps occur within the same transaction batch (consider short-lived memory cache if profiler shows benefit).
+- ✅ contracts/lib/FeePolicy.sol: `FeeConfig` now packs to a single word with a cached decay multiplier; hot paths decode once per call.
+- ✅ contracts/DnmPool.sol: fee/inventory configs reuse packed storage and immutable token metadata to trim SLOADs.
+- contracts/lib/Inventory.sol: investigate precomputing floor reserves for common sizes or caching deviation inputs when quote + swap occur in the same block to shave a few hundred gas more from stretch targets.
 - script/run_invariants.sh: parallel shards currently echo full forge logs; piping through `--gas-report` during smoke runs can surface regressions early without re-running the full perf suite.

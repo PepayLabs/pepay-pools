@@ -16,7 +16,7 @@ contract DnmPoolGovernanceTest is BaseTest {
 
     function test_onlyGovernance_updates() public {
         vm.prank(alice);
-        vm.expectRevert(bytes(Errors.NOT_GOVERNANCE));
+        vm.expectRevert(Errors.NotGovernance.selector);
         pool.updateParams(DnmPool.ParamKind.Fee, abi.encode(defaultFeeConfig()));
     }
 
@@ -25,7 +25,7 @@ contract DnmPoolGovernanceTest is BaseTest {
         pool.pause();
 
         vm.prank(alice);
-        vm.expectRevert(bytes(Errors.PAUSED));
+        vm.expectRevert(Errors.PoolPaused.selector);
         pool.swapExactIn(100 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
 
         vm.prank(gov);
@@ -51,7 +51,7 @@ contract DnmPoolGovernanceTest is BaseTest {
         vm.prank(gov);
         pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(strictCfg));
 
-        vm.expectRevert(bytes(Errors.ORACLE_SPREAD));
+        vm.expectRevert(Errors.OracleSpread.selector);
         quote(1_000 ether, true, IDnmPool.OracleMode.Spot);
 
         DnmPool.OracleConfig memory relaxed = strictCfg;
@@ -71,14 +71,14 @@ contract DnmPoolGovernanceTest is BaseTest {
         (uint128 targetBase,, uint16 thresholdBps) = pool.inventoryConfig();
 
         vm.prank(alice);
-        vm.expectRevert(bytes(Errors.NOT_GOVERNANCE));
+        vm.expectRevert(Errors.NotGovernance.selector);
         pool.setTargetBaseXstar(targetBase - 1 ether);
 
         uint128 thresholdDelta = uint128((uint256(targetBase) * thresholdBps) / 10_000);
         uint128 nearTarget = targetBase - (thresholdDelta > 0 ? thresholdDelta - 1 : 0);
 
         vm.prank(gov);
-        vm.expectRevert("THRESHOLD");
+        vm.expectRevert(Errors.RecenterThreshold.selector);
         pool.setTargetBaseXstar(nearTarget);
 
         uint128 farDelta = uint128((uint256(targetBase) * (thresholdBps + 100)) / 10_000);
@@ -93,7 +93,7 @@ contract DnmPoolGovernanceTest is BaseTest {
         cfg.confCapBpsStrict = cfg.confCapBpsSpot + 1;
 
         vm.prank(gov);
-        vm.expectRevert(bytes(Errors.INVALID_CONFIG));
+        vm.expectRevert(Errors.InvalidConfig.selector);
         pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(cfg));
     }
 
@@ -102,7 +102,7 @@ contract DnmPoolGovernanceTest is BaseTest {
         cfg.floorBps = 6000;
 
         vm.prank(gov);
-        vm.expectRevert(bytes(Errors.INVALID_CONFIG));
+        vm.expectRevert(Errors.InvalidConfig.selector);
         pool.updateParams(DnmPool.ParamKind.Inventory, abi.encode(cfg));
     }
 
@@ -111,7 +111,7 @@ contract DnmPoolGovernanceTest is BaseTest {
         cfg.capBps = cfg.baseBps - 1;
 
         vm.prank(gov);
-        vm.expectRevert(bytes(Errors.INVALID_CONFIG));
+        vm.expectRevert(Errors.InvalidConfig.selector);
         pool.updateParams(DnmPool.ParamKind.Fee, abi.encode(cfg));
     }
 

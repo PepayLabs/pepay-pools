@@ -153,7 +153,7 @@ contract ForkParityTest is BaseTest {
         unchecked {
             ++staleAttempts;
         }
-        vm.expectRevert(bytes(Errors.ORACLE_STALE));
+        vm.expectRevert(Errors.OracleStale.selector);
         quote(10 ether, true, IDnmPool.OracleMode.Spot);
         unchecked {
             ++staleRejections;
@@ -166,7 +166,7 @@ contract ForkParityTest is BaseTest {
         updateSpot(1_005e18, 3, true);
         updateBidAsk(995e15, 1_005e15, 15, true);
         oracleHC.setResponseMode(MockOracleHC.ReadKind.Book, MockOracleHC.ResponseMode.Garbage);
-        vm.expectRevert(bytes(Errors.INVALID_OB));
+        vm.expectRevert(Errors.InvalidOrderbook.selector);
         quote(5 ether, true, IDnmPool.OracleMode.Spot);
         oracleHC.clearResponseModes();
 
@@ -272,7 +272,7 @@ contract ForkParityTest is BaseTest {
 
             bool expectsRevert = deltaBps > divergenceCap;
             if (expectsRevert) {
-                vm.expectRevert(bytes(Errors.ORACLE_DIVERGENCE));
+                vm.expectRevert(Errors.OracleDivergence.selector);
                 quote(15 ether, true, IDnmPool.OracleMode.Spot);
                 unchecked {
                     ++divergenceRejections;

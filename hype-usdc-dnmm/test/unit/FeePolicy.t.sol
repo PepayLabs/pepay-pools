@@ -59,4 +59,29 @@ contract FeePolicyTest is Test {
         assertEq(state.lastFeeBps, fee, "state updated");
         assertEq(state.lastBlock, uint64(block.number), "block updated");
     }
+
+    function test_pack_unpack_round_trip() public {
+        uint256 packed = FeePolicy.pack(cfg);
+        FeePolicy.FeeConfig memory unpacked = FeePolicy.unpack(packed);
+
+        assertEq(unpacked.baseBps, cfg.baseBps, "base");
+        assertEq(unpacked.alphaConfNumerator, cfg.alphaConfNumerator, "alpha num");
+        assertEq(unpacked.alphaConfDenominator, cfg.alphaConfDenominator, "alpha den");
+        assertEq(unpacked.betaInvDevNumerator, cfg.betaInvDevNumerator, "beta num");
+        assertEq(unpacked.betaInvDevDenominator, cfg.betaInvDevDenominator, "beta den");
+        assertEq(unpacked.capBps, cfg.capBps, "cap");
+        assertEq(unpacked.decayPctPerBlock, cfg.decayPctPerBlock, "decay");
+    }
+
+    function test_preview_packed_matches_struct() public {
+        uint256 packed = FeePolicy.pack(cfg);
+        (uint16 feePacked, FeePolicy.FeeState memory packedState) =
+            FeePolicy.previewPacked(state, packed, 45, 123, block.number + 1);
+        (uint16 feeStruct, FeePolicy.FeeState memory structState) =
+            FeePolicy.preview(state, cfg, 45, 123, block.number + 1);
+
+        assertEq(feePacked, feeStruct, "fee match");
+        assertEq(packedState.lastFeeBps, structState.lastFeeBps, "state fee");
+        assertEq(packedState.lastBlock, structState.lastBlock, "state block");
+    }
 }

@@ -1,4 +1,4 @@
 case,gas_used,cap
-floor_breach,143251,150000
-oracle_stale,35135,120000
-divergence_reject,77638,120000
+floor_breach,145315,150000
+oracle_stale,36380,120000
+divergence_reject,78741,120000

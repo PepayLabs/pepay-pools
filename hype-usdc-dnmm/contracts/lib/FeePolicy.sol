@@ -8,6 +8,16 @@ library FeePolicy {
 
     uint256 private constant HUNDRED = 100;
     uint256 private constant DECAY_SCALE = 1e9;
+    uint256 private constant MASK_16 = 0xFFFF;
+    uint256 private constant MASK_32 = 0xFFFFFFFF;
+
+    uint256 private constant OFFSET_ALPHA_CONF_NUM = 16;
+    uint256 private constant OFFSET_ALPHA_CONF_DEN = 32;
+    uint256 private constant OFFSET_BETA_INV_NUM = 48;
+    uint256 private constant OFFSET_BETA_INV_DEN = 64;
+    uint256 private constant OFFSET_CAP_BPS = 80;
+    uint256 private constant OFFSET_DECAY_PCT = 96;
+    uint256 private constant OFFSET_DECAY_FACTOR = 112;
 
     struct FeeConfig {
         uint16 baseBps;
@@ -22,6 +32,63 @@ library FeePolicy {
     struct FeeState {
         uint64 lastBlock;
         uint16 lastFeeBps;
+    }
+
+    function pack(FeeConfig memory cfg) internal pure returns (uint256 packed) {
+        packed = uint256(cfg.baseBps);
+        packed |= uint256(cfg.alphaConfNumerator) << OFFSET_ALPHA_CONF_NUM;
+        packed |= uint256(cfg.alphaConfDenominator) << OFFSET_ALPHA_CONF_DEN;
+        packed |= uint256(cfg.betaInvDevNumerator) << OFFSET_BETA_INV_NUM;
+        packed |= uint256(cfg.betaInvDevDenominator) << OFFSET_BETA_INV_DEN;
+        packed |= uint256(cfg.capBps) << OFFSET_CAP_BPS;
+        packed |= uint256(cfg.decayPctPerBlock) << OFFSET_DECAY_PCT;
+
+        uint256 decayFactor = (DECAY_SCALE * (HUNDRED - cfg.decayPctPerBlock)) / HUNDRED;
+        packed |= decayFactor << OFFSET_DECAY_FACTOR;
+    }
+
+    function unpack(uint256 packed) internal pure returns (FeeConfig memory cfg) {
+        (
+            uint16 baseBps,
+            uint16 alphaConfNumerator,
+            uint16 alphaConfDenominator,
+            uint16 betaInvDevNumerator,
+            uint16 betaInvDevDenominator,
+            uint16 capBps,
+            uint16 decayPctPerBlock
+        ) = decode(packed);
+
+        cfg = FeeConfig({
+            baseBps: baseBps,
+            alphaConfNumerator: alphaConfNumerator,
+            alphaConfDenominator: alphaConfDenominator,
+            betaInvDevNumerator: betaInvDevNumerator,
+            betaInvDevDenominator: betaInvDevDenominator,
+            capBps: capBps,
+            decayPctPerBlock: decayPctPerBlock
+        });
+    }
+
+    function decode(uint256 packed)
+        internal
+        pure
+        returns (
+            uint16 baseBps,
+            uint16 alphaConfNumerator,
+            uint16 alphaConfDenominator,
+            uint16 betaInvDevNumerator,
+            uint16 betaInvDevDenominator,
+            uint16 capBps,
+            uint16 decayPctPerBlock
+        )
+    {
+        baseBps = uint16(packed & MASK_16);
+        alphaConfNumerator = uint16((packed >> OFFSET_ALPHA_CONF_NUM) & MASK_16);
+        alphaConfDenominator = uint16((packed >> OFFSET_ALPHA_CONF_DEN) & MASK_16);
+        betaInvDevNumerator = uint16((packed >> OFFSET_BETA_INV_NUM) & MASK_16);
+        betaInvDevDenominator = uint16((packed >> OFFSET_BETA_INV_DEN) & MASK_16);
+        capBps = uint16((packed >> OFFSET_CAP_BPS) & MASK_16);
+        decayPctPerBlock = uint16((packed >> OFFSET_DECAY_PCT) & MASK_16);
     }
 
     function preview(
@@ -74,6 +141,75 @@ library FeePolicy {
         returns (uint16)
     {
         (uint16 feeBps, FeeState memory newState) = preview(state, cfg, confBps, inventoryDeviationBps, block.number);
+        state.lastBlock = newState.lastBlock;
+        state.lastFeeBps = newState.lastFeeBps;
+        return feeBps;
+    }
+
+    function previewPacked(
+        FeeState memory state,
+        uint256 packedCfg,
+        uint256 confBps,
+        uint256 inventoryDeviationBps,
+        uint256 currentBlock
+    ) internal pure returns (uint16 feeBps, FeeState memory newState) {
+        newState = state;
+
+        (
+            uint16 baseBps,
+            uint16 alphaConfNumerator,
+            uint16 alphaConfDenominator,
+            uint16 betaInvDevNumerator,
+            uint16 betaInvDevDenominator,
+            uint16 capBps,
+            uint16 decayPctPerBlock
+        ) = decode(packedCfg);
+        uint256 decayFactor = (packedCfg >> OFFSET_DECAY_FACTOR) & MASK_32;
+
+        if (newState.lastBlock == 0) {
+            newState.lastBlock = uint64(currentBlock);
+            newState.lastFeeBps = baseBps;
+        }
+
+        if (decayPctPerBlock > 0 && currentBlock > newState.lastBlock) {
+            uint256 blocksElapsed = currentBlock - uint256(newState.lastBlock);
+            if (newState.lastFeeBps > baseBps) {
+                uint256 delta = newState.lastFeeBps - baseBps;
+                uint256 scaledMultiplier = _powScaled(decayFactor, blocksElapsed, DECAY_SCALE);
+                uint256 decayedDelta = FixedPointMath.mulDivDown(delta, scaledMultiplier, DECAY_SCALE);
+                newState.lastFeeBps = uint16(baseBps + decayedDelta);
+            } else {
+                newState.lastFeeBps = baseBps;
+            }
+        }
+
+        newState.lastBlock = uint64(currentBlock);
+
+        uint256 confComponent = alphaConfDenominator == 0
+            ? 0
+            : FixedPointMath.mulDivDown(confBps, alphaConfNumerator, alphaConfDenominator);
+        uint256 invComponent = betaInvDevDenominator == 0
+            ? 0
+            : FixedPointMath.mulDivDown(inventoryDeviationBps, betaInvDevNumerator, betaInvDevDenominator);
+
+        uint256 fee = uint256(baseBps) + confComponent + invComponent;
+        if (fee > capBps) {
+            fee = capBps;
+        }
+
+        newState.lastFeeBps = uint16(fee);
+        feeBps = uint16(fee);
+    }
+
+    function settlePacked(
+        FeeState storage state,
+        uint256 packedCfg,
+        uint256 confBps,
+        uint256 inventoryDeviationBps
+    ) internal returns (uint16)
+    {
+        (uint16 feeBps, FeeState memory newState) =
+            previewPacked(state, packedCfg, confBps, inventoryDeviationBps, block.number);
         state.lastBlock = newState.lastBlock;
         state.lastFeeBps = newState.lastFeeBps;
         return feeBps;

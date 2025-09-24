@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {OracleWatcher} from "../../contracts/observer/OracleWatcher.sol";
-import {DnmPool} from "../../contracts/DnmPool.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 
 contract OracleWatcherTest is BaseTest {
@@ -29,6 +28,11 @@ contract OracleWatcherTest is BaseTest {
         assertEq(result.hcAgeSec, 90, "age reflected");
         assertTrue(result.hcSuccess, "hc success");
         assertTrue(result.pythSuccess, "pyth success");
+    }
+
+    function test_autopause_requires_handler() public {
+        vm.expectRevert(OracleWatcher.PauseHandlerZero.selector);
+        watcher.setAutoPauseEnabled(true);
     }
 
     function test_emits_divergence_alert() public {

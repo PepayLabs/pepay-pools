@@ -7,12 +7,23 @@ import {FixedPointMath} from "../lib/FixedPointMath.sol";
 contract MockOraclePyth is IOracleAdapterPyth {
     PythResult public result;
 
+    error SweepFailed();
+    error SweepRecipientZero();
+
     function setResult(PythResult memory newResult) external {
         result = newResult;
     }
 
     function readPythUsdMid(bytes calldata) external payable override returns (PythResult memory) {
         return result;
+    }
+
+    function sweep(address payable recipient) external {
+        if (recipient == address(0)) revert SweepRecipientZero();
+        uint256 bal = address(this).balance;
+        if (bal == 0) return;
+        (bool ok,) = recipient.call{value: bal}(hex"");
+        if (!ok) revert SweepFailed();
     }
 
     function computePairMid(PythResult memory res)

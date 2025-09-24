@@ -3,21 +3,21 @@
   "entries": [
     {
       "path": "metrics/mid_event_vs_precompile_mid_bps.csv",
-      "age_minutes": 0.5,
+      "age_minutes": 1.0,
       "row_count": 5,
       "min_rows_required": 2,
       "status": "pass"
     },
     {
       "path": "metrics/canary_deltas.csv",
-      "age_minutes": 0.5,
+      "age_minutes": 1.0,
       "row_count": 4,
       "min_rows_required": 2,
       "status": "pass"
     },
     {
       "path": "metrics/divergence_histogram.csv",
-      "age_minutes": 0.5,
+      "age_minutes": 1.0,
       "row_count": 7,
       "min_rows_required": 4,
       "status": "pass"

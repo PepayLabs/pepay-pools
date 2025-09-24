@@ -25,6 +25,8 @@ contract OracleAdapterPyth is IOracleAdapterPyth {
     bytes32 internal immutable PRICE_ID_HYPE_USD_;
     bytes32 internal immutable PRICE_ID_USDC_USD_;
 
+    error NegativePrice(int64 price);
+
     constructor(address _pyth, bytes32 _priceIdHypeUsd, bytes32 _priceIdUsdcUsd) {
         PYTH_ = IPyth(_pyth);
         PRICE_ID_HYPE_USD_ = _priceIdHypeUsd;
@@ -80,7 +82,7 @@ contract OracleAdapterPyth is IOracleAdapterPyth {
     }
 
     function _scaleToWad(int64 price, int32 expo) internal pure returns (uint256) {
-        require(price > 0, "PYTH_NEG");
+        if (price <= 0) revert NegativePrice(price);
         uint256 magnitude = uint256(int256(price));
         if (expo == 0) {
             return magnitude * ONE;

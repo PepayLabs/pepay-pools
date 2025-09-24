@@ -22,6 +22,9 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
     error QuoteOutputBelowPool();
     error QuoteSignatureLength();
     error QuoteSignatureV();
+    error QuoteOwnerZero();
+    error QuoteInputMismatch();
+    error QuoteMakerKeyZero();
 
     bytes32 private constant EIP712_DOMAIN_TYPEHASH = keccak256(
         "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
@@ -45,6 +48,7 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
     event QuoteFilled(
         address indexed taker, bool isBaseIn, uint256 amountIn, uint256 amountOut, uint256 expiry, uint256 salt
     );
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert QuoteNotOwner();
@@ -53,6 +57,7 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
 
     constructor(address pool_, address makerKey_) {
         if (pool_ == address(0)) revert QuotePoolZero();
+        if (makerKey_ == address(0)) revert QuoteMakerKeyZero();
         POOL_ = IDnmPool(pool_);
         makerKey = makerKey_;
         owner = msg.sender;
@@ -80,14 +85,17 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         bytes32 digest = hashTypedDataV4(params);
         if (_recoverSigner(digest, makerSignature) != makerKey) revert QuoteSignerMismatch();
 
-        (address baseToken, address quoteToken,,,,) = POOL_.tokens();
+        address baseToken = POOL_.baseTokenAddress();
+        address quoteToken = POOL_.quoteTokenAddress();
         address inputToken = params.isBaseIn ? baseToken : quoteToken;
         address outputToken = params.isBaseIn ? quoteToken : baseToken;
 
-        inputToken.safeTransferFrom(params.taker, address(this), params.amountIn);
-
         uint256 inputBalanceBefore = IERC20(inputToken).balanceOf(address(this));
         uint256 outputBalanceBefore = IERC20(outputToken).balanceOf(address(this));
+
+        inputToken.safeTransferFrom(msg.sender, address(this), params.amountIn);
+        uint256 inputReceived = IERC20(inputToken).balanceOf(address(this)) - inputBalanceBefore;
+        if (inputReceived != params.amountIn) revert QuoteInputMismatch();
 
         inputToken.safeApprove(address(POOL_), params.amountIn);
         uint256 poolAmountOut = POOL_.swapExactIn(
@@ -98,7 +106,6 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         uint256 inputBalanceAfter = IERC20(inputToken).balanceOf(address(this));
         uint256 outputBalanceAfter = IERC20(outputToken).balanceOf(address(this));
 
-        uint256 consumedInput = inputBalanceBefore - inputBalanceAfter;
         if (inputBalanceAfter > 0) {
             inputToken.safeTransfer(params.taker, inputBalanceAfter);
         }
@@ -108,15 +115,18 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
 
         outputToken.safeTransfer(params.taker, amountOut);
 
-        emit QuoteFilled(params.taker, params.isBaseIn, consumedInput, amountOut, params.expiry, params.salt);
+        emit QuoteFilled(params.taker, params.isBaseIn, params.amountIn, amountOut, params.expiry, params.salt);
     }
 
     function setMakerKey(address newKey) external override onlyOwner {
+        if (newKey == address(0)) revert QuoteMakerKeyZero();
         emit MakerKeyUpdated(makerKey, newKey);
         makerKey = newKey;
     }
 
     function transferOwnership(address newOwner) external onlyOwner {
+        if (newOwner == address(0)) revert QuoteOwnerZero();
+        emit OwnershipTransferred(owner, newOwner);
         owner = newOwner;
     }
 

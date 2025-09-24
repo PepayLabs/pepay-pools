@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";

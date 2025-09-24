@@ -23,6 +23,8 @@ contract MockHyperCore {
     bytes4 internal constant SELECTOR_ORDERBOOK = 0x3f5d0c52;
     bytes4 internal constant SELECTOR_EMA = 0x0e349d01;
 
+    error UnknownSelector(bytes4 selector);
+
     function setTOB(uint256 bid_, uint256 ask_, uint256 mid_, uint64 ts_) external {
         bid = bid_;
         ask = ask_;
@@ -50,7 +52,7 @@ contract MockHyperCore {
         if (selector == SELECTOR_EMA) {
             return abi.encode(emaMid, emaTs);
         }
-        revert("HC_UNKNOWN");
+        revert UnknownSelector(selector);
     }
 }
 
@@ -71,7 +73,7 @@ contract MockPyth is IPyth {
 contract ReentrantERC20 is IERC20 {
     string public name;
     string public symbol;
-    uint8 public decimals;
+    uint8 public immutable decimals;
     uint256 public override totalSupply;
 
     mapping(address => uint256) public override balanceOf;
@@ -81,6 +83,9 @@ contract ReentrantERC20 is IERC20 {
 
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);
+
+    error AllowanceExceeded(address owner, address spender, uint256 currentAllowance, uint256 neededAllowance);
+    error BalanceTooLow(address account, uint256 balance, uint256 needed);
 
     constructor(string memory name_, string memory symbol_, uint8 decimals_) {
         name = name_;
@@ -111,15 +116,16 @@ contract ReentrantERC20 is IERC20 {
 
     function transferFrom(address from, address to, uint256 value) external override returns (bool) {
         uint256 allowed = allowance[from][msg.sender];
-        require(allowed >= value, "ALLOWANCE");
+        if (allowed < value) revert AllowanceExceeded(from, msg.sender, allowed, value);
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - value;
         _transfer(from, to, value);
         return true;
     }
 
     function _transfer(address from, address to, uint256 value) internal virtual {
-        require(balanceOf[from] >= value, "BALANCE");
-        balanceOf[from] -= value;
+        uint256 balance = balanceOf[from];
+        if (balance < value) revert BalanceTooLow(from, balance, value);
+        balanceOf[from] = balance - value;
         balanceOf[to] += value;
         emit Transfer(from, to, value);
         if (hook != address(0) && to == hook) {
@@ -180,12 +186,13 @@ contract FeeOnTransferERC20 is BaseMockERC20 {
     }
 
     function _transfer(address from, address to, uint256 value) internal virtual override {
-        require(balanceOf[from] >= value, "BALANCE");
+        uint256 balance = balanceOf[from];
+        if (balance < value) revert BalanceTooLow(from, balance, value);
 
         uint256 fee = feeBps == 0 ? 0 : (value * feeBps) / 10_000;
         uint256 net = value - fee;
 
-        balanceOf[from] -= value;
+        balanceOf[from] = balance - value;
         balanceOf[to] += net;
         emit Transfer(from, to, net);
 
@@ -278,7 +285,8 @@ contract ArbBot {
         bytes calldata oracleData,
         uint256 deadline
     ) external onlyOwner returns (uint256 amountOut) {
-        (address baseToken, address quoteToken,,,,) = pool.tokens();
+        address baseToken = pool.baseTokenAddress();
+        address quoteToken = pool.quoteTokenAddress();
         IERC20 tokenIn = isBaseIn ? IERC20(baseToken) : IERC20(quoteToken);
         IERC20 tokenOut = isBaseIn ? IERC20(quoteToken) : IERC20(baseToken);
         require(tokenIn.transferFrom(owner, address(this), amountIn), "POOL_TRANSFER_IN");
@@ -289,7 +297,8 @@ contract ArbBot {
     }
 
     function swapDex(uint256 amountIn, uint256 minOut, bool isBaseIn) external onlyOwner returns (uint256 amountOut) {
-        (address baseToken, address quoteToken,,,,) = pool.tokens();
+        address baseToken = pool.baseTokenAddress();
+        address quoteToken = pool.quoteTokenAddress();
         IERC20 tokenIn = isBaseIn ? IERC20(baseToken) : IERC20(quoteToken);
         require(tokenIn.transferFrom(owner, address(this), amountIn), "DEX_TRANSFER_IN");
         tokenIn.approve(address(dex), amountIn);

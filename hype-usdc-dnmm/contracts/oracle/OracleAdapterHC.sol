@@ -14,8 +14,14 @@ contract OracleAdapterHC is IOracleAdapterHC {
     bytes32 internal immutable MARKET_ID_;
 
     error PrecompileCallFailed();
+    error PrecompileZero();
+    error AssetIdZero();
+    error MarketIdZero();
 
     constructor(address _precompile, bytes32 _assetIdBase, bytes32 _assetIdQuote, bytes32 _marketId) {
+        if (_precompile == address(0)) revert PrecompileZero();
+        if (_assetIdBase == bytes32(0) || _assetIdQuote == bytes32(0)) revert AssetIdZero();
+        if (_marketId == bytes32(0)) revert MarketIdZero();
         HYPER_CORE_PRECOMPILE_ = _precompile;
         ASSET_ID_BASE_ = _assetIdBase;
         ASSET_ID_QUOTE_ = _assetIdQuote;

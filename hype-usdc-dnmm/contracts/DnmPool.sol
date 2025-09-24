@@ -215,11 +215,11 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         guardians = guardians_;
     }
 
-    function oracleHC() public view returns (IOracleAdapterHC) {
+    function oracleAdapterHC() public view returns (IOracleAdapterHC) {
         return ORACLE_HC_;
     }
 
-    function oraclePyth() public view returns (IOracleAdapterPyth) {
+    function oracleAdapterPyth() public view returns (IOracleAdapterPyth) {
         return ORACLE_PYTH_;
     }
 
@@ -323,7 +323,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         );
         FeePolicy.FeeState memory state =
             FeePolicy.FeeState({lastBlock: feeState.lastBlock, lastFeeBps: feeState.lastFeeBps});
-        (uint16 feeBps,) = FeePolicy.previewPacked(state, feeConfigPacked, confBps, invDev, block.number);
+        FeePolicy.FeeState memory previewState;
+        uint16 feeBps;
+        (feeBps, previewState) = FeePolicy.previewPacked(state, feeConfigPacked, confBps, invDev, block.number);
+        if (previewState.lastFeeBps != feeBps) revert Errors.FeePreviewInvariant();
 
         bidPx = FixedPointMath.mulDivDown(midRes.mid, BPS - feeBps, BPS);
         askPx = FixedPointMath.mulDivUp(midRes.mid, BPS + feeBps, BPS);
@@ -346,6 +349,14 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     {
         TokenConfig memory cfg = tokenConfig;
         return (cfg.baseToken, cfg.quoteToken, cfg.baseDecimals, cfg.quoteDecimals, cfg.baseScale, cfg.quoteScale);
+    }
+
+    function baseTokenAddress() external view override returns (address) {
+        return BASE_TOKEN_;
+    }
+
+    function quoteTokenAddress() external view override returns (address) {
+        return QUOTE_TOKEN_;
     }
 
     function feeConfig()
@@ -460,7 +471,9 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         } else {
             FeePolicy.FeeState memory state =
                 FeePolicy.FeeState({lastBlock: feeState.lastBlock, lastFeeBps: feeState.lastFeeBps});
-            (feeBps,) = FeePolicy.previewPacked(state, feeCfgPacked, outcome.confBps, invDevBps, block.number);
+            FeePolicy.FeeState memory previewState;
+            (feeBps, previewState) = FeePolicy.previewPacked(state, feeCfgPacked, outcome.confBps, invDevBps, block.number);
+            if (previewState.lastFeeBps != feeBps) revert Errors.FeePreviewInvariant();
         }
 
         if (flags.debugEmit) {

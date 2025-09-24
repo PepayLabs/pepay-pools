@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
 /// @notice Common numerical assertions tuned for the DNMM fixed-point conventions.
 abstract contract MathAsserts is Test {

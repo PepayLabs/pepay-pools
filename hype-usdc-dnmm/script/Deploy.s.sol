@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import {DnmPool} from "../contracts/DnmPool.sol";
 import {OracleAdapterHC} from "../contracts/oracle/OracleAdapterHC.sol";
 import {OracleAdapterPyth} from "../contracts/oracle/OracleAdapterPyth.sol";

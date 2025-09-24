@@ -38,9 +38,9 @@
     },
     {
       "operation": "rfq_verify_swap",
-      "gas_used": 364797,
+      "gas_used": 367557,
       "budget": 400000,
-      "headroom": 35203,
+      "headroom": 32443,
       "status": "pass"
     }
   ]

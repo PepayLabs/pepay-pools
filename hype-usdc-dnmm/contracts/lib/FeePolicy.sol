@@ -218,7 +218,7 @@ library FeePolicy {
     function _powScaled(uint256 factor, uint256 exponent, uint256 scale) private pure returns (uint256 result) {
         result = scale;
         while (exponent > 0) {
-            if (exponent & 1 == 1) {
+            if ((exponent & 1) != 0) {
                 result = FixedPointMath.mulDivDown(result, factor, scale);
             }
             factor = FixedPointMath.mulDivDown(factor, factor, scale);

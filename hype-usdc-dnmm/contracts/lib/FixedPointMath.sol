@@ -90,6 +90,7 @@ library FixedPointMath {
             prod0 |= prod1 * twos;
 
             uint256 inverse = _modInverse(denominator);
+            // slither-disable-next-line divide-before-multiply
             result = prod0 * inverse;
 
             if (shouldRound) {
@@ -100,6 +101,7 @@ library FixedPointMath {
 
     function _modInverse(uint256 a) private pure returns (uint256 inverse) {
         unchecked {
+            // slither-disable-next-line incorrect-exp
             inverse = (3 * a) ^ 2;
             inverse *= 2 - a * inverse;
             inverse *= 2 - a * inverse;

@@ -46,6 +46,10 @@ interface IDnmPool {
             uint256 quoteScale
         );
 
+    function baseTokenAddress() external view returns (address);
+
+    function quoteTokenAddress() external view returns (address);
+
     function pause() external;
 
     function unpause() external;

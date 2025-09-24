@@ -5,13 +5,14 @@ import {DnmPool} from "../DnmPool.sol";
 import {IOracleAdapterHC} from "../interfaces/IOracleAdapterHC.sol";
 import {IOracleAdapterPyth} from "../interfaces/IOracleAdapterPyth.sol";
 import {OracleUtils} from "../lib/OracleUtils.sol";
+import {ReentrancyGuard} from "../lib/ReentrancyGuard.sol";
 
 interface IOraclePauseHandler {
     function onOracleCritical(bytes32 label) external;
 }
 
 /// @notice OracleWatcher mirrors the pool's oracle reads and emits alerts when thresholds are violated.
-contract OracleWatcher {
+contract OracleWatcher is ReentrancyGuard {
     using OracleUtils for uint256;
 
     enum AlertKind {
@@ -39,6 +40,9 @@ contract OracleWatcher {
 
     error NotOwner();
     error InvalidThreshold();
+    error PauseHandlerZero();
+    error FeeResidual(uint256 leftoverWei);
+    error OwnerZero();
 
     event OracleAlert(bytes32 indexed source, AlertKind kind, uint256 value, uint256 threshold, bool critical);
     event AutoPauseRequested(bytes32 indexed source, bool handlerCalled, bytes handlerData);
@@ -57,6 +61,7 @@ contract OracleWatcher {
     constructor(DnmPool pool_, Config memory config_, address pauseHandler_, bool autoPauseEnabled_) {
         POOL_ = pool_;
         owner = msg.sender;
+        if (pauseHandler_ == address(0) && autoPauseEnabled_) revert PauseHandlerZero();
         pauseHandler = pauseHandler_;
         autoPauseEnabled = autoPauseEnabled_;
 
@@ -66,14 +71,19 @@ contract OracleWatcher {
     /// @notice Mirror the oracle reads and emit alerts when thresholds are violated.
     /// @param label An opaque label forwarded to emitted events/handlers (e.g. bytes32("KEEPER"))
     /// @param oracleData Optional Pyth price-update payload (forwarded directly to the pool's adapter).
-    function check(bytes32 label, bytes calldata oracleData) external payable returns (CheckResult memory result) {
+    function check(bytes32 label, bytes calldata oracleData)
+        external
+        payable
+        nonReentrant
+        returns (CheckResult memory result)
+    {
         DnmPool.OracleConfig memory poolCfg = _pullOracleConfig();
 
-        IOracleAdapterHC oracleHc = POOL_.oracleHC();
+        IOracleAdapterHC oracleHc = POOL_.oracleAdapterHC();
         IOracleAdapterHC.MidResult memory midRes = oracleHc.readMidAndAge();
         IOracleAdapterHC.BidAskResult memory bookRes = oracleHc.readBidAsk();
 
-        IOracleAdapterPyth oraclePyth = POOL_.oraclePyth();
+        IOracleAdapterPyth oraclePyth = POOL_.oracleAdapterPyth();
         IOracleAdapterPyth.PythResult memory pythRes;
         bool pythSuccess;
         try oraclePyth.readPythUsdMid{value: msg.value}(oracleData) returns (IOracleAdapterPyth.PythResult memory res) {
@@ -131,10 +141,7 @@ contract OracleWatcher {
 
         // Refund any leftover ETH from the Pyth adapter call back to the caller.
         uint256 balance = address(this).balance;
-        if (balance > 0) {
-            (bool refundSuccess,) = msg.sender.call{value: balance}("");
-            require(refundSuccess, "REFUND_FAILED");
-        }
+        if (balance > 0) revert FeeResidual(balance);
     }
 
     function setConfig(Config calldata newConfig) external onlyOwner {
@@ -142,17 +149,19 @@ contract OracleWatcher {
     }
 
     function setPauseHandler(address newHandler) external onlyOwner {
+        if (newHandler == address(0) && autoPauseEnabled) revert PauseHandlerZero();
         emit PauseHandlerUpdated(pauseHandler, newHandler);
         pauseHandler = newHandler;
     }
 
     function setAutoPauseEnabled(bool enabled) external onlyOwner {
+        if (enabled && pauseHandler == address(0)) revert PauseHandlerZero();
         autoPauseEnabled = enabled;
         emit AutoPauseToggled(enabled);
     }
 
     function transferOwnership(address newOwner) external onlyOwner {
-        require(newOwner != address(0), "OWNER_ZERO");
+        if (newOwner == address(0)) revert OwnerZero();
         emit OwnershipTransferred(owner, newOwner);
         owner = newOwner;
     }

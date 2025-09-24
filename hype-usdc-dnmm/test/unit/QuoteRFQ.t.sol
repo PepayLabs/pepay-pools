@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
-
 import {QuoteRFQ} from "../../contracts/quotes/QuoteRFQ.sol";
 import {IQuoteRFQ} from "../../contracts/interfaces/IQuoteRFQ.sol";
-import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 
 contract QuoteRFQTest is BaseTest {
@@ -24,6 +21,16 @@ contract QuoteRFQTest is BaseTest {
         hype.approve(address(rfq), type(uint256).max);
         vm.prank(bob);
         usdc.approve(address(rfq), type(uint256).max);
+    }
+
+    function test_constructor_reverts_when_maker_zero() public {
+        vm.expectRevert(QuoteRFQ.QuoteMakerKeyZero.selector);
+        new QuoteRFQ(address(pool), address(0));
+    }
+
+    function test_setMakerKey_rejects_zero() public {
+        vm.expectRevert(QuoteRFQ.QuoteMakerKeyZero.selector);
+        rfq.setMakerKey(address(0));
     }
 
     function test_verifyAndSwap_valid_signature_ttl() public {

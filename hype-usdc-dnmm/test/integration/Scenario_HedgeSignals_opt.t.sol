@@ -2,10 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
-import {DnmPool} from "../../contracts/DnmPool.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 import {EventRecorder} from "../utils/EventRecorder.sol";
-import "forge-std/Vm.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 contract ScenarioHedgeSignalsOptTest is BaseTest {
     function setUp() public {

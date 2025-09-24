@@ -26,4 +26,5 @@ library Errors {
     error MidUnset();
     error RecenterThreshold();
     error FeeCapExceeded();
+    error FeePreviewInvariant();
 }

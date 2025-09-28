@@ -152,15 +152,12 @@ contract FeeDynamicsTest is BaseTest {
             vm.warp(block.timestamp + 1);
             DnmPool.QuoteResult memory q = quote(1 ether, true, IDnmPool.OracleMode.Spot);
             (uint128 baseRes, uint128 quoteRes) = pool.reserves();
-            uint256 invDev = Inventory.deviationBps(
-                uint256(baseRes), uint256(quoteRes), targetBase, q.midUsed, tokens
-            );
+            uint256 invDev = Inventory.deviationBps(uint256(baseRes), uint256(quoteRes), targetBase, q.midUsed, tokens);
             uint256 invComponent = cfg.betaInvDevDenominator == 0
                 ? 0
                 : FixedPointMath.mulDivDown(invDev, cfg.betaInvDevNumerator, cfg.betaInvDevDenominator);
-            uint256 confComponent = q.feeBpsUsed > cfg.baseBps + invComponent
-                ? q.feeBpsUsed - cfg.baseBps - invComponent
-                : 0;
+            uint256 confComponent =
+                q.feeBpsUsed > cfg.baseBps + invComponent ? q.feeBpsUsed - cfg.baseBps - invComponent : 0;
             uint256 confBps = cfg.alphaConfNumerator == 0
                 ? 0
                 : FixedPointMath.mulDivDown(confComponent, cfg.alphaConfDenominator, cfg.alphaConfNumerator);

@@ -57,12 +57,7 @@ contract ScenarioDivergenceHistogramTest is BaseTest {
             );
         }
 
-        EventRecorder.writeCSV(
-            vm,
-            "metrics/divergence_histogram.csv",
-            "bin_bps,attempts,rejects,rate_bps",
-            rows
-        );
+        EventRecorder.writeCSV(vm, "metrics/divergence_histogram.csv", "bin_bps,attempts,rejects,rate_bps", rows);
     }
 
     function _attemptQuote() internal {

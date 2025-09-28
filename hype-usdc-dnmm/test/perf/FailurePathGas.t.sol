@@ -33,12 +33,7 @@ contract FailurePathGasTest is BaseTest {
         assertLe(gasDivergence, DIVERGENCE_CAP, "divergence gas cap");
         rows[2] = _formatRow("divergence_reject", gasDivergence, DIVERGENCE_CAP);
 
-        EventRecorder.writeCSV(
-            vm,
-            "metrics/gas_dos_failures.csv",
-            "case,gas_used,cap",
-            rows
-        );
+        EventRecorder.writeCSV(vm, "metrics/gas_dos_failures.csv", "case,gas_used,cap", rows);
     }
 
     function _measureFloorBreach() internal returns (uint256 gasUsed) {
@@ -57,13 +52,7 @@ contract FailurePathGasTest is BaseTest {
         }
 
         bytes memory callData = abi.encodeWithSelector(
-            DnmPool.swapExactIn.selector,
-            1 ether,
-            0,
-            true,
-            IDnmPool.OracleMode.Spot,
-            bytes(""),
-            block.timestamp + 1
+            DnmPool.swapExactIn.selector, 1 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1
         );
         (uint256 used, bool success, bytes memory ret) = _call(address(pool), callData);
         require(!success, "floor breach should revert");
@@ -95,11 +84,7 @@ contract FailurePathGasTest is BaseTest {
         oraclePyth.setResult(emptyPyth);
 
         bytes memory callData = abi.encodeWithSelector(
-            DnmPool.quoteSwapExactIn.selector,
-            5 ether,
-            true,
-            IDnmPool.OracleMode.Spot,
-            bytes("")
+            DnmPool.quoteSwapExactIn.selector, 5 ether, true, IDnmPool.OracleMode.Spot, bytes("")
         );
         (uint256 used, bool success, bytes memory ret) = _call(address(pool), callData);
         require(!success, "stale oracle should revert");
@@ -122,11 +107,7 @@ contract FailurePathGasTest is BaseTest {
         updatePyth(1_500_000_000_000_000_000, 1e18, 0, 0, 20, 20);
 
         bytes memory callData = abi.encodeWithSelector(
-            DnmPool.quoteSwapExactIn.selector,
-            5 ether,
-            true,
-            IDnmPool.OracleMode.Spot,
-            bytes("")
+            DnmPool.quoteSwapExactIn.selector, 5 ether, true, IDnmPool.OracleMode.Spot, bytes("")
         );
         (uint256 used, bool success, bytes memory ret) = _call(address(pool), callData);
         require(!success, "divergence should revert");
@@ -173,12 +154,6 @@ contract FailurePathGasTest is BaseTest {
     }
 
     function _formatRow(string memory label, uint256 gasUsed, uint256 cap) internal pure returns (string memory) {
-        return string.concat(
-            label,
-            ",",
-            EventRecorder.uintToString(gasUsed),
-            ",",
-            EventRecorder.uintToString(cap)
-        );
+        return string.concat(label, ",", EventRecorder.uintToString(gasUsed), ",", EventRecorder.uintToString(cap));
     }
 }

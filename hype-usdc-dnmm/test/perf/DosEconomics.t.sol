@@ -26,12 +26,7 @@ contract DosEconomicsTest is BaseTest {
         rowIdx = _recordBurst(rows, rowIdx, "SPREAD", Errors.OracleSpread.selector, _configureSpreadScenario);
         rowIdx = _recordBurst(rows, rowIdx, "DIVERGENCE", Errors.OracleDiverged.selector, _configureDivergenceScenario);
 
-        EventRecorder.writeCSV(
-            vm,
-            "metrics/gas_dos_failures.csv",
-            "reason,avg_gas,max_gas",
-            rows
-        );
+        EventRecorder.writeCSV(vm, "metrics/gas_dos_failures.csv", "reason,avg_gas,max_gas", rows);
 
         (uint128 baseAfter, uint128 quoteAfter) = pool.reserves();
         assertEq(baseAfter, baseBefore, "base reserves drift");
@@ -54,11 +49,7 @@ contract DosEconomicsTest is BaseTest {
             uint256 gasBefore = gasleft();
             (bool ok, bytes memory data) = address(pool).call(
                 abi.encodeWithSelector(
-                    IDnmPool.quoteSwapExactIn.selector,
-                    10 ether,
-                    true,
-                    IDnmPool.OracleMode.Spot,
-                    bytes("")
+                    IDnmPool.quoteSwapExactIn.selector, 10 ether, true, IDnmPool.OracleMode.Spot, bytes("")
                 )
             );
             uint256 gasUsed = gasBefore - gasleft();
@@ -73,13 +64,8 @@ contract DosEconomicsTest is BaseTest {
         }
 
         uint256 avgGas = totalGas / SAMPLE_COUNT;
-        rows[startIdx] = string.concat(
-            label,
-            ",",
-            EventRecorder.uintToString(avgGas),
-            ",",
-            EventRecorder.uintToString(maxGas)
-        );
+        rows[startIdx] =
+            string.concat(label, ",", EventRecorder.uintToString(avgGas), ",", EventRecorder.uintToString(maxGas));
 
         return startIdx + 1;
     }

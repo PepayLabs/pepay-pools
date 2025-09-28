@@ -9,10 +9,7 @@ contract OracleWatcherTest is BaseTest {
 
     function setUp() public {
         setUpBase();
-        OracleWatcher.Config memory cfg = OracleWatcher.Config({
-            maxAgeCritical: 40,
-            divergenceCriticalBps: 50
-        });
+        OracleWatcher.Config memory cfg = OracleWatcher.Config({maxAgeCritical: 40, divergenceCriticalBps: 50});
         watcher = new OracleWatcher(pool, cfg, address(0), false);
     }
 

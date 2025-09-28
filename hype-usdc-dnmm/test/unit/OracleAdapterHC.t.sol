@@ -21,9 +21,7 @@ contract OracleAdapterHCTest is Test {
         _installPrecompile(address(new MockHyperCorePx()), HyperCoreConstants.MARK_PX_PRECOMPILE);
         _installPrecompile(address(new MockHyperCoreBbo()), HyperCoreConstants.BBO_PRECOMPILE);
 
-        adapter = new OracleAdapterHC(
-            HyperCoreConstants.ORACLE_PX_PRECOMPILE, ASSET_BASE, ASSET_QUOTE, MARKET
-        );
+        adapter = new OracleAdapterHC(HyperCoreConstants.ORACLE_PX_PRECOMPILE, ASSET_BASE, ASSET_QUOTE, MARKET);
 
         MockHyperCorePx(HyperCoreConstants.ORACLE_PX_PRECOMPILE).setResult(MARKET_KEY, uint64(1e18));
         MockHyperCorePx(HyperCoreConstants.MARK_PX_PRECOMPILE).setResult(MARKET_KEY, uint64(1e18));
@@ -52,18 +50,14 @@ contract OracleAdapterHCTest is Test {
         MockHyperCorePx(HyperCoreConstants.ORACLE_PX_PRECOMPILE).setShortResult(MARKET_KEY, uint64(1));
         vm.expectRevert(
             abi.encodeWithSelector(
-                OracleAdapterHC.HyperCoreInvalidResponse.selector,
-                HyperCoreConstants.ORACLE_PX_PRECOMPILE,
-                uint256(8)
+                OracleAdapterHC.HyperCoreInvalidResponse.selector, HyperCoreConstants.ORACLE_PX_PRECOMPILE, uint256(8)
             )
         );
         adapter.readMidAndAge();
     }
 
     function test_spreadCap_rejects_when_bid_ask_bad() public {
-        MockHyperCoreBbo(HyperCoreConstants.BBO_PRECOMPILE).setResult(
-            MARKET_KEY, uint64(900e14), uint64(1200e14)
-        );
+        MockHyperCoreBbo(HyperCoreConstants.BBO_PRECOMPILE).setResult(MARKET_KEY, uint64(900e14), uint64(1200e14));
         IOracleAdapterHC.BidAskResult memory res = adapter.readBidAsk();
         assertTrue(res.success, "bidask success");
         assertGt(res.spreadBps, 2000, "large spread");
@@ -81,9 +75,7 @@ contract OracleAdapterHCTest is Test {
         uint256 diff = (mid * 2) / 1000; // 0.2%
         uint256 bid = mid - diff / 2;
         uint256 ask = mid + diff / 2;
-        MockHyperCoreBbo(HyperCoreConstants.BBO_PRECOMPILE).setResult(
-            MARKET_KEY, uint64(bid), uint64(ask)
-        );
+        MockHyperCoreBbo(HyperCoreConstants.BBO_PRECOMPILE).setResult(MARKET_KEY, uint64(bid), uint64(ask));
         IOracleAdapterHC.BidAskResult memory res = adapter.readBidAsk();
         assertTrue(res.success, "bidask success");
         assertEq(res.spreadBps, 20, "spread rounding");

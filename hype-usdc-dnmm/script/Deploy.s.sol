@@ -12,17 +12,16 @@ contract Deploy is Script {
     function run() external {
         vm.startBroadcast();
 
-        // TODO: replace with live addresses
-        address hyperCorePrecompile = HyperCoreConstants.ORACLE_PX_PRECOMPILE;
-        bytes32 assetIdHype = bytes32("HYPE");
-        bytes32 assetIdUsdc = bytes32("USDC");
-        bytes32 marketId = bytes32("HYPE_USDC");
+        address hyperCorePrecompile = vm.envOr("DNMM_HYPERCORE_PRECOMPILE", HyperCoreConstants.ORACLE_PX_PRECOMPILE);
+        bytes32 assetIdHype = vm.envOr("DNMM_HYPERCORE_ASSET_ID_HYPE", bytes32("HYPE"));
+        bytes32 assetIdUsdc = vm.envOr("DNMM_HYPERCORE_ASSET_ID_USDC", bytes32("USDC"));
+        bytes32 marketId = vm.envOr("DNMM_HYPERCORE_MARKET_ID", bytes32("HYPE_USDC"));
 
         OracleAdapterHC hc = new OracleAdapterHC(hyperCorePrecompile, assetIdHype, assetIdUsdc, marketId);
 
-        address pythContract = address(0x5678);
-        bytes32 priceIdHypeUsd = bytes32(0);
-        bytes32 priceIdUsdcUsd = bytes32(0);
+        address pythContract = vm.envAddress("DNMM_PYTH_CONTRACT");
+        bytes32 priceIdHypeUsd = vm.envBytes32("DNMM_PYTH_PRICE_ID_HYPE_USD");
+        bytes32 priceIdUsdcUsd = vm.envBytes32("DNMM_PYTH_PRICE_ID_USDC_USD");
         OracleAdapterPyth pyth = new OracleAdapterPyth(pythContract, priceIdHypeUsd, priceIdUsdcUsd);
 
         DnmPool.InventoryConfig memory inventoryCfg =
@@ -55,11 +54,16 @@ contract Deploy is Script {
 
         DnmPool.Guardians memory guardians = DnmPool.Guardians({governance: msg.sender, pauser: msg.sender});
 
+        address baseToken = vm.envAddress("DNMM_BASE_TOKEN");
+        address quoteToken = vm.envAddress("DNMM_QUOTE_TOKEN");
+        uint8 baseDecimals = uint8(uint256(vm.envUint("DNMM_BASE_DECIMALS")));
+        uint8 quoteDecimals = uint8(uint256(vm.envUint("DNMM_QUOTE_DECIMALS")));
+
         new DnmPool(
-            address(0),
-            address(0),
-            18,
-            6,
+            baseToken,
+            quoteToken,
+            baseDecimals,
+            quoteDecimals,
             address(hc),
             address(pyth),
             inventoryCfg,

@@ -82,8 +82,7 @@ contract DnmPoolQuoteTest is BaseTest {
         assertEq(qr.reason, bytes32("PYTH"), "pyth fallback reason");
         assertTrue(qr.usedFallback, "pyth fallback flagged");
 
-        EventRecorder.ConfidenceDebugEvent[] memory conf =
-            EventRecorder.decodeConfidenceDebug(vm.getRecordedLogs());
+        EventRecorder.ConfidenceDebugEvent[] memory conf = EventRecorder.decodeConfidenceDebug(vm.getRecordedLogs());
         assertEq(conf.length, 1, "confidence debug");
         uint256 strictCap = cfg.confCapBpsStrict;
         assertLe(conf[0].confBlendedBps, strictCap, "blend respects strict cap");
@@ -111,8 +110,7 @@ contract DnmPoolQuoteTest is BaseTest {
         assertEq(qr.reason, bytes32("EMA"), "ema fallback reason");
         assertTrue(qr.usedFallback, "ema fallback flagged");
 
-        EventRecorder.ConfidenceDebugEvent[] memory conf =
-            EventRecorder.decodeConfidenceDebug(vm.getRecordedLogs());
+        EventRecorder.ConfidenceDebugEvent[] memory conf = EventRecorder.decodeConfidenceDebug(vm.getRecordedLogs());
         assertEq(conf.length, 1, "confidence debug");
         assertEq(conf[0].confPythBps, 0, "pyth component suppressed when EMA wins");
     }

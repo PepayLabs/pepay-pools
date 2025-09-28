@@ -28,7 +28,7 @@ contract ScenarioPythHygieneTest is BaseTest {
         require(debugs.length == 1, "debug count");
         EventRecorder.ConfidenceDebugEvent memory dbg = debugs[0];
         uint16 capSpot;
-        (, , capSpot, , , , , , ,) = pool.oracleConfig();
+        (,, capSpot,,,,,,,) = pool.oracleConfig();
         require(dbg.confPythBps == 0, "pyth component should be zero");
         require(dbg.confBlendedBps <= capSpot, "spot cap respected");
     }
@@ -37,7 +37,7 @@ contract ScenarioPythHygieneTest is BaseTest {
         uint32 maxAgeSec;
         uint32 stallWindowSec;
         uint16 capStrict;
-        (maxAgeSec, stallWindowSec, , capStrict, , , , , ,) = pool.oracleConfig();
+        (maxAgeSec, stallWindowSec,, capStrict,,,,,,) = pool.oracleConfig();
         updateSpot(1_025e15, maxAgeSec + 10, true);
         updateBidAsk(1_020e15, 1_030e15, 45, true);
         updateEma(1_022e15, stallWindowSec + 15, true);

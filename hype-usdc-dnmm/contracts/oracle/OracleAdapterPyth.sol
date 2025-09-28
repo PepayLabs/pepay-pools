@@ -96,6 +96,14 @@ contract OracleAdapterPyth is IOracleAdapterPyth {
     }
 
     function _confidenceToBps(IPyth.Price memory price) internal pure returns (uint256) {
+        if (price.conf == 0) {
+            return 0;
+        }
+
+        if (price.conf > uint64(type(int64).max)) {
+            return type(uint256).max;
+        }
+
         uint256 confValue = _scaleToWad(int64(uint64(price.conf)), price.expo);
         uint256 priceValue = _scaleToWad(price.price, price.expo);
         if (priceValue == 0) return type(uint256).max;

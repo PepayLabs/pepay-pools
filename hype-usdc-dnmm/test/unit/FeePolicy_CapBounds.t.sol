@@ -33,8 +33,7 @@ contract FeePolicyCapBoundsTest is Test {
     function test_packAllowsValidBounds() external {
         FeePolicy.FeeConfig memory cfg = _cfg(150, 9_999);
         uint256 packed = FeePolicy.pack(cfg);
-        (,, , , , uint16 capBps,) = FeePolicy.decode(packed);
+        (,,,,, uint16 capBps,) = FeePolicy.decode(packed);
         assertEq(capBps, cfg.capBps, "cap bps");
     }
 }
-

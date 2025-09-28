@@ -191,9 +191,8 @@ library FeePolicy {
 
         newState.lastBlock = uint64(currentBlock);
 
-        uint256 confComponent = alphaConfDenominator == 0
-            ? 0
-            : FixedPointMath.mulDivDown(confBps, alphaConfNumerator, alphaConfDenominator);
+        uint256 confComponent =
+            alphaConfDenominator == 0 ? 0 : FixedPointMath.mulDivDown(confBps, alphaConfNumerator, alphaConfDenominator);
         uint256 invComponent = betaInvDevDenominator == 0
             ? 0
             : FixedPointMath.mulDivDown(inventoryDeviationBps, betaInvDevNumerator, betaInvDevDenominator);
@@ -207,12 +206,9 @@ library FeePolicy {
         feeBps = uint16(fee);
     }
 
-    function settlePacked(
-        FeeState storage state,
-        uint256 packedCfg,
-        uint256 confBps,
-        uint256 inventoryDeviationBps
-    ) internal returns (uint16)
+    function settlePacked(FeeState storage state, uint256 packedCfg, uint256 confBps, uint256 inventoryDeviationBps)
+        internal
+        returns (uint16)
     {
         (uint16 feeBps, FeeState memory newState) =
             previewPacked(state, packedCfg, confBps, inventoryDeviationBps, block.number);

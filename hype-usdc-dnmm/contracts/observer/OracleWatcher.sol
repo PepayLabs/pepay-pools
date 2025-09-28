@@ -204,13 +204,7 @@ contract OracleWatcher is ReentrancyGuard {
         return POOL_;
     }
 
-    function _emitAndHandle(
-        bytes32 label,
-        AlertKind kind,
-        uint256 value,
-        uint256 threshold,
-        bool critical
-    ) internal {
+    function _emitAndHandle(bytes32 label, AlertKind kind, uint256 value, uint256 threshold, bool critical) internal {
         emit OracleAlert(label, kind, value, threshold, critical);
 
         if (autoPauseEnabled && critical) {

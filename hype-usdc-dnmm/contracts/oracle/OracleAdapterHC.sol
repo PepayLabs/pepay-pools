@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IOracleAdapterHC} from "../interfaces/IOracleAdapterHC.sol";
 import {OracleUtils} from "../lib/OracleUtils.sol";
+import {HyperCoreConstants} from "./HyperCoreConstants.sol";
 
 /// @notice Adapter for HyperCore order-book/oracle read precompiles.
 contract OracleAdapterHC is IOracleAdapterHC {
@@ -13,7 +14,8 @@ contract OracleAdapterHC is IOracleAdapterHC {
     bytes32 internal immutable ASSET_ID_QUOTE_;
     bytes32 internal immutable MARKET_ID_;
 
-    error PrecompileCallFailed();
+    error HyperCoreCallFailed(bytes4 selector, bytes data);
+    error HyperCoreInvalidResponse(bytes4 selector, uint256 length);
     error PrecompileZero();
     error AssetIdZero();
     error MarketIdZero();
@@ -44,17 +46,11 @@ contract OracleAdapterHC is IOracleAdapterHC {
         return MARKET_ID_;
     }
 
-    // Hypothetical function selectors for demonstration; replace with canonical ones when confirmed.
-    bytes4 private constant SELECTOR_SPOT = 0x6a627842; // getSpotOraclePrice(bytes32)
-    bytes4 private constant SELECTOR_ORDERBOOK = 0x3f5d0c52; // getOrderbookTopOfBook(bytes32)
-    bytes4 private constant SELECTOR_EMA = 0x0e349d01; // getEmaOraclePrice(bytes32)
-
     function readMidAndAge() external view override returns (MidResult memory result) {
-        bytes memory callData = abi.encodeWithSelector(SELECTOR_SPOT, ASSET_ID_BASE_, ASSET_ID_QUOTE_);
-        (bool ok, bytes memory data) = HYPER_CORE_PRECOMPILE_.staticcall(callData);
-        if (!ok || data.length < 64) {
-            return MidResult(0, type(uint256).max, false);
-        }
+        bytes memory callData = abi.encodeWithSelector(
+            HyperCoreConstants.SEL_GET_SPOT_ORACLE_PRICE, ASSET_ID_BASE_, ASSET_ID_QUOTE_
+        );
+        bytes memory data = _callHyperCore(callData, HyperCoreConstants.SEL_GET_SPOT_ORACLE_PRICE, 64);
 
         (uint256 mid, uint64 timestamp) = abi.decode(data, (uint256, uint64));
         uint256 age = block.timestamp > timestamp ? block.timestamp - timestamp : 0;
@@ -62,11 +58,8 @@ contract OracleAdapterHC is IOracleAdapterHC {
     }
 
     function readBidAsk() external view override returns (BidAskResult memory result) {
-        bytes memory callData = abi.encodeWithSelector(SELECTOR_ORDERBOOK, MARKET_ID_);
-        (bool ok, bytes memory data) = HYPER_CORE_PRECOMPILE_.staticcall(callData);
-        if (!ok || data.length < 64) {
-            return BidAskResult(0, 0, type(uint256).max, false);
-        }
+        bytes memory callData = abi.encodeWithSelector(HyperCoreConstants.SEL_GET_TOP_OF_BOOK, MARKET_ID_);
+        bytes memory data = _callHyperCore(callData, HyperCoreConstants.SEL_GET_TOP_OF_BOOK, 64);
 
         (uint256 bid, uint256 ask) = abi.decode(data, (uint256, uint256));
         uint256 spreadBps = OracleUtils.computeSpreadBps(bid, ask);
@@ -74,14 +67,25 @@ contract OracleAdapterHC is IOracleAdapterHC {
     }
 
     function readMidEmaFallback() external view override returns (MidResult memory result) {
-        bytes memory callData = abi.encodeWithSelector(SELECTOR_EMA, ASSET_ID_BASE_, ASSET_ID_QUOTE_);
-        (bool ok, bytes memory data) = HYPER_CORE_PRECOMPILE_.staticcall(callData);
-        if (!ok || data.length < 64) {
-            return MidResult(0, type(uint256).max, false);
-        }
+        bytes memory callData = abi.encodeWithSelector(
+            HyperCoreConstants.SEL_GET_EMA_ORACLE_PRICE, ASSET_ID_BASE_, ASSET_ID_QUOTE_
+        );
+        bytes memory data = _callHyperCore(callData, HyperCoreConstants.SEL_GET_EMA_ORACLE_PRICE, 64);
 
         (uint256 emaMid, uint64 timestamp) = abi.decode(data, (uint256, uint64));
         uint256 age = block.timestamp > timestamp ? block.timestamp - timestamp : 0;
         return MidResult(emaMid, age, true);
+    }
+
+    function _callHyperCore(bytes memory callData, bytes4 selector, uint256 minLength)
+        private
+        view
+        returns (bytes memory data)
+    {
+        // AUDIT:HCABI-002 fail-closed on staticcall failure
+        (bool ok, bytes memory raw) = HYPER_CORE_PRECOMPILE_.staticcall(callData);
+        if (!ok) revert HyperCoreCallFailed(selector, raw);
+        if (raw.length < minLength) revert HyperCoreInvalidResponse(selector, raw.length);
+        return raw;
     }
 }

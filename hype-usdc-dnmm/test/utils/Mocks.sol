@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IERC20} from "../../contracts/interfaces/IERC20.sol";
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {IPyth} from "../../contracts/oracle/OracleAdapterPyth.sol";
+import {HyperCoreConstants} from "../../contracts/oracle/HyperCoreConstants.sol";
 import {MockERC20 as BaseMockERC20} from "../../contracts/mocks/MockERC20.sol";
 
 interface IReentrancyHook {
@@ -18,10 +19,6 @@ contract MockHyperCore {
 
     uint256 public emaMid;
     uint64 public emaTs;
-
-    bytes4 internal constant SELECTOR_SPOT = 0x6a627842;
-    bytes4 internal constant SELECTOR_ORDERBOOK = 0x3f5d0c52;
-    bytes4 internal constant SELECTOR_EMA = 0x0e349d01;
 
     error UnknownSelector(bytes4 selector);
 
@@ -43,13 +40,13 @@ contract MockHyperCore {
         assembly {
             selector := calldataload(0)
         }
-        if (selector == SELECTOR_SPOT) {
+        if (selector == HyperCoreConstants.SEL_GET_SPOT_ORACLE_PRICE) {
             return abi.encode(mid, spotTs);
         }
-        if (selector == SELECTOR_ORDERBOOK) {
+        if (selector == HyperCoreConstants.SEL_GET_TOP_OF_BOOK) {
             return abi.encode(bid, ask);
         }
-        if (selector == SELECTOR_EMA) {
+        if (selector == HyperCoreConstants.SEL_GET_EMA_ORACLE_PRICE) {
             return abi.encode(emaMid, emaTs);
         }
         revert UnknownSelector(selector);

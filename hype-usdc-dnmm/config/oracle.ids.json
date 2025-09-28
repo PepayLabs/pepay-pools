@@ -3,7 +3,7 @@
     "assetIdHype": "0x484f5045ffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
     "assetIdUsdc": "0x55534443ffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
     "marketIdHypeUsdc": "0x484f50455f55534443ffffffffffffffffffffffffffffffffffffffffffffff",
-    "precompile": "0x0000000000000000000000000000000000000000"
+    "precompile": "0x0000000000000000000000000000000000000807"
   },
   "pyth": {
     "contract": "0x0000000000000000000000000000000000000000",

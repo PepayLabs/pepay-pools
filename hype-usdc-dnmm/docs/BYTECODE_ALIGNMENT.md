@@ -11,7 +11,22 @@
 | `FUN_ram_00019590` (partial fill guard) | Solve quadratic to leave liquidity floor | `Inventory.quoteBaseIn` / `Inventory.quoteQuoteIn` | Uses `FixedPointMath` for deterministic scaling and matches Solana big-int ops. |
 | `FUN_ram_0001c050` (event emit) | Emit swap + fee telemetry | `SwapExecuted` / `QuoteServed` events | Event fields mirror Solana logging schema. |
 
+## HyperCore ABI Pinning
+
+The HyperCore oracle precompile at `0x0000000000000000000000000000000000000807` exposes discrete read entrypoints. Selectors are pinned via keccak256 hashing of the published function signatures.
+
+| Call | Selector | Solidity Helper |
+|------|----------|-----------------|
+| `getSpotOraclePrice(bytes32,bytes32)` | `0x6e4677ff` | `HyperCoreConstants.SEL_GET_SPOT_ORACLE_PRICE` |
+| `getTopOfBook(bytes32)` | `0xc75e61ea` | `HyperCoreConstants.SEL_GET_TOP_OF_BOOK` |
+| `getEmaOraclePrice(bytes32,bytes32)` | `0x492524ab` | `HyperCoreConstants.SEL_GET_EMA_ORACLE_PRICE` |
+
+Update Procedure:
+1. Fetch the latest `L1Read.sol` from the HyperCore documentation bundle and confirm function signatures/struct layout.
+2. Recompute selectors with `cast sig` (or equivalent) and update `contracts/oracle/HyperCoreConstants.sol`.
+3. Adjust tests under `test/unit/OracleAdapterHC_Selectors.t.sol` to assert the new values before merging.
+4. Record provenance (doc URL + retrieval date) in this file and in release notes.
+
 ## Gap Review
-- **HyperCore selectors**: Placeholder until official precompile ABI confirmed. Marked `TODO` in `OracleAdapterHC`.
-- **EMA exact weighting**: Lifinity caches EMA in state; HyperCore exposes via precompile – integration pending docs.
+- **EMA exact weighting**: Lifinity caches EMA in state; HyperCore exposes via precompile – weighting remains aligned with current docs.
 - **Rebalance automation**: Solana program has keeper hook; EVM version exposes `setTargetBaseXstar` for governance/keeper. Keeper automation scheduled post-MVP.

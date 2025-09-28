@@ -50,7 +50,7 @@ contract OracleAdapterHCTest is Test {
         MockHyperCorePx(HyperCoreConstants.ORACLE_PX_PRECOMPILE).setShortResult(MARKET_KEY, uint64(1));
         vm.expectRevert(
             abi.encodeWithSelector(
-                OracleAdapterHC.HyperCoreInvalidResponse.selector, HyperCoreConstants.ORACLE_PX_PRECOMPILE, uint256(8)
+                OracleAdapterHC.HyperCoreInvalidResponse.selector, HyperCoreConstants.ORACLE_PX_PRECOMPILE, uint256(4)
             )
         );
         adapter.readMidAndAge();

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Errors} from "../../contracts/lib/Errors.sol";
+import {OracleUtils} from "../../contracts/lib/OracleUtils.sol";
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {EventRecorder} from "../utils/EventRecorder.sol";
@@ -33,11 +34,18 @@ contract ScenarioDivergenceHistogramTest is BaseTest {
             uint256 binBps = bins[i];
             _setDivergence(binBps);
 
+            (uint256 hcMid,,) = oracleHC.spot();
+            (uint256 pythMid,,,,,,) = oraclePyth.result();
+            uint256 actualDelta = OracleUtils.computeDivergenceBps(hcMid, pythMid);
+
             uint256 attempts = 1;
             uint256 rejects;
 
-            if (binBps > divergenceThreshold) {
-                vm.expectRevert(Errors.OracleDiverged.selector);
+            bool shouldReject = actualDelta > divergenceThreshold;
+            if (shouldReject) {
+                vm.expectRevert(
+                    abi.encodeWithSelector(Errors.OracleDiverged.selector, actualDelta, divergenceThreshold)
+                );
                 _attemptQuote();
                 rejects = 1;
             } else {
@@ -47,7 +55,7 @@ contract ScenarioDivergenceHistogramTest is BaseTest {
 
             uint256 rateBps = rejects * 10_000 / attempts;
             rows[i] = string.concat(
-                EventRecorder.uintToString(binBps),
+                EventRecorder.uintToString(actualDelta),
                 ",",
                 EventRecorder.uintToString(attempts),
                 ",",
@@ -57,7 +65,7 @@ contract ScenarioDivergenceHistogramTest is BaseTest {
             );
         }
 
-        EventRecorder.writeCSV(vm, "metrics/divergence_histogram.csv", "bin_bps,attempts,rejects,rate_bps", rows);
+        EventRecorder.writeCSV(vm, "metrics/divergence_histogram.csv", "delta_bps,attempts,rejects,rate_bps", rows);
     }
 
     function _attemptQuote() internal {

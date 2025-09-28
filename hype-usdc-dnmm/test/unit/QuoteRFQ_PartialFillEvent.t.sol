@@ -21,6 +21,9 @@ contract QuoteRFQPartialFillEventTest is BaseTest {
         approveAll(alice);
         approveAll(bob);
 
+        // ensure taker inventory is sufficient to cover large partial-fill requests
+        hype.transfer(alice, 500_000 ether);
+
         vm.prank(alice);
         hype.approve(address(rfq), type(uint256).max);
         vm.prank(bob);

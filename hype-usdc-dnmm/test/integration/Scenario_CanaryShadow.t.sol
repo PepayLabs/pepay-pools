@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Vm} from "forge-std/Vm.sol";
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {Errors} from "../../contracts/lib/Errors.sol";
+import {OracleUtils} from "../../contracts/lib/OracleUtils.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {DnmOracleObserver} from "../../contracts/observer/DnmOracleObserver.sol";
 import {EventRecorder} from "../utils/EventRecorder.sol";
@@ -54,9 +55,12 @@ contract ScenarioCanaryShadowTest is BaseTest {
             observer.snapshot(label);
 
             if (expectRevert) {
+                (uint256 hcMid,,) = oracleHC.spot();
+                (uint256 pythMid,,,,,,) = oraclePyth.result();
+                uint256 expectedDelta = OracleUtils.computeDivergenceBps(hcMid, pythMid);
                 rejectionCount += 1;
                 vm.prank(alice);
-                vm.expectRevert(Errors.OracleDiverged.selector);
+                vm.expectRevert(abi.encodeWithSelector(Errors.OracleDiverged.selector, expectedDelta, divergenceBps));
                 pool.swapExactIn(amountIn, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 10);
             } else {
                 swap(alice, amountIn, 0, true, IDnmPool.OracleMode.Spot, block.timestamp + 10);

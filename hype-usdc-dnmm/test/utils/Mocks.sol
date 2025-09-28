@@ -34,7 +34,7 @@ contract MockHyperCorePx {
     }
 
     fallback(bytes calldata data) external returns (bytes memory) {
-        if (data.length != 32) revert("MockHyperCorePx:bad-len");
+        if (data.length != 32 && data.length != 4) revert("MockHyperCorePx:bad-len");
         uint32 key;
         assembly {
             key := shr(224, calldataload(0))
@@ -48,7 +48,7 @@ contract MockHyperCorePx {
             }
         }
         if (res.shortReturn) {
-            return abi.encodePacked(res.px);
+            return abi.encodePacked(uint32(res.px));
         }
         return abi.encode(res.px);
     }
@@ -78,7 +78,7 @@ contract MockHyperCoreBbo {
     }
 
     fallback(bytes calldata data) external returns (bytes memory) {
-        if (data.length != 32) revert("MockHyperCoreBbo:bad-len");
+        if (data.length != 32 && data.length != 4) revert("MockHyperCoreBbo:bad-len");
         uint32 key;
         assembly {
             key := shr(224, calldataload(0))
@@ -237,7 +237,6 @@ contract FeeOnTransferERC20 is BaseMockERC20 {
             balanceOf[feeRecipient] += fee;
             emit Transfer(from, feeRecipient, fee);
         }
-
     }
 }
 

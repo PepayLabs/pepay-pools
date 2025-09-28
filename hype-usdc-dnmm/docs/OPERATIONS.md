@@ -4,6 +4,10 @@
 - [ ] Update `config/parameters_default.json` (or env-specific file) with approved values.
 - [ ] Populate `config/oracle.ids.json` with live HyperCore + Pyth identifiers.
 - [ ] `terragon-forge.sh script script/Deploy.s.sol --broadcast --rpc-url <RPC>`.
+- [ ] Export deployment environment variables before running the script:
+  - `DNMM_BASE_TOKEN`, `DNMM_QUOTE_TOKEN`, `DNMM_BASE_DECIMALS`, `DNMM_QUOTE_DECIMALS`
+  - `DNMM_PYTH_CONTRACT`, `DNMM_PYTH_PRICE_ID_HYPE_USD`, `DNMM_PYTH_PRICE_ID_USDC_USD`
+  - Optional overrides: `DNMM_HYPERCORE_PRECOMPILE`, `DNMM_HYPERCORE_ASSET_ID_HYPE`, `DNMM_HYPERCORE_ASSET_ID_USDC`, `DNMM_HYPERCORE_MARKET_ID`
 - [ ] Seed DNMM vault with balanced HYPE/USDC liquidity and call `sync()`.
 - [ ] Set `targetBaseXstar` once post-deposit price drift ≥ recenter threshold.
 - [ ] (Optional) Deploy `QuoteRFQ` and register maker signing keys.

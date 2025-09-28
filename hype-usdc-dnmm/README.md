@@ -6,7 +6,7 @@ End-to-end research and engineering drop for a Lifinity v2–style dynamic no-ma
 
 - Production-focused Solidity contracts (`contracts/`) with modular oracle adapters and dedicated math/inventory libraries
 - Configurable DNMM fee, inventory, and risk controls with guarded updates (`FeePolicy`, `Inventory`, `FixedPointMath`)
-- Deployment and operations scaffolding (scripts, checklists, telemetry hooks)
+- Deployment and operations scaffolding (scripts, checklists, telemetry hooks; deployment scripts read `DNMM_*` env vars defined in `docs/OPERATIONS.md`)
 - Research docs summarising math, oracle wiring, config provenance, and runbooks (`docs/`)
 - Foundry-based test harness (`test/`) covering fee dynamics, partial fills, divergence gates, fuzzing, and RFQ verification flows
 - Canonical parameter packs under `config/` derived from Lifinity SOL/USDC settings

@@ -26,7 +26,7 @@
 ## Operational Notes
 - Track external dependencies (oracles, precompiles, external feeds) and their addresses.
 - Define telemetry hooks and alerting thresholds for critical metrics/events.
-- Flag open questions or TODOs that block production readiness.
+- Track open questions that block production readiness.
 
 ## Maintainers & Contacts
 - Primary: TBD (assign owner)
@@ -34,4 +34,4 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- Update this section whenever significant architectural or dependency changes land.
+- 2025-09-28: Parameterised `script/Deploy.s.sol` via `DNMM_*` environment variables and documented required inputs in `docs/OPERATIONS.md`.

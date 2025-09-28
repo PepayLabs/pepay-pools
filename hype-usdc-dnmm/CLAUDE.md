@@ -26,7 +26,7 @@
 ## Operational Notes
 - Track external dependencies (oracles, precompiles, external feeds) and their addresses.
 - Define telemetry hooks and alerting thresholds for critical metrics/events.
-- Flag open questions or TODOs that block production readiness.
+- Track open questions that block production readiness.
 
 ## Maintainers & Contacts
 - Primary: TBD (assign owner)
@@ -34,7 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2025-09-28: Hardened divergence gating (symmetric Pyth<->HyperCore delta + debug emit), reworked inventory solvers for floor-safe partial fills, handled zero-confidence Pyth confidence scaling, and refreshed Quick Start script paths/docs for invariants and parity reports.
+- 2025-09-28: Hardened divergence gating (symmetric Pyth<->HyperCore delta + debug emit), reworked inventory solvers for floor-safe partial fills, handled zero-confidence Pyth confidence scaling, refreshed Quick Start script paths/docs for invariants and parity reports, and parameterised deployment scripts via `DNMM_*` env variables.
 - 2024-05-24: Folder initialized with contracts, docs, and Foundry harness.
 - 2024-05-25: Synced fee/oracle config, added Inventory/Fee libraries, extended tests and tooling.
 - 2024-07-12: Integrated Phase 8 confidence blend (EWMA sigma, feature flags), diagnostics, and extended fee parity metrics.

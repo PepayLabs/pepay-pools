@@ -47,26 +47,28 @@ library Inventory {
         uint16 floorBps,
         Tokens memory tokens
     ) internal pure returns (uint256 amountOut, uint256 appliedAmountIn, bool isPartial) {
-        uint256 amountInWad = FixedPointMath.mulDivDown(amountIn, ONE, tokens.baseScale);
-        uint256 grossQuoteWad = FixedPointMath.mulDivDown(amountInWad, mid, ONE);
-        uint256 feeWad = FixedPointMath.mulDivDown(grossQuoteWad, feeBps, BPS);
-        uint256 netQuoteWad = grossQuoteWad - feeWad;
-        amountOut = FixedPointMath.mulDivDown(netQuoteWad, tokens.quoteScale, ONE);
-
         uint256 availableQuote = availableInventory(quoteReserves, floorBps);
+
+        uint256 netQuoteWadFull = _netQuoteWadFromBaseIn(amountIn, mid, feeBps, tokens);
+        amountOut = FixedPointMath.mulDivDown(netQuoteWadFull, tokens.quoteScale, ONE);
+
         if (amountOut <= availableQuote) {
-            appliedAmountIn = amountIn;
             return (amountOut, amountIn, false);
         }
 
         if (availableQuote == 0) revert Errors.FloorBreach();
-        amountOut = availableQuote;
-        isPartial = true;
 
-        uint256 netQuoteWadPartial = FixedPointMath.mulDivDown(amountOut, ONE, tokens.quoteScale);
-        uint256 grossQuoteWadPartial = FixedPointMath.mulDivUp(netQuoteWadPartial, BPS, BPS - feeBps);
-        uint256 amountInWadPartial = FixedPointMath.mulDivUp(grossQuoteWadPartial, ONE, mid);
-        appliedAmountIn = FixedPointMath.mulDivUp(amountInWadPartial, tokens.baseScale, ONE);
+        uint256 netQuoteWadTarget = FixedPointMath.mulDivDown(availableQuote, ONE, tokens.quoteScale);
+        uint256 appliedCandidate = _baseInForNetQuoteWad(netQuoteWadTarget, mid, feeBps, tokens);
+        assert(appliedCandidate <= amountIn);
+        appliedAmountIn = appliedCandidate;
+
+        uint256 netQuoteWadApplied = _netQuoteWadFromBaseIn(appliedAmountIn, mid, feeBps, tokens);
+        amountOut = FixedPointMath.mulDivDown(netQuoteWadApplied, tokens.quoteScale, ONE);
+        if (amountOut > availableQuote) {
+            amountOut = availableQuote;
+        }
+
         return (amountOut, appliedAmountIn, true);
     }
 
@@ -78,26 +80,89 @@ library Inventory {
         uint16 floorBps,
         Tokens memory tokens
     ) internal pure returns (uint256 amountOut, uint256 appliedAmountIn, bool isPartial) {
-        uint256 amountInWad = FixedPointMath.mulDivDown(amountIn, ONE, tokens.quoteScale);
-        uint256 grossBaseWad = FixedPointMath.mulDivDown(amountInWad, ONE, mid);
-        uint256 feeWad = FixedPointMath.mulDivDown(grossBaseWad, feeBps, BPS);
-        uint256 netBaseWad = grossBaseWad - feeWad;
-        amountOut = FixedPointMath.mulDivDown(netBaseWad, tokens.baseScale, ONE);
+        uint256 baseFloor = floorAmount(baseReserves, floorBps);
+        uint256 availableBase = baseReserves > baseFloor ? baseReserves - baseFloor : 0;
 
-        uint256 availableBase = availableInventory(baseReserves, floorBps);
+        uint256 netBaseWadFull = _netBaseWadFromQuoteIn(amountIn, mid, feeBps, tokens);
+        amountOut = FixedPointMath.mulDivDown(netBaseWadFull, tokens.baseScale, ONE);
+
         if (amountOut <= availableBase) {
-            appliedAmountIn = amountIn;
             return (amountOut, amountIn, false);
         }
 
         if (availableBase == 0) revert Errors.FloorBreach();
-        amountOut = availableBase;
-        isPartial = true;
 
-        uint256 netBaseWadPartial = FixedPointMath.mulDivDown(amountOut, ONE, tokens.baseScale);
-        uint256 grossBaseWadPartial = FixedPointMath.mulDivUp(netBaseWadPartial, BPS, BPS - feeBps);
-        uint256 amountInWadPartial = FixedPointMath.mulDivUp(grossBaseWadPartial, mid, ONE);
-        appliedAmountIn = FixedPointMath.mulDivUp(amountInWadPartial, tokens.quoteScale, ONE);
+        uint256 netBaseWadTarget = FixedPointMath.mulDivDown(availableBase, ONE, tokens.baseScale);
+        uint256 appliedCandidate = _quoteInForNetBaseWad(netBaseWadTarget, mid, feeBps, tokens);
+        assert(appliedCandidate <= amountIn);
+        appliedAmountIn = appliedCandidate;
+
+        uint256 netBaseWadApplied = _netBaseWadFromQuoteIn(appliedAmountIn, mid, feeBps, tokens);
+        uint256 desiredBaseOut = FixedPointMath.mulDivDown(netBaseWadApplied, tokens.baseScale, ONE);
+        amountOut = _clampToFloor(desiredBaseOut, baseReserves, baseFloor);
+
         return (amountOut, appliedAmountIn, true);
+    }
+
+    function _netQuoteWadFromBaseIn(uint256 amountIn, uint256 mid, uint256 feeBps, Tokens memory tokens)
+        private
+        pure
+        returns (uint256 netQuoteWad)
+    {
+        uint256 amountInWad = FixedPointMath.mulDivDown(amountIn, ONE, tokens.baseScale);
+        if (amountInWad == 0) return 0;
+
+        uint256 grossQuoteWad = FixedPointMath.mulDivDown(amountInWad, mid, ONE);
+        if (grossQuoteWad == 0) return 0;
+
+        uint256 feeWad = feeBps == 0 ? 0 : FixedPointMath.mulDivDown(grossQuoteWad, feeBps, BPS);
+        return grossQuoteWad - feeWad;
+    }
+
+    function _baseInForNetQuoteWad(uint256 netQuoteWad, uint256 mid, uint256 feeBps, Tokens memory tokens)
+        private
+        pure
+        returns (uint256)
+    {
+        if (netQuoteWad == 0) return 0;
+        uint256 grossQuoteWad = feeBps == 0 ? netQuoteWad : FixedPointMath.mulDivUp(netQuoteWad, BPS, BPS - feeBps);
+        uint256 amountInWad = FixedPointMath.mulDivUp(grossQuoteWad, ONE, mid);
+        return FixedPointMath.mulDivUp(amountInWad, tokens.baseScale, ONE);
+    }
+
+    function _netBaseWadFromQuoteIn(uint256 amountIn, uint256 mid, uint256 feeBps, Tokens memory tokens)
+        private
+        pure
+        returns (uint256 netBaseWad)
+    {
+        uint256 amountInWad = FixedPointMath.mulDivDown(amountIn, ONE, tokens.quoteScale);
+        if (amountInWad == 0) return 0;
+
+        uint256 grossBaseWad = FixedPointMath.mulDivDown(amountInWad, ONE, mid);
+        if (grossBaseWad == 0) return 0;
+
+        uint256 feeWad = feeBps == 0 ? 0 : FixedPointMath.mulDivDown(grossBaseWad, feeBps, BPS);
+        return grossBaseWad - feeWad;
+    }
+
+    function _quoteInForNetBaseWad(uint256 netBaseWad, uint256 mid, uint256 feeBps, Tokens memory tokens)
+        private
+        pure
+        returns (uint256)
+    {
+        if (netBaseWad == 0) return 0;
+        uint256 grossBaseWad = feeBps == 0 ? netBaseWad : FixedPointMath.mulDivUp(netBaseWad, BPS, BPS - feeBps);
+        uint256 amountInWad = FixedPointMath.mulDivUp(grossBaseWad, mid, ONE);
+        return FixedPointMath.mulDivUp(amountInWad, tokens.quoteScale, ONE);
+    }
+
+    function _clampToFloor(uint256 desiredBaseOut, uint256 baseReserve, uint256 baseFloor)
+        internal
+        pure
+        returns (uint256 clampedBaseOut)
+    {
+        if (baseReserve <= baseFloor) return 0;
+        uint256 maxOut = baseReserve - baseFloor;
+        return desiredBaseOut > maxOut ? maxOut : desiredBaseOut;
     }
 }

@@ -130,7 +130,7 @@ contract FailurePathGasTest is BaseTest {
         );
         (uint256 used, bool success, bytes memory ret) = _call(address(pool), callData);
         require(!success, "divergence should revert");
-        require(_revertMatches(ret, Errors.OracleDivergence.selector), "divergence reason");
+        require(_revertMatches(ret, Errors.OracleDiverged.selector), "divergence reason");
         return used;
     }
 

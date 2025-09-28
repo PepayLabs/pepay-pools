@@ -24,7 +24,7 @@ contract DosEconomicsTest is BaseTest {
 
         rowIdx = _recordBurst(rows, rowIdx, "STALE", Errors.OracleStale.selector, _configureStaleScenario);
         rowIdx = _recordBurst(rows, rowIdx, "SPREAD", Errors.OracleSpread.selector, _configureSpreadScenario);
-        rowIdx = _recordBurst(rows, rowIdx, "DIVERGENCE", Errors.OracleDivergence.selector, _configureDivergenceScenario);
+        rowIdx = _recordBurst(rows, rowIdx, "DIVERGENCE", Errors.OracleDiverged.selector, _configureDivergenceScenario);
 
         EventRecorder.writeCSV(
             vm,

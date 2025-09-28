@@ -20,6 +20,7 @@ contract InventoryTest is Test {
             Inventory.quoteBaseIn(2_000_000 ether, 1e18, 100, quoteReserves, floorBps, tokens);
         assertTrue(isPartial, "should partial");
         assertGt(appliedAmountIn, 0, "applied amount");
+        assertLt(appliedAmountIn, 2_000_000 ether, "partial must reduce input");
         assertEq(quoteReserves - amountOut, floor, "floor preserved");
     }
 
@@ -27,9 +28,10 @@ contract InventoryTest is Test {
         uint256 baseReserves = 200_000 ether;
         uint16 floorBps = 300;
         uint256 floor = Inventory.floorAmount(baseReserves, floorBps);
-        (uint256 amountOut,, bool isPartial) =
+        (uint256 amountOut, uint256 appliedAmountIn, bool isPartial) =
             Inventory.quoteQuoteIn(20_000_000e6, 1e18, 100, baseReserves, floorBps, tokens);
         assertTrue(isPartial, "should partial");
+        assertLt(appliedAmountIn, 20_000_000e6, "partial must reduce quote input");
         assertEq(baseReserves - amountOut, floor, "floor after partial");
     }
 

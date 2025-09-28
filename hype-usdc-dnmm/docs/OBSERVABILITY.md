@@ -20,13 +20,14 @@
 - `ParamsUpdated(kind, oldVal, newVal)` – Governance changes (Oracle/Fee/Inventory/Maker).
 - `Paused(pauser)` / `Unpaused(pauser)` – Lifecycle controls.
 - `ConfidenceDebug(confSpreadBps, confSigmaBps, confPythBps, confBps, sigmaBps, feeBaseBps, feeVolBps, feeInvBps, feeTotalBps)` – Optional diagnostic log gated by `DEBUG_EMIT`; surfaces confidence blend and fee decomposition per quote/swap.
+- `OracleDivergenceChecked(pythMid, hcMid, deltaBps, divergenceBps)` – Emitted before `Errors.OracleDiverged` reverts when `debugEmit` is enabled; attach to divergence alerting.
 - `OracleSnapshot(label, mid, ageSec, spreadBps, pythMid, deltaBps, hcSuccess, bookSuccess, pythSuccess)` – Emitted by the on-chain observer canary; mirrors pool oracle reads for block-synchronous parity dashboards.
 - `OracleAlert(source, kind, value, threshold, critical)` – Emitted by `OracleWatcher` when observed age, divergence, or fallback usage violates configured thresholds. `kind` enumerates `Age`, `Divergence`, `Fallback`.
 - `AutoPauseRequested(source, handlerCalled, handlerData)` – Fired by `OracleWatcher` whenever auto-pause is enabled and a critical alert is detected. The optional pause handler hook is invoked first; `handlerCalled` captures the call outcome, while `handlerData` surfaces revert payloads for debugging.
 
 ## Dashboards
 - **Liquidity Health** – Track inventory deviation, floor breaches, partial percentages.
-- **Oracle Health** – Monitor fallback usage, divergence rejects (`Errors.OracleDivergence()`).
+- **Oracle Health** – Monitor fallback usage, divergence rejects (`Errors.OracleDiverged()`).
 - **Canary Shadow** – Track `canary_deltas.csv` median vs ε and ensure divergence rejections line up with observer deltas.
 - **Fee Dynamics** – Graph fee_bps vs time; overlay α/β contributions derived from oracle + inventory inputs.
 - **Revenue** – Aggregate LP fees per period (amountIn × fee_bps/BPS).

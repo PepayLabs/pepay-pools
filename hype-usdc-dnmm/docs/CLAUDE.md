@@ -34,4 +34,5 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-09-28: Added divergence guard reference (`docs/DIVERGENCE_POLICY.md`) and floor-invariant explainer (`docs/INVENTORY_FLOOR.md`).
 - 2024-07-12: Documented confidence blending weights, EWMA sigma, and the `ConfidenceDebug` telemetry stream.

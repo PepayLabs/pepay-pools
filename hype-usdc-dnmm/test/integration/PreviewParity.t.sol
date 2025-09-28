@@ -209,11 +209,11 @@ contract PreviewParityTest is BaseTest {
         });
         bytes memory sig = _signQuote(params);
 
-        vm.expectRevert(Errors.OracleDivergence.selector);
+        vm.expectRevert(Errors.OracleDiverged.selector);
         quote(params.amountIn, params.isBaseIn, IDnmPool.OracleMode.Spot);
 
         vm.prank(params.taker);
-        vm.expectRevert(Errors.OracleDivergence.selector);
+        vm.expectRevert(Errors.OracleDiverged.selector);
         rfq.verifyAndSwap(sig, params, bytes(""));
 
         vm.roll(block.number + 1);

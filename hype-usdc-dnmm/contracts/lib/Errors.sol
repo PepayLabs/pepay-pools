@@ -8,7 +8,7 @@ library Errors {
     error DeadlineExpired();
     error OracleStale();
     error OracleSpread();
-    error OracleDivergence();
+    error OracleDiverged(uint256 deltaBps, uint256 maxBps);
     error InvalidOrderbook();
     error InvalidTimestamp();
     error TokenFeeUnsupported();

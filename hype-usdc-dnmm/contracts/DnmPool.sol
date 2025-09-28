@@ -155,6 +155,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 feeTotalBps
     );
 
+    event OracleDivergenceChecked(uint256 pythMid, uint256 hcMid, uint256 deltaBps, uint256 maxBps);
+
     modifier onlyGovernance() {
         if (msg.sender != guardians.governance) revert Errors.NotGovernance();
         _;
@@ -311,8 +313,9 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         FeatureFlags memory flags = featureFlags;
-        uint256 confBps =
-            _previewConfidenceView(cfg, flags, OracleMode.Spot, midRes.mid, baRes.spreadBps, baRes.success, false, 0, false);
+        uint256 confBps = _previewConfidenceView(
+            cfg, flags, OracleMode.Spot, midRes.mid, baRes.spreadBps, baRes.success, false, 0, false
+        );
         InventoryConfig memory invCfg = inventoryConfig;
         Inventory.Tokens memory invTokens = _inventoryTokens();
         uint256 invDev = Inventory.deviationBps(
@@ -476,7 +479,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             FeePolicy.FeeState memory state =
                 FeePolicy.FeeState({lastBlock: feeState.lastBlock, lastFeeBps: feeState.lastFeeBps});
             FeePolicy.FeeState memory previewState;
-            (feeBps, previewState) = FeePolicy.previewPacked(state, feeCfgPacked, outcome.confBps, invDevBps, block.number);
+            (feeBps, previewState) =
+                FeePolicy.previewPacked(state, feeCfgPacked, outcome.confBps, invDevBps, block.number);
             if (previewState.lastFeeBps != feeBps) revert Errors.FeePreviewInvariant();
         }
 
@@ -507,14 +511,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 appliedAmountIn;
         bytes32 reason;
         (amountOut, appliedAmountIn, reason) = _computeSwapAmounts(
-            amountIn,
-            isBaseIn,
-            outcome.mid,
-            feeBps,
-            invTokens,
-            baseReservesLocal,
-            quoteReservesLocal,
-            invCfg.floorBps
+            amountIn, isBaseIn, outcome.mid, feeBps, invTokens, baseReservesLocal, quoteReservesLocal, invCfg.floorBps
         );
 
         result = QuoteResult({
@@ -550,9 +547,6 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
                 Inventory.quoteQuoteIn(amountIn, mid, feeBps, baseReservesLocal, floorBps, invTokens);
         }
 
-        if (appliedAmountIn > amountIn) {
-            appliedAmountIn = amountIn;
-        }
         reason = didPartial ? REASON_FLOOR : REASON_NONE;
     }
 
@@ -561,12 +555,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         invTokens.quoteScale = QUOTE_SCALE_;
     }
 
-    function _readOracle(
-        OracleMode mode,
-        bytes calldata oracleData,
-        FeatureFlags memory flags,
-        OracleConfig memory cfg
-    )
+    function _readOracle(OracleMode mode, bytes calldata oracleData, FeatureFlags memory flags, OracleConfig memory cfg)
         internal
         returns (OracleOutcome memory outcome)
     {
@@ -602,8 +591,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         if (cfg.allowEmaFallback) {
             emaRes = ORACLE_HC_.readMidEmaFallback();
             bool emaAgeKnown = emaRes.ageSec != HC_AGE_UNKNOWN;
-            emaFresh = emaRes.mid > 0 && emaAgeKnown && emaRes.ageSec <= cfg.maxAgeSec
-                && emaRes.ageSec <= cfg.stallWindowSec;
+            emaFresh =
+                emaRes.mid > 0 && emaAgeKnown && emaRes.ageSec <= cfg.maxAgeSec && emaRes.ageSec <= cfg.stallWindowSec;
         }
 
         if (midFresh && spreadAvailable && spreadAcceptable) {
@@ -636,21 +625,26 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         (outcome.confBps, outcome.confSpreadBps, outcome.confSigmaBps, outcome.confPythBps, outcome.sigmaBps) =
-            _computeConfidence(
-                cfg,
-                flags,
-                mode,
-                outcome.mid,
-                outcome.spreadBps,
-                spreadAvailable,
-                pythFresh,
-                pythConf,
-                outcome.reason == REASON_PYTH
-            );
+        _computeConfidence(
+            cfg,
+            flags,
+            mode,
+            outcome.mid,
+            outcome.spreadBps,
+            spreadAvailable,
+            pythFresh,
+            pythConf,
+            outcome.reason == REASON_PYTH
+        );
 
         if (!outcome.usedFallback && pythFresh && cfg.divergenceBps > 0) {
             uint256 divergenceBps = OracleUtils.computeDivergenceBps(outcome.mid, pythMid);
-            if (divergenceBps > cfg.divergenceBps) revert Errors.OracleDivergence();
+            if (divergenceBps > cfg.divergenceBps) {
+                if (flags.debugEmit) {
+                    emit OracleDivergenceChecked(pythMid, outcome.mid, divergenceBps, cfg.divergenceBps);
+                }
+                revert Errors.OracleDiverged(divergenceBps, cfg.divergenceBps);
+            }
         }
 
         return outcome;
@@ -736,7 +730,11 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         return sigmaBps;
     }
 
-    function _previewSigma(OracleConfig memory cfg, uint256 mid, uint256 spreadSample) internal view returns (uint256) {
+    function _previewSigma(OracleConfig memory cfg, uint256 mid, uint256 spreadSample)
+        internal
+        view
+        returns (uint256)
+    {
         ConfidenceState memory snapshot = ConfidenceState({
             lastSigmaBlock: confidenceState.lastSigmaBlock,
             sigmaBps: confidenceState.sigmaBps,

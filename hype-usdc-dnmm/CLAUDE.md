@@ -34,6 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-09-28: Hardened divergence gating (symmetric Pyth<->HyperCore delta + debug emit), reworked inventory solvers for floor-safe partial fills, and added end-to-end docs/tests for the new guards.
 - 2024-05-24: Folder initialized with contracts, docs, and Foundry harness.
 - 2024-05-25: Synced fee/oracle config, added Inventory/Fee libraries, extended tests and tooling.
 - 2024-07-12: Integrated Phase 8 confidence blend (EWMA sigma, feature flags), diagnostics, and extended fee parity metrics.

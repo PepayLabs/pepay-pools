@@ -37,7 +37,7 @@ contract ScenarioDivergenceHistogramTest is BaseTest {
             uint256 rejects;
 
             if (binBps > divergenceThreshold) {
-                vm.expectRevert(Errors.OracleDivergence.selector);
+                vm.expectRevert(Errors.OracleDiverged.selector);
                 _attemptQuote();
                 rejects = 1;
             } else {

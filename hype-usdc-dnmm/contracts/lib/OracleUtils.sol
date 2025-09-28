@@ -23,10 +23,16 @@ library OracleUtils {
     }
 
     function computeDivergenceBps(uint256 primaryMid, uint256 fallbackMid) internal pure returns (uint256) {
+        if (primaryMid == 0 && fallbackMid == 0) {
+            return 0;
+        }
         if (primaryMid == 0 || fallbackMid == 0) {
             return type(uint256).max;
         }
-        uint256 diff = FixedPointMath.absDiff(primaryMid, fallbackMid);
-        return FixedPointMath.toBps(diff, primaryMid);
+
+        uint256 hi = FixedPointMath.max(primaryMid, fallbackMid);
+        uint256 lo = FixedPointMath.min(primaryMid, fallbackMid);
+        uint256 diff = hi - lo;
+        return FixedPointMath.toBps(diff, hi);
     }
 }

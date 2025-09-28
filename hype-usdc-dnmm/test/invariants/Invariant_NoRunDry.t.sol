@@ -64,7 +64,9 @@ contract Handler {
         uint256 balance = base.balanceOf(address(this));
         if (balance == 0) return;
         if (amount > balance) amount = balance;
-        try pool.quoteSwapExactIn(amount, true, IDnmPool.OracleMode.Spot, bytes("")) returns (DnmPool.QuoteResult memory) {
+        try pool.quoteSwapExactIn(amount, true, IDnmPool.OracleMode.Spot, bytes("")) returns (
+            DnmPool.QuoteResult memory
+        ) {
             pool.swapExactIn(amount, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
         } catch {
             return;
@@ -76,7 +78,9 @@ contract Handler {
         uint256 balance = quote.balanceOf(address(this));
         if (balance == 0) return;
         if (amount > balance) amount = balance;
-        try pool.quoteSwapExactIn(amount, false, IDnmPool.OracleMode.Spot, bytes("")) returns (DnmPool.QuoteResult memory) {
+        try pool.quoteSwapExactIn(amount, false, IDnmPool.OracleMode.Spot, bytes("")) returns (
+            DnmPool.QuoteResult memory
+        ) {
             pool.swapExactIn(amount, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
         } catch {
             return;

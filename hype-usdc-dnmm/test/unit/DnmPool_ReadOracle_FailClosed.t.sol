@@ -37,17 +37,11 @@ contract DnmPoolReadOracleFailClosedTest is Test {
         address core = address(new RevertingHyperCore());
         vm.etch(HyperCoreConstants.ORACLE_PX_PRECOMPILE, core.code);
         adapter = new OracleAdapterHC(
-            HyperCoreConstants.ORACLE_PX_PRECOMPILE,
-            bytes32("HYPE"),
-            bytes32("USDC"),
-            bytes32("HYPE")
+            HyperCoreConstants.ORACLE_PX_PRECOMPILE, bytes32("HYPE"), bytes32("USDC"), bytes32("HYPE")
         );
 
-        DnmPool.InventoryConfig memory inventoryCfg = DnmPool.InventoryConfig({
-            targetBaseXstar: 50_000 ether,
-            floorBps: 300,
-            recenterThresholdPct: 750
-        });
+        DnmPool.InventoryConfig memory inventoryCfg =
+            DnmPool.InventoryConfig({targetBaseXstar: 50_000 ether, floorBps: 300, recenterThresholdPct: 750});
         DnmPool.OracleConfig memory oracleCfg = DnmPool.OracleConfig({
             maxAgeSec: 60,
             stallWindowSec: 15,
@@ -113,9 +107,7 @@ contract DnmPoolReadOracleFailClosedTest is Test {
         vm.prank(trader);
         vm.expectRevert(
             abi.encodeWithSelector(
-                OracleAdapterHC.HyperCoreCallFailed.selector,
-                HyperCoreConstants.ORACLE_PX_PRECOMPILE,
-                revertData
+                OracleAdapterHC.HyperCoreCallFailed.selector, HyperCoreConstants.ORACLE_PX_PRECOMPILE, revertData
             )
         );
         pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);

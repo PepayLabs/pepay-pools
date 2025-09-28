@@ -27,19 +27,13 @@ contract OracleAdapterHCFailClosedTest is Test {
     function test_revertsWhenStaticcallFails() external {
         address core = address(new HyperCoreReverter());
         vm.etch(HyperCoreConstants.ORACLE_PX_PRECOMPILE, core.code);
-        OracleAdapterHC adapter = new OracleAdapterHC(
-            HyperCoreConstants.ORACLE_PX_PRECOMPILE,
-            ASSET_BASE,
-            ASSET_QUOTE,
-            MARKET
-        );
+        OracleAdapterHC adapter =
+            new OracleAdapterHC(HyperCoreConstants.ORACLE_PX_PRECOMPILE, ASSET_BASE, ASSET_QUOTE, MARKET);
 
         bytes memory revertData = abi.encodeWithSignature("Error(string)", "HC fail");
         vm.expectRevert(
             abi.encodeWithSelector(
-                OracleAdapterHC.HyperCoreCallFailed.selector,
-                HyperCoreConstants.ORACLE_PX_PRECOMPILE,
-                revertData
+                OracleAdapterHC.HyperCoreCallFailed.selector, HyperCoreConstants.ORACLE_PX_PRECOMPILE, revertData
             )
         );
         adapter.readMidAndAge();
@@ -48,18 +42,12 @@ contract OracleAdapterHCFailClosedTest is Test {
     function test_revertsOnShortResponse() external {
         address core = address(new HyperCoreShortReturn());
         vm.etch(HyperCoreConstants.ORACLE_PX_PRECOMPILE, core.code);
-        OracleAdapterHC adapter = new OracleAdapterHC(
-            HyperCoreConstants.ORACLE_PX_PRECOMPILE,
-            ASSET_BASE,
-            ASSET_QUOTE,
-            MARKET
-        );
+        OracleAdapterHC adapter =
+            new OracleAdapterHC(HyperCoreConstants.ORACLE_PX_PRECOMPILE, ASSET_BASE, ASSET_QUOTE, MARKET);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                OracleAdapterHC.HyperCoreInvalidResponse.selector,
-                HyperCoreConstants.ORACLE_PX_PRECOMPILE,
-                uint256(8)
+                OracleAdapterHC.HyperCoreInvalidResponse.selector, HyperCoreConstants.ORACLE_PX_PRECOMPILE, uint256(8)
             )
         );
         adapter.readMidAndAge();

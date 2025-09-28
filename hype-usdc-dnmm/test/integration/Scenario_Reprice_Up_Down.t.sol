@@ -177,10 +177,7 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         comparisonRows[0] = _formatComparisonRow("up", metricsUp.executedVwap, dexVwapUp);
         comparisonRows[1] = _formatComparisonRow("down", metricsDown.executedVwap, dexVwapDown);
         EventRecorder.writeCSV(
-            vm,
-            "metrics/reprice_vwap_comparison.csv",
-            "phase,dnmm_vwap,cpamm_vwap,diff_vs_cpamm_bps",
-            comparisonRows
+            vm, "metrics/reprice_vwap_comparison.csv", "phase,dnmm_vwap,cpamm_vwap,diff_vs_cpamm_bps", comparisonRows
         );
     }
 

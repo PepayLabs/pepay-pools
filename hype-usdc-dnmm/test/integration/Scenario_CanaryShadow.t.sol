@@ -103,12 +103,7 @@ contract ScenarioCanaryShadowTest is BaseTest {
 
             deltas[deltaPtr++] = snap.deltaBps;
             rows[i] = _formatCanaryRow(
-                label,
-                currentBlock,
-                swapEvt.mid,
-                snap.pythMid,
-                snap.deltaBps,
-                _reasonString(swapEvt.reason)
+                label, currentBlock, swapEvt.mid, snap.pythMid, snap.deltaBps, _reasonString(swapEvt.reason)
             );
         }
 
@@ -116,12 +111,7 @@ contract ScenarioCanaryShadowTest is BaseTest {
         uint256 medianDelta = _median(deltas, deltaPtr);
         require(medianDelta <= divergenceBps, "median within epsilon");
 
-        EventRecorder.writeCSV(
-            vm,
-            "metrics/canary_deltas.csv",
-            "label,block,swap_mid,pyth_mid,delta_bps,reason",
-            rows
-        );
+        EventRecorder.writeCSV(vm, "metrics/canary_deltas.csv", "label,block,swap_mid,pyth_mid,delta_bps,reason", rows);
     }
 
     function _configureScenario(bytes32 label) internal {
@@ -213,5 +203,4 @@ contract ScenarioCanaryShadowTest is BaseTest {
         if (label == LABEL_DIV) return "divergence";
         return "unknown";
     }
-
 }

@@ -46,6 +46,19 @@ contract OracleAdapterPythTest is Test {
         assertEq(conf, expectedConf, "conf selection");
     }
 
+    function test_zero_confidence_short_circuits_to_zero_bps() public {
+        pyth.setPrice(HYPE_ID, 30_000_000_000, -8, 0, uint64(block.timestamp));
+        pyth.setPrice(USDC_ID, 1_000_000_000, -8, 0, uint64(block.timestamp));
+
+        IOracleAdapterPyth.PythResult memory res = adapter.readPythUsdMid(bytes(""));
+        assertTrue(res.success, "pyth success");
+        assertEq(res.confBpsHype, 0, "hype conf zero bps");
+        assertEq(res.confBpsUsdc, 0, "usdc conf zero bps");
+
+        (,, uint256 conf) = adapter.computePairMid(res);
+        assertEq(conf, 0, "pair confidence zero");
+    }
+
     function test_age_caps() public {
         pyth.setPrice(HYPE_ID, 20_000_000_000, -8, 40, uint64(block.timestamp - 100));
         pyth.setPrice(USDC_ID, 1_000_000_000, -8, 40, uint64(block.timestamp - 10));

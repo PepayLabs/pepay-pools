@@ -1,6 +1,6 @@
 # HYPE/USDC DNMM (HyperEVM)
 
-End-to-end research and engineering drop for a Lifinity v2–style dynamic no-manual-market-maker (DNMM) tailored to the HYPE/USDC spot market on HyperEVM. The design anchors on Hyperliquid HyperCore order-book data with a Pyth fallback/divergence oracle, provides on-chain quoting + swap execution, optional RFQ settlement, and exposes the governance/observability hooks required for mainnet-readiness.
+End-to-end research and engineering drop for a Lifinity v2–style dynamic no-manual-market-maker (DNMM) tailored to the HYPE/USDC spot market on HyperEVM. The design anchors on Hyperliquid HyperCore order-book data with a Pyth fallback/divergence oracle, delivers on-chain quoting + swap execution, optional RFQ settlement, and exposes the governance/observability hooks required for mainnet readiness.
 
 ## What lives here
 
@@ -18,8 +18,8 @@ End-to-end research and engineering drop for a Lifinity v2–style dynamic no-ma
 3. Configure HyperCore + Pyth identifiers under `config/oracle.ids.json` and token metadata under `config/tokens.hyper.json`.
 4. Execute `terragon-forge.sh test` for the default suite or `terragon-forge.sh test --match-path test/perf` to capture gas/load artefacts in `metrics/` and `gas-snapshots.txt` alongside component-focused runs like `--match-test testFeeDecay`.
 5. Review `RUNBOOK.md`, `SECURITY.md`, and `docs/CONFIG.md` ahead of any deployment for operational expectations.
-6. For invariants, run the PR smoke sweep with `FOUNDRY_PROFILE=ci FOUNDRY_INVARIANT_RUNS=2000 forge test --match-path test/invariants/Invariant_NoRunDry.t.sol`; for adaptive 20k runs use `script/run_invariants.sh` (sampler + shard/idle guards) from the repo root.
-7. After long runs, `script/check_parity_metrics.sh --log <log>` enforces CSV freshness, and `script/report_invariants.sh <log> --max-revert-rate-bps 1000` emits `reports/invariants_run.json` (and fails if revert rate exceeds 10%).
+6. For invariants, run the PR smoke sweep with `FOUNDRY_PROFILE=ci FOUNDRY_INVARIANT_RUNS=2000 forge test --match-path test/invariants/Invariant_NoRunDry.t.sol`; for adaptive 20k runs, execute `./script/run_invariants.sh` (sampler + shard/idle guards) from `hype-usdc-dnmm/` or `hype-usdc-dnmm/script/run_invariants.sh` from the repo root.
+7. After long runs, `./script/check_parity_metrics.sh --log <log>` enforces CSV freshness, and `./script/report_invariants.sh <log> --max-revert-rate-bps 1000` emits `reports/invariants_run.json` (and fails if revert rate exceeds 10%).
 
 > ℹ️  HyperCore precompile addresses and asset identifiers are placeholders; confirm before stage deployments.
 

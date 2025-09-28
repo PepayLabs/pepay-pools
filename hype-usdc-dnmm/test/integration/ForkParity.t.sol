@@ -193,14 +193,8 @@ contract ForkParityTest is BaseTest {
             uint256 capCheck = evt.reason == REASON_PYTH ? capStrict : capSpot;
 
             string memory sourceLabel = _sourceLabel(evt.reason);
-            parityRows[i] = _formatParityRow(
-                labels[i],
-                sourceLabel,
-                blockNumbers[i],
-                evt.mid,
-                expectedMids[i],
-                deltaBps
-            );
+            parityRows[i] =
+                _formatParityRow(labels[i], sourceLabel, blockNumbers[i], evt.mid, expectedMids[i], deltaBps);
 
             ageRows[i] = _formatAgeRow(labels[i], sourceLabel, expectedAges[i]);
 
@@ -289,10 +283,7 @@ contract ForkParityTest is BaseTest {
         for (uint256 i = 0; i < divergenceDeltasBps.length; ++i) {
             bool shouldReject = divergenceDeltasBps[i] > divergenceCap;
             if (shouldReject) {
-                require(
-                    divergenceRejectionsByDelta[i] == divergenceAttemptsByDelta[i],
-                    "divergence bin must reject"
-                );
+                require(divergenceRejectionsByDelta[i] == divergenceAttemptsByDelta[i], "divergence bin must reject");
             } else {
                 require(divergenceRejectionsByDelta[i] == 0, "divergence bin should pass");
             }
@@ -301,21 +292,16 @@ contract ForkParityTest is BaseTest {
         string[] memory divergenceRows = new string[](3);
         divergenceRows[0] = _formatCountRow("divergence_attempts", divergenceAttempts);
         divergenceRows[1] = _formatCountRow("divergence_rejections", divergenceRejections);
-        uint256 divergenceRateBps = divergenceAttempts == 0
-            ? 0
-            : (divergenceRejections * 10_000) / divergenceAttempts;
+        uint256 divergenceRateBps = divergenceAttempts == 0 ? 0 : (divergenceRejections * 10_000) / divergenceAttempts;
         divergenceRows[2] = _formatCountRow("divergence_reject_rate_bps", divergenceRateBps);
         EventRecorder.writeCSV(vm, "metrics/divergence_rate.csv", "metric,value", divergenceRows);
 
-        require(
-            divergenceRejections == expectedDivergenceRejections,
-            "divergence rejection count"
-        );
+        require(divergenceRejections == expectedDivergenceRejections, "divergence rejection count");
         require(staleAttempts == staleRejections, "stale must reject");
     }
 
     function _pythAge() private view returns (uint256) {
-        (, , uint256 ageHype, uint256 ageUsdc, , ,) = oraclePyth.result();
+        (,, uint256 ageHype, uint256 ageUsdc,,,) = oraclePyth.result();
         return ageHype > ageUsdc ? ageHype : ageUsdc;
     }
 

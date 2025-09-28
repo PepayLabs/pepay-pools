@@ -17,9 +17,9 @@ contract OracleAdapterHCTest is Test {
 
     function setUp() public {
         vm.warp(1000);
-        _installPrecompile(new MockHyperCorePx(), HyperCoreConstants.ORACLE_PX_PRECOMPILE);
-        _installPrecompile(new MockHyperCorePx(), HyperCoreConstants.MARK_PX_PRECOMPILE);
-        _installPrecompile(new MockHyperCoreBbo(), HyperCoreConstants.BBO_PRECOMPILE);
+        _installPrecompile(address(new MockHyperCorePx()), HyperCoreConstants.ORACLE_PX_PRECOMPILE);
+        _installPrecompile(address(new MockHyperCorePx()), HyperCoreConstants.MARK_PX_PRECOMPILE);
+        _installPrecompile(address(new MockHyperCoreBbo()), HyperCoreConstants.BBO_PRECOMPILE);
 
         adapter = new OracleAdapterHC(
             HyperCoreConstants.ORACLE_PX_PRECOMPILE, ASSET_BASE, ASSET_QUOTE, MARKET

@@ -7,14 +7,13 @@ import {OracleAdapterHC} from "../../contracts/oracle/OracleAdapterHC.sol";
 import {HyperCoreConstants} from "../../contracts/oracle/HyperCoreConstants.sol";
 
 contract HyperCoreReverter {
-    fallback(bytes calldata) external pure {
+    fallback() external {
         revert("HC fail");
     }
 }
 
 contract HyperCoreShortReturn {
-    fallback(bytes calldata data) external pure returns (bytes memory) {
-        data;
+    fallback(bytes calldata data) external returns (bytes memory) {
         return abi.encode(uint256(1));
     }
 }
@@ -25,8 +24,8 @@ contract OracleAdapterHCFailClosedTest is Test {
     bytes32 internal constant MARKET = bytes32("HYPE");
 
     function test_revertsWhenStaticcallFails() external {
-        HyperCoreReverter core = new HyperCoreReverter();
-        vm.etch(HyperCoreConstants.ORACLE_PX_PRECOMPILE, address(core).code);
+        address core = address(new HyperCoreReverter());
+        vm.etch(HyperCoreConstants.ORACLE_PX_PRECOMPILE, core.code);
         OracleAdapterHC adapter = new OracleAdapterHC(
             HyperCoreConstants.ORACLE_PX_PRECOMPILE,
             ASSET_BASE,
@@ -46,8 +45,8 @@ contract OracleAdapterHCFailClosedTest is Test {
     }
 
     function test_revertsOnShortResponse() external {
-        HyperCoreShortReturn core = new HyperCoreShortReturn();
-        vm.etch(HyperCoreConstants.ORACLE_PX_PRECOMPILE, address(core).code);
+        address core = address(new HyperCoreShortReturn());
+        vm.etch(HyperCoreConstants.ORACLE_PX_PRECOMPILE, core.code);
         OracleAdapterHC adapter = new OracleAdapterHC(
             HyperCoreConstants.ORACLE_PX_PRECOMPILE,
             ASSET_BASE,

@@ -5,6 +5,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {Errors} from "../../contracts/lib/Errors.sol";
+import {OracleUtils} from "../../contracts/lib/OracleUtils.sol";
 import {MockOracleHC} from "../../contracts/mocks/MockOracleHC.sol";
 import {EventRecorder} from "../utils/EventRecorder.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
@@ -264,9 +265,11 @@ contract ForkParityTest is BaseTest {
                 ++divergenceAttemptsByDelta[i];
             }
 
-            bool expectsRevert = deltaBps > divergenceCap;
+            (uint256 hcMidCurrent,,) = oracleHC.spot();
+            uint256 actualDelta = OracleUtils.computeDivergenceBps(hcMidCurrent, pythMid);
+            bool expectsRevert = actualDelta > divergenceCap;
             if (expectsRevert) {
-                vm.expectRevert(Errors.OracleDiverged.selector);
+                vm.expectRevert(abi.encodeWithSelector(Errors.OracleDiverged.selector, actualDelta, divergenceCap));
                 quote(15 ether, true, IDnmPool.OracleMode.Spot);
                 unchecked {
                     ++divergenceRejections;
@@ -281,7 +284,10 @@ contract ForkParityTest is BaseTest {
         }
 
         for (uint256 i = 0; i < divergenceDeltasBps.length; ++i) {
-            bool shouldReject = divergenceDeltasBps[i] > divergenceCap;
+            uint256 pythMid = (1e18 * (10_000 + divergenceDeltasBps[i])) / 10_000;
+            (uint256 hcMidLoop,,) = oracleHC.spot();
+            uint256 actualDelta = OracleUtils.computeDivergenceBps(hcMidLoop, pythMid);
+            bool shouldReject = actualDelta > divergenceCap;
             if (shouldReject) {
                 require(divergenceRejectionsByDelta[i] == divergenceAttemptsByDelta[i], "divergence bin must reject");
             } else {

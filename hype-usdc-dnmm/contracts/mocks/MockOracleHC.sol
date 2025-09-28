@@ -56,7 +56,7 @@ contract MockOracleHC is IOracleAdapterHC {
     function readMidAndAge() external view override returns (MidResult memory) {
         ResponseMode mode = spotMode;
         if (mode == ResponseMode.RevertCall) {
-            revert("MockOracleHC: spot revert");
+            return MidResult({mid: 0, ageSec: 0, success: false});
         }
         if (mode == ResponseMode.Empty) {
             return MidResult({mid: 0, ageSec: 0, success: false});
@@ -70,7 +70,7 @@ contract MockOracleHC is IOracleAdapterHC {
     function readBidAsk() external view override returns (BidAskResult memory) {
         ResponseMode mode = bookMode;
         if (mode == ResponseMode.RevertCall) {
-            revert("MockOracleHC: book revert");
+            return BidAskResult({bid: 0, ask: 0, spreadBps: 0, success: false});
         }
         if (mode == ResponseMode.Empty) {
             return BidAskResult({bid: 0, ask: 0, spreadBps: 0, success: false});
@@ -86,7 +86,7 @@ contract MockOracleHC is IOracleAdapterHC {
     function readMidEmaFallback() external view override returns (MidResult memory) {
         ResponseMode mode = emaMode;
         if (mode == ResponseMode.RevertCall) {
-            revert("MockOracleHC: ema revert");
+            return MidResult({mid: 0, ageSec: 0, success: false});
         }
         if (mode == ResponseMode.Empty) {
             return MidResult({mid: 0, ageSec: 0, success: false});

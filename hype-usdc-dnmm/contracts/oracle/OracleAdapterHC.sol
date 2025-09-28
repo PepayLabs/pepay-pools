@@ -60,20 +60,39 @@ contract OracleAdapterHC is IOracleAdapterHC {
     }
 
     function readMidAndAge() external view override returns (MidResult memory result) {
-        bytes memory callData = abi.encode(MARKET_KEY_);
+        bytes memory callData = abi.encodePacked(MARKET_KEY_);
         // AUDIT:HCABI-001 canonical oraclePx precompile (returns single uint64 word)
-        bytes memory data = _callHyperCore(HyperCoreConstants.ORACLE_PX_PRECOMPILE, callData, 32);
+        bytes memory data = _callHyperCore(HyperCoreConstants.ORACLE_PX_PRECOMPILE, callData, 8);
 
-        uint64 midWord = abi.decode(data, (uint64));
+        uint64 midWord;
+        if (data.length == 8) {
+            midWord = uint64(bytes8(data));
+        } else if (data.length == 32) {
+            midWord = abi.decode(data, (uint64));
+        } else {
+            revert HyperCoreInvalidResponse(HyperCoreConstants.ORACLE_PX_PRECOMPILE, data.length);
+        }
         return MidResult(uint256(midWord), AGE_UNKNOWN, true);
     }
 
     function readBidAsk() external view override returns (BidAskResult memory result) {
-        bytes memory callData = abi.encode(MARKET_KEY_);
+        bytes memory callData = abi.encodePacked(MARKET_KEY_);
         // AUDIT:HCABI-001 canonical bbo precompile for bid/ask spread
-        bytes memory data = _callHyperCore(HyperCoreConstants.BBO_PRECOMPILE, callData, 64);
+        bytes memory data = _callHyperCore(HyperCoreConstants.BBO_PRECOMPILE, callData, 16);
 
-        (uint64 bidWord, uint64 askWord) = abi.decode(data, (uint64, uint64));
+        uint64 bidWord;
+        uint64 askWord;
+        if (data.length == 16) {
+            assembly {
+                let word := mload(add(data, 0x20))
+                bidWord := shr(192, word)
+                askWord := and(shr(128, word), 0xFFFFFFFFFFFFFFFF)
+            }
+        } else if (data.length == 64) {
+            (bidWord, askWord) = abi.decode(data, (uint64, uint64));
+        } else {
+            revert HyperCoreInvalidResponse(HyperCoreConstants.BBO_PRECOMPILE, data.length);
+        }
         uint256 bid = uint256(bidWord);
         uint256 ask = uint256(askWord);
         uint256 spreadBps = OracleUtils.computeSpreadBps(bid, ask);
@@ -81,11 +100,18 @@ contract OracleAdapterHC is IOracleAdapterHC {
     }
 
     function readMidEmaFallback() external view override returns (MidResult memory result) {
-        bytes memory callData = abi.encode(MARKET_KEY_);
+        bytes memory callData = abi.encodePacked(MARKET_KEY_);
         // AUDIT:HCABI-001 canonical markPx precompile used as EMA fallback
-        bytes memory data = _callHyperCore(HyperCoreConstants.MARK_PX_PRECOMPILE, callData, 32);
+        bytes memory data = _callHyperCore(HyperCoreConstants.MARK_PX_PRECOMPILE, callData, 8);
 
-        uint64 emaMidWord = abi.decode(data, (uint64));
+        uint64 emaMidWord;
+        if (data.length == 8) {
+            emaMidWord = uint64(bytes8(data));
+        } else if (data.length == 32) {
+            emaMidWord = abi.decode(data, (uint64));
+        } else {
+            revert HyperCoreInvalidResponse(HyperCoreConstants.MARK_PX_PRECOMPILE, data.length);
+        }
         return MidResult(uint256(emaMidWord), AGE_UNKNOWN, true);
     }
 

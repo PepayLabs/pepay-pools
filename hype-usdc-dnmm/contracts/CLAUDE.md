@@ -34,7 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2025-09-28: Added `Errors.OracleDiverged`, symmetric divergence gating with debug telemetry, floor-conserving inventory solvers (helper decomposition for partial fills), and guarded `_confidenceToBps` against zero-confidence feeds.
+- 2025-09-28: Added `Errors.OracleDiverged`, symmetric divergence gating with debug telemetry, floor-conserving inventory solvers (helper decomposition for partial fills), guarded `_confidenceToBps` against zero-confidence feeds, and aligned `MockOracleHC` response modes with fail-closed semantics for regression tests.
 - 2025-09-28: Rewired `OracleAdapterHC` to HyperCore's raw 32-byte precompiles (0x0806/0x0807/0x0808/0x080e) with fail-closed semantics; added address-pin tests and canonical constants.
 - 2025-09-22: Hardened oracle handling with precompile failure fallbacks, invalid orderbook guardrails, Pyth-only confidence blending + strict caps, timestamp regression checks, and explicit fee-on-transfer rejection in `DnmPool`.
 - 2024-07-12: Added confidence-blend feature flags, EWMA sigma state, and `ConfidenceDebug` emission across quoting/swap paths.

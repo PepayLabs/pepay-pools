@@ -6,6 +6,7 @@ import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {IQuoteRFQ} from "../../contracts/interfaces/IQuoteRFQ.sol";
 import {FixedPointMath} from "../../contracts/lib/FixedPointMath.sol";
 import {Errors} from "../../contracts/lib/Errors.sol";
+import {OracleUtils} from "../../contracts/lib/OracleUtils.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {QuoteRFQ} from "../../contracts/quotes/QuoteRFQ.sol";
 import {EventRecorder} from "../utils/EventRecorder.sol";
@@ -209,11 +210,13 @@ contract PreviewParityTest is BaseTest {
         });
         bytes memory sig = _signQuote(params);
 
-        vm.expectRevert(Errors.OracleDiverged.selector);
+        (uint256 hcMid,,) = oracleHC.spot();
+        uint256 expectedDelta = OracleUtils.computeDivergenceBps(hcMid, 1_120_000_000_000_000_000);
+        vm.expectRevert(abi.encodeWithSelector(Errors.OracleDiverged.selector, expectedDelta, divergenceCap));
         quote(params.amountIn, params.isBaseIn, IDnmPool.OracleMode.Spot);
 
         vm.prank(params.taker);
-        vm.expectRevert(Errors.OracleDiverged.selector);
+        vm.expectRevert(abi.encodeWithSelector(Errors.OracleDiverged.selector, expectedDelta, divergenceCap));
         rfq.verifyAndSwap(sig, params, bytes(""));
 
         vm.roll(block.number + 1);

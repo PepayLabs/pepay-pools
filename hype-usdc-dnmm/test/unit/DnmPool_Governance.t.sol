@@ -111,7 +111,7 @@ contract DnmPoolGovernanceTest is BaseTest {
         cfg.capBps = cfg.baseBps - 1;
 
         vm.prank(gov);
-        vm.expectRevert(Errors.InvalidConfig.selector);
+        vm.expectRevert(abi.encodeWithSelector(FeePolicy.FeeBaseAboveCap.selector, cfg.baseBps, cfg.capBps));
         pool.updateParams(DnmPool.ParamKind.Fee, abi.encode(cfg));
     }
 

@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {Errors} from "../../contracts/lib/Errors.sol";
+import {OracleUtils} from "../../contracts/lib/OracleUtils.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 
@@ -15,7 +16,10 @@ contract ScenarioDivergenceTripwireTest is BaseTest {
     function test_divergence_blocks_and_resumes() public {
         updatePyth(12e17, 1e18, 0, 0, 20, 20);
 
-        vm.expectRevert(Errors.OracleDiverged.selector);
+        (uint256 hcMid,,) = oracleHC.spot();
+        uint256 expectedDelta = OracleUtils.computeDivergenceBps(hcMid, 12e17);
+        (,,,, uint16 divergenceCap,,,,,) = pool.oracleConfig();
+        vm.expectRevert(abi.encodeWithSelector(Errors.OracleDiverged.selector, expectedDelta, divergenceCap));
         quote(1_000 ether, true, IDnmPool.OracleMode.Spot);
 
         updatePyth(1005e15, 1e18, 0, 0, 20, 20);

@@ -30,8 +30,8 @@ contract DnmPoolReadOracleFailClosedTest is Test {
     address internal trader = address(0xB0B);
 
     function setUp() public {
-        baseToken = new MockERC20("HYPE", "HYPE", 18, 1_000_000 ether, address(this));
-        quoteToken = new MockERC20("USDC", "USDC", 6, 1_000_000_000000, address(this));
+        baseToken = new MockERC20("HYPE", "HYPE", 18, 2_000_000 ether, address(this));
+        quoteToken = new MockERC20("USDC", "USDC", 6, 2_000_000_000000, address(this));
         pyth = new MockOraclePyth();
 
         address core = address(new RevertingHyperCore());

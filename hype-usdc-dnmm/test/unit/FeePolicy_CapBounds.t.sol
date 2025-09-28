@@ -5,7 +5,19 @@ import {Test} from "forge-std/Test.sol";
 
 import {FeePolicy} from "../../contracts/lib/FeePolicy.sol";
 
+contract FeePolicyHarness {
+    function pack(FeePolicy.FeeConfig memory cfg) external pure {
+        FeePolicy.pack(cfg);
+    }
+}
+
 contract FeePolicyCapBoundsTest is Test {
+    FeePolicyHarness internal harness;
+
+    function setUp() public {
+        harness = new FeePolicyHarness();
+    }
+
     function _cfg(uint16 baseBps, uint16 capBps) internal pure returns (FeePolicy.FeeConfig memory cfg) {
         cfg = FeePolicy.FeeConfig({
             baseBps: baseBps,
@@ -21,13 +33,13 @@ contract FeePolicyCapBoundsTest is Test {
     function test_packRevertsWhenCapAtOrAbove100Percent() external {
         FeePolicy.FeeConfig memory cfg = _cfg(50, 10_000);
         vm.expectRevert(abi.encodeWithSelector(FeePolicy.FeeCapTooHigh.selector, uint16(10_000)));
-        FeePolicy.pack(cfg);
+        harness.pack(cfg);
     }
 
     function test_packRevertsWhenBaseExceedsCap() external {
         FeePolicy.FeeConfig memory cfg = _cfg(200, 150);
         vm.expectRevert(abi.encodeWithSelector(FeePolicy.FeeBaseAboveCap.selector, uint16(200), uint16(150)));
-        FeePolicy.pack(cfg);
+        harness.pack(cfg);
     }
 
     function test_packAllowsValidBounds() external {

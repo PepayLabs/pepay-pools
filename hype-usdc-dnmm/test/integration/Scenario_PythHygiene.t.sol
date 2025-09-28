@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {Errors} from "../../contracts/lib/Errors.sol";
+import {OracleUtils} from "../../contracts/lib/OracleUtils.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {EventRecorder} from "../utils/EventRecorder.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
@@ -66,11 +67,13 @@ contract ScenarioPythHygieneTest is BaseTest {
         updateEma(1e18, 3, true);
         updatePyth(1_120e15, 1e18, 1, 1, 30, 30);
 
-        vm.expectRevert(Errors.OracleDiverged.selector);
+        (uint256 hcMid,,) = oracleHC.spot();
+        uint256 expectedDelta = OracleUtils.computeDivergenceBps(hcMid, 1_120e15);
+        vm.expectRevert(abi.encodeWithSelector(Errors.OracleDiverged.selector, expectedDelta, divergenceBps));
         quote(10 ether, true, IDnmPool.OracleMode.Spot);
 
         vm.prank(alice);
-        vm.expectRevert(Errors.OracleDiverged.selector);
+        vm.expectRevert(abi.encodeWithSelector(Errors.OracleDiverged.selector, expectedDelta, divergenceBps));
         pool.swapExactIn(10 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 5);
 
         vm.roll(block.number + 1);

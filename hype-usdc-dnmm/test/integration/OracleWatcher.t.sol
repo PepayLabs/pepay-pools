@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {OracleWatcher} from "../../contracts/observer/OracleWatcher.sol";
+import {OracleUtils} from "../../contracts/lib/OracleUtils.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 
 contract OracleWatcherTest is BaseTest {
@@ -37,8 +38,10 @@ contract OracleWatcherTest is BaseTest {
         updateBidAsk(998e15, 1_002e15, 15, true);
         updatePyth(1_200_000_000_000_000_000, 1e18, 0, 0, 20, 20);
 
+        (uint256 hcMid,,) = oracleHC.spot();
+        uint256 deltaBps = OracleUtils.computeDivergenceBps(hcMid, 1_200_000_000_000_000_000);
         vm.expectEmit(true, false, false, true, address(watcher));
-        emit OracleWatcher.OracleAlert("DELTA", OracleWatcher.AlertKind.Divergence, 2000, 50, true);
+        emit OracleWatcher.OracleAlert("DELTA", OracleWatcher.AlertKind.Divergence, deltaBps, 50, true);
 
         watcher.check("DELTA", bytes(""));
     }

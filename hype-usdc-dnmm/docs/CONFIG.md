@@ -37,8 +37,28 @@ Holds production token metadata for HYPE and USDC. Replace placeholder addresses
 
 ### `oracle.ids.json`
 Tracks HyperCore asset/market IDs and Pyth price IDs.
-- `hypercore.precompile` must be filled once the official read precompile is published.
+- `hypercore.precompile` should point to `0x0000000000000000000000000000000000000807`, the published HyperCore oracle precompile.
 - `pyth.*` entries map to the feed IDs for HYPE/USD and USDC/USD.
+- Asset / market identifiers are ABI-encoded as 32-byte words. The adapter slices the first four bytes (big-endian) to obtain the `uint32` index required by the HyperCore precompiles—keep those prefixes in sync with HyperCore's `L1Read.sol` constants.
+
+### Fee Policy Bounds (Audit ORFQ-002)
+- Governance must keep `capBps < 10_000` (100%). Any higher value reverts via `FeeCapTooHigh`.
+- `baseBps` must satisfy `baseBps ≤ capBps`; violations revert with `FeeBaseAboveCap`.
+- When editing JSON configs, run `forge test -m CapBounds` (see `test/unit/FeePolicy_CapBounds.t.sol`) before proposing on-chain updates.
+
+### RFQ Maker Keys & Signatures (Audit RFQ-001)
+- `QuoteRFQ` now accepts either EOAs or EIP-1271 smart wallets.
+- EOAs must supply 65-byte `r,s,v` signatures, failing with `QuoteSignerMismatch` on mismatch.
+- Contract makers must return `0x1626ba7e` from `isValidSignature`. Reverts bubble as `MakerMustBeEOA` (no interface) or `Invalid1271MagicValue` (bad magic).
+- Rotation Playbook: deploy the 1271 contract, test on staging with `forge test -m 1271`, then call `setMakerKey(newContract)` from the RFQ owner.
+
+### QuoteFilled Telemetry (Audit RFQ-002)
+- Event payload now includes actual consumed input/output amounts and any leftover returned to the taker.
+- Indexers should read:
+  - `requestedAmountIn` (3rd arg) – original taker intent.
+  - `amountOut` (4th arg) and `actualAmountOut` (8th arg) – executed size (identical for backward compatibility).
+  - `actualAmountIn` (7th arg) and `leftoverReturned` (9th arg) – to distinguish partial fills.
+- Update downstream analytics and alarms to consume the new fields before upgrading prod RPC nodes.
 
 ## Management
 1. Copy defaults to environment-specific variants (e.g. `parameters_staging.json`).

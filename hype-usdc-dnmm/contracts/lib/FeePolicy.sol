@@ -6,6 +6,9 @@ import {FixedPointMath} from "./FixedPointMath.sol";
 library FeePolicy {
     using FixedPointMath for uint256;
 
+    error FeeCapTooHigh(uint16 capBps); // AUDIT:ORFQ-002 guard cap < 100%
+    error FeeBaseAboveCap(uint16 baseBps, uint16 capBps); // AUDIT:ORFQ-002 base must not exceed cap
+
     uint256 private constant HUNDRED = 100;
     uint256 private constant DECAY_SCALE = 1e9;
     uint256 private constant MASK_16 = 0xFFFF;
@@ -35,6 +38,9 @@ library FeePolicy {
     }
 
     function pack(FeeConfig memory cfg) internal pure returns (uint256 packed) {
+        if (cfg.capBps >= 10_000) revert FeeCapTooHigh(cfg.capBps);
+        if (cfg.baseBps > cfg.capBps) revert FeeBaseAboveCap(cfg.baseBps, cfg.capBps);
+
         packed = uint256(cfg.baseBps);
         packed |= uint256(cfg.alphaConfNumerator) << OFFSET_ALPHA_CONF_NUM;
         packed |= uint256(cfg.alphaConfDenominator) << OFFSET_ALPHA_CONF_DEN;

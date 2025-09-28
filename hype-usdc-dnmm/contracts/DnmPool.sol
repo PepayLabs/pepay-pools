@@ -387,7 +387,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         } else if (kind == ParamKind.Fee) {
             FeePolicy.FeeConfig memory oldCfg = FeePolicy.unpack(feeConfigPacked);
             FeePolicy.FeeConfig memory newCfg = abi.decode(data, (FeePolicy.FeeConfig));
-            if (newCfg.capBps < newCfg.baseBps) revert Errors.InvalidConfig();
+            if (newCfg.capBps >= 10_000) revert FeePolicy.FeeCapTooHigh(newCfg.capBps); // AUDIT:ORFQ-002 enforce <100%
+            if (newCfg.baseBps > newCfg.capBps) {
+                revert FeePolicy.FeeBaseAboveCap(newCfg.baseBps, newCfg.capBps);
+            }
             feeConfigPacked = FeePolicy.pack(newCfg);
             emit ParamsUpdated("FEE", abi.encode(oldCfg), data);
         } else if (kind == ParamKind.Inventory) {
@@ -566,23 +569,12 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         internal
         returns (OracleOutcome memory outcome)
     {
-        IOracleAdapterHC.MidResult memory midRes;
-        IOracleAdapterHC.BidAskResult memory baRes;
+        // AUDIT:HCABI-002 adapters now fail-closed; surface reverts instead of success flags
+        IOracleAdapterHC.MidResult memory midRes = ORACLE_HC_.readMidAndAge();
+        IOracleAdapterHC.BidAskResult memory baRes = ORACLE_HC_.readBidAsk();
 
-        try ORACLE_HC_.readMidAndAge() returns (IOracleAdapterHC.MidResult memory res) {
-            midRes = res;
-        } catch {
-            midRes = IOracleAdapterHC.MidResult({mid: 0, ageSec: type(uint256).max, success: false});
-        }
-
-        try ORACLE_HC_.readBidAsk() returns (IOracleAdapterHC.BidAskResult memory res) {
-            baRes = res;
-        } catch {
-            baRes = IOracleAdapterHC.BidAskResult({bid: 0, ask: 0, spreadBps: 0, success: false});
-        }
-
-        bool bookInvalid = baRes.success && (baRes.bid == 0 || baRes.ask == 0 || baRes.ask <= baRes.bid);
-        if (bookInvalid) revert Errors.InvalidOrderbook();
+        bool spreadAvailable = baRes.bid > 0 && baRes.ask > 0;
+        if (spreadAvailable && baRes.ask <= baRes.bid) revert Errors.InvalidOrderbook();
 
         uint256 pythMid;
         uint256 pythAge;
@@ -600,20 +592,14 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             }
         }
 
-        bool midFresh = midRes.success && midRes.mid > 0 && midRes.ageSec <= cfg.maxAgeSec;
-        bool spreadAvailable = baRes.success;
+        bool midFresh = midRes.mid > 0 && midRes.ageSec <= cfg.maxAgeSec;
         bool spreadAcceptable = baRes.spreadBps <= cfg.confCapBpsSpot;
         bool spreadRejected = midFresh && spreadAvailable && !spreadAcceptable;
         IOracleAdapterHC.MidResult memory emaRes;
         bool emaFresh;
         if (cfg.allowEmaFallback) {
-            try ORACLE_HC_.readMidEmaFallback() returns (IOracleAdapterHC.MidResult memory res) {
-                emaRes = res;
-            } catch {
-                emaRes = IOracleAdapterHC.MidResult({mid: 0, ageSec: type(uint256).max, success: false});
-            }
-            emaFresh = emaRes.success && emaRes.mid > 0 && emaRes.ageSec <= cfg.maxAgeSec
-                && emaRes.ageSec <= cfg.stallWindowSec;
+            emaRes = ORACLE_HC_.readMidEmaFallback();
+            emaFresh = emaRes.mid > 0 && emaRes.ageSec <= cfg.maxAgeSec && emaRes.ageSec <= cfg.stallWindowSec;
         }
 
         if (midFresh && spreadAvailable && spreadAcceptable) {

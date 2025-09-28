@@ -10,49 +10,108 @@ interface IReentrancyHook {
     function onTokenTransfer(address token, address from, address to, uint256 amount) external;
 }
 
-contract MockHyperCore {
-    uint256 public bid;
-    uint256 public ask;
-    uint256 public mid;
-    uint64 public spotTs;
-
-    uint256 public emaMid;
-    uint64 public emaTs;
-
-    bytes4 internal constant SELECTOR_SPOT = 0x6a627842;
-    bytes4 internal constant SELECTOR_ORDERBOOK = 0x3f5d0c52;
-    bytes4 internal constant SELECTOR_EMA = 0x0e349d01;
-
-    error UnknownSelector(bytes4 selector);
-
-    function setTOB(uint256 bid_, uint256 ask_, uint256 mid_, uint64 ts_) external {
-        bid = bid_;
-        ask = ask_;
-        mid = mid_;
-        spotTs = ts_;
+contract MockHyperCorePx {
+    struct Result {
+        uint256 px;
+        uint64 timestamp;
+        bool configured;
+        bool success;
+        bool shortReturn;
+        bytes revertData;
     }
 
-    function setEMA(uint256 emaMid_, uint64 emaTs_) external {
-        emaMid = emaMid_;
-        emaTs = emaTs_;
+    mapping(uint32 => Result) internal results;
+
+    function setResult(uint32 key, uint256 px, uint64 ts) external {
+        results[key] = Result({
+            px: px,
+            timestamp: ts,
+            configured: true,
+            success: true,
+            shortReturn: false,
+            revertData: ""
+        });
+    }
+
+    function setShortResult(uint32 key, uint256 px) external {
+        results[key] = Result({
+            px: px,
+            timestamp: 0,
+            configured: true,
+            success: true,
+            shortReturn: true,
+            revertData: ""
+        });
+    }
+
+    function setFailure(uint32 key, bytes calldata revertData) external {
+        results[key] = Result({
+            px: 0,
+            timestamp: 0,
+            configured: true,
+            success: false,
+            shortReturn: false,
+            revertData: revertData
+        });
     }
 
     fallback(bytes calldata data) external returns (bytes memory) {
-        data;
-        bytes4 selector;
+        if (data.length != 32) revert("MockHyperCorePx:bad-len");
+        uint32 key;
         assembly {
-            selector := calldataload(0)
+            key := shr(224, calldataload(0))
         }
-        if (selector == SELECTOR_SPOT) {
-            return abi.encode(mid, spotTs);
+        Result memory res = results[key];
+        if (!res.configured) revert("MockHyperCorePx:missing");
+        if (!res.success) {
+            bytes memory revertData = res.revertData.length > 0 ? res.revertData : bytes("HC fail");
+            assembly {
+                revert(add(revertData, 0x20), mload(revertData))
+            }
         }
-        if (selector == SELECTOR_ORDERBOOK) {
-            return abi.encode(bid, ask);
+        if (res.shortReturn) {
+            return abi.encode(res.px);
         }
-        if (selector == SELECTOR_EMA) {
-            return abi.encode(emaMid, emaTs);
+        return abi.encode(res.px, res.timestamp);
+    }
+}
+
+contract MockHyperCoreBbo {
+    struct Result {
+        uint256 bid;
+        uint256 ask;
+        bool configured;
+        bool success;
+        bool shortReturn;
+    }
+
+    mapping(uint32 => Result) internal results;
+
+    function setResult(uint32 key, uint256 bid_, uint256 ask_) external {
+        results[key] = Result({bid: bid_, ask: ask_, configured: true, success: true, shortReturn: false});
+    }
+
+    function setShortResult(uint32 key, uint256 bid_) external {
+        results[key] = Result({bid: bid_, ask: 0, configured: true, success: true, shortReturn: true});
+    }
+
+    function setFailure(uint32 key) external {
+        results[key] = Result({bid: 0, ask: 0, configured: true, success: false, shortReturn: false});
+    }
+
+    fallback(bytes calldata data) external returns (bytes memory) {
+        if (data.length != 32) revert("MockHyperCoreBbo:bad-len");
+        uint32 key;
+        assembly {
+            key := shr(224, calldataload(0))
         }
-        revert UnknownSelector(selector);
+        Result memory res = results[key];
+        if (!res.configured) revert("MockHyperCoreBbo:missing");
+        if (!res.success) revert("MockHyperCoreBbo:fail");
+        if (res.shortReturn) {
+            return abi.encode(res.bid);
+        }
+        return abi.encode(res.bid, res.ask);
     }
 }
 

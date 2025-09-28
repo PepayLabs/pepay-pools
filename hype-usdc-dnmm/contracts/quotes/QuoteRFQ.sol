@@ -7,6 +7,10 @@ import {IERC20} from "../interfaces/IERC20.sol";
 import {SafeTransferLib} from "../lib/SafeTransferLib.sol";
 import {ReentrancyGuard} from "../lib/ReentrancyGuard.sol";
 
+interface IERC1271 {
+    function isValidSignature(bytes32 hash, bytes calldata signature) external view returns (bytes4);
+}
+
 contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
     using SafeTransferLib for address;
 
@@ -25,6 +29,8 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
     error QuoteOwnerZero();
     error QuoteInputMismatch();
     error QuoteMakerKeyZero();
+    error MakerMustBeEOA(); // AUDIT:RFQ-001 require EOAs or compliant contracts
+    error Invalid1271MagicValue(bytes4 provided); // AUDIT:RFQ-001 invalid 1271 magic
 
     bytes32 private constant EIP712_DOMAIN_TYPEHASH = keccak256(
         "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
@@ -32,6 +38,7 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
     bytes32 private constant QUOTE_TYPEHASH = keccak256(
         "Quote(address taker,uint256 amountIn,uint256 minAmountOut,bool isBaseIn,uint256 expiry,uint256 salt)"
     );
+    bytes4 private constant ERC1271_MAGIC_VALUE = 0x1626ba7e;
 
     IDnmPool internal immutable POOL_;
     address public makerKey;
@@ -46,8 +53,16 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
 
     event MakerKeyUpdated(address indexed oldKey, address indexed newKey);
     event QuoteFilled(
-        address indexed taker, bool isBaseIn, uint256 amountIn, uint256 amountOut, uint256 expiry, uint256 salt
-    );
+        address indexed taker,
+        bool isBaseIn,
+        uint256 requestedAmountIn,
+        uint256 amountOut,
+        uint256 expiry,
+        uint256 salt,
+        uint256 actualAmountIn,
+        uint256 actualAmountOut,
+        uint256 leftoverReturned
+    ); // AUDIT:RFQ-002 emit actual fill amounts
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     modifier onlyOwner() {
@@ -83,7 +98,7 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         consumedSalts[params.salt] = true;
 
         bytes32 digest = hashTypedDataV4(params);
-        if (_recoverSigner(digest, makerSignature) != makerKey) revert QuoteSignerMismatch();
+        _assertValidMakerSignature(digest, makerSignature);
 
         address baseToken = POOL_.baseTokenAddress();
         address quoteToken = POOL_.quoteTokenAddress();
@@ -106,8 +121,9 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         uint256 inputBalanceAfter = IERC20(inputToken).balanceOf(address(this));
         uint256 outputBalanceAfter = IERC20(outputToken).balanceOf(address(this));
 
-        if (inputBalanceAfter > 0) {
-            inputToken.safeTransfer(params.taker, inputBalanceAfter);
+        uint256 leftoverIn = inputBalanceAfter;
+        if (leftoverIn > 0) {
+            inputToken.safeTransfer(params.taker, leftoverIn);
         }
 
         amountOut = outputBalanceAfter - outputBalanceBefore;
@@ -115,7 +131,18 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
 
         outputToken.safeTransfer(params.taker, amountOut);
 
-        emit QuoteFilled(params.taker, params.isBaseIn, params.amountIn, amountOut, params.expiry, params.salt);
+        uint256 actualAmountIn = inputReceived - leftoverIn; // AUDIT:RFQ-002 track filled input after partial return
+        emit QuoteFilled(
+            params.taker,
+            params.isBaseIn,
+            params.amountIn,
+            amountOut,
+            params.expiry,
+            params.salt,
+            actualAmountIn,
+            amountOut,
+            leftoverIn
+        );
     }
 
     function setMakerKey(address newKey) external override onlyOwner {
@@ -154,7 +181,16 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         override
         returns (bool)
     {
-        return _recoverSigner(hashTypedDataV4(params), signature) == signer;
+        bytes32 digest = hashTypedDataV4(params);
+        if (signer.code.length == 0) {
+            if (signature.length != 65) return false;
+            return _recoverSigner(digest, signature) == signer;
+        }
+        (bool ok, bytes memory data) = signer.staticcall(
+            abi.encodeWithSelector(IERC1271.isValidSignature.selector, digest, signature)
+        );
+        if (!ok || data.length < 32) return false;
+        return bytes4(data) == ERC1271_MAGIC_VALUE;
     }
 
     function _domainSeparatorV4() internal view returns (bytes32) {
@@ -183,5 +219,21 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
         if (v < 27) v += 27;
         if (v != 27 && v != 28) revert QuoteSignatureV();
         return ecrecover(digest, v, r, s);
+    }
+
+    function _assertValidMakerSignature(bytes32 digest, bytes calldata signature) internal view {
+        address key = makerKey;
+        if (key.code.length == 0) {
+            if (_recoverSigner(digest, signature) != key) revert QuoteSignerMismatch();
+            return;
+        }
+
+        (bool ok, bytes memory data) = key.staticcall(
+            abi.encodeWithSelector(IERC1271.isValidSignature.selector, digest, signature)
+        );
+        if (!ok || data.length < 32) revert MakerMustBeEOA(); // AUDIT:RFQ-001 reject contracts without 1271 support
+
+        bytes4 magic = bytes4(data);
+        if (magic != ERC1271_MAGIC_VALUE) revert Invalid1271MagicValue(magic);
     }
 }

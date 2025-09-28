@@ -11,7 +11,23 @@
 | `FUN_ram_00019590` (partial fill guard) | Solve quadratic to leave liquidity floor | `Inventory.quoteBaseIn` / `Inventory.quoteQuoteIn` | Uses `FixedPointMath` for deterministic scaling and matches Solana big-int ops. |
 | `FUN_ram_0001c050` (event emit) | Emit swap + fee telemetry | `SwapExecuted` / `QuoteServed` events | Event fields mirror Solana logging schema. |
 
+## HyperCore Precompile Pinning
+
+HyperCore exposes dedicated read-only precompiles at 0x…0800+. The adapter calls them with raw ABI-encoded 32-byte inputs (no selectors) and decodes the returned tuples.
+
+| Call | Precompile Address | Solidity Helper |
+|------|--------------------|-----------------|
+| `markPx(uint32)` | `0x0000000000000000000000000000000000000806` | `HyperCoreConstants.MARK_PX_PRECOMPILE` |
+| `oraclePx(uint32)` | `0x0000000000000000000000000000000000000807` | `HyperCoreConstants.ORACLE_PX_PRECOMPILE` |
+| `spotPx(uint32)` | `0x0000000000000000000000000000000000000808` | `HyperCoreConstants.SPOT_PX_PRECOMPILE` |
+| `bbo(uint32)` | `0x000000000000000000000000000000000000080e` | `HyperCoreConstants.BBO_PRECOMPILE` |
+
+Update Procedure:
+1. Fetch the latest `L1Read.sol` from the HyperCore documentation bundle and confirm the precompile addresses/return structs.
+2. If Hyperliquid shifts addresses, update `contracts/oracle/HyperCoreConstants.sol` and re-run `test/unit/OracleAdapterHC_Selectors.t.sol` (now checking addresses).
+3. Adjust mocks in `test/utils/Mocks.sol` so canonical addresses continue to respond during unit tests.
+4. Record provenance (doc URL + retrieval date) in this file and in release notes.
+
 ## Gap Review
-- **HyperCore selectors**: Placeholder until official precompile ABI confirmed. Marked `TODO` in `OracleAdapterHC`.
-- **EMA exact weighting**: Lifinity caches EMA in state; HyperCore exposes via precompile – integration pending docs.
+- **EMA exact weighting**: Lifinity caches EMA in state; HyperCore exposes via precompile – weighting remains aligned with current docs.
 - **Rebalance automation**: Solana program has keeper hook; EVM version exposes `setTargetBaseXstar` for governance/keeper. Keeper automation scheduled post-MVP.

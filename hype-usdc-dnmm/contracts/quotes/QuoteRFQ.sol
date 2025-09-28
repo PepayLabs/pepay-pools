@@ -32,9 +32,8 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
     error MakerMustBeEOA(); // AUDIT:RFQ-001 require EOAs or compliant contracts
     error Invalid1271MagicValue(bytes4 provided); // AUDIT:RFQ-001 invalid 1271 magic
 
-    bytes32 private constant EIP712_DOMAIN_TYPEHASH = keccak256(
-        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-    );
+    bytes32 private constant EIP712_DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
     bytes32 private constant QUOTE_TYPEHASH = keccak256(
         "Quote(address taker,uint256 amountIn,uint256 minAmountOut,bool isBaseIn,uint256 expiry,uint256 salt)"
     );
@@ -186,9 +185,8 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
             if (signature.length != 65) return false;
             return _recoverSigner(digest, signature) == signer;
         }
-        (bool ok, bytes memory data) = signer.staticcall(
-            abi.encodeWithSelector(IERC1271.isValidSignature.selector, digest, signature)
-        );
+        (bool ok, bytes memory data) =
+            signer.staticcall(abi.encodeWithSelector(IERC1271.isValidSignature.selector, digest, signature));
         if (!ok || data.length < 32) return false;
         return bytes4(data) == ERC1271_MAGIC_VALUE;
     }
@@ -201,9 +199,7 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
     }
 
     function _buildDomainSeparator(bytes32 hashedName, bytes32 hashedVersion) private view returns (bytes32) {
-        return keccak256(
-            abi.encode(EIP712_DOMAIN_TYPEHASH, hashedName, hashedVersion, block.chainid, address(this))
-        );
+        return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, hashedName, hashedVersion, block.chainid, address(this)));
     }
 
     function _recoverSigner(bytes32 digest, bytes calldata signature) internal pure returns (address) {
@@ -228,9 +224,8 @@ contract QuoteRFQ is IQuoteRFQ, ReentrancyGuard {
             return;
         }
 
-        (bool ok, bytes memory data) = key.staticcall(
-            abi.encodeWithSelector(IERC1271.isValidSignature.selector, digest, signature)
-        );
+        (bool ok, bytes memory data) =
+            key.staticcall(abi.encodeWithSelector(IERC1271.isValidSignature.selector, digest, signature));
         if (!ok || data.length < 32) revert MakerMustBeEOA(); // AUDIT:RFQ-001 reject contracts without 1271 support
 
         bytes4 magic = bytes4(data);

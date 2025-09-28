@@ -22,6 +22,11 @@ HyperCore exposes dedicated read-only precompiles at 0x…0800+. The adapter cal
 | `spotPx(uint32)` | `0x0000000000000000000000000000000000000808` | `HyperCoreConstants.SPOT_PX_PRECOMPILE` |
 | `bbo(uint32)` | `0x000000000000000000000000000000000000080e` | `HyperCoreConstants.BBO_PRECOMPILE` |
 
+ABI Shapes:
+- `markPx`, `oraclePx`, and `spotPx` each return a single `uint64` price word. No timestamp is supplied; downstream consumers must source freshness elsewhere.
+- `bbo` returns two `uint64` words: `(bid, ask)`.
+- Calls still use raw 32-byte calldata (`abi.encode(uint32 index)`) and revert on invalid indices.
+
 Update Procedure:
 1. Fetch the latest `L1Read.sol` from the HyperCore documentation bundle and confirm the precompile addresses/return structs.
 2. If Hyperliquid shifts addresses, update `contracts/oracle/HyperCoreConstants.sol` and re-run `test/unit/OracleAdapterHC_Selectors.t.sol` (now checking addresses).

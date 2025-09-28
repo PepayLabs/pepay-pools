@@ -17,18 +17,18 @@ contract OracleAdapterHCTest is Test {
 
     function setUp() public {
         vm.warp(1000);
-        _installPrecompile(new MockHyperCorePx(), HyperCoreConstants.ORACLE_PX_PRECOMPILE);
-        _installPrecompile(new MockHyperCorePx(), HyperCoreConstants.MARK_PX_PRECOMPILE);
-        _installPrecompile(new MockHyperCoreBbo(), HyperCoreConstants.BBO_PRECOMPILE);
+        _installPrecompile(address(new MockHyperCorePx()), HyperCoreConstants.ORACLE_PX_PRECOMPILE);
+        _installPrecompile(address(new MockHyperCorePx()), HyperCoreConstants.MARK_PX_PRECOMPILE);
+        _installPrecompile(address(new MockHyperCoreBbo()), HyperCoreConstants.BBO_PRECOMPILE);
 
         adapter = new OracleAdapterHC(
             HyperCoreConstants.ORACLE_PX_PRECOMPILE, ASSET_BASE, ASSET_QUOTE, MARKET
         );
 
-        MockHyperCorePx(HyperCoreConstants.ORACLE_PX_PRECOMPILE).setResult(MARKET_KEY, 1e18, 995);
-        MockHyperCorePx(HyperCoreConstants.MARK_PX_PRECOMPILE).setResult(MARKET_KEY, 1e18, 997);
+        MockHyperCorePx(HyperCoreConstants.ORACLE_PX_PRECOMPILE).setResult(MARKET_KEY, uint64(1e18));
+        MockHyperCorePx(HyperCoreConstants.MARK_PX_PRECOMPILE).setResult(MARKET_KEY, uint64(1e18));
         MockHyperCoreBbo(HyperCoreConstants.BBO_PRECOMPILE).setResult(
-            MARKET_KEY, 1e18 - 2e15, 1e18 + 2e15
+            MARKET_KEY, uint64(1e18 - 2e15), uint64(1e18 + 2e15)
         );
     }
 
@@ -36,7 +36,7 @@ contract OracleAdapterHCTest is Test {
         IOracleAdapterHC.MidResult memory res = adapter.readMidAndAge();
         assertTrue(res.success, "mid success");
         assertEq(res.mid, 1e18, "mid");
-        assertEq(res.ageSec, 5, "age");
+        assertEq(res.ageSec, type(uint256).max, "age sentinel");
     }
 
     function test_spreadToConfBps_ok() public {
@@ -48,18 +48,21 @@ contract OracleAdapterHCTest is Test {
         assertEq(res.spreadBps, 40, "spread bps");
     }
 
-    function test_stale_mid_returns_max_age() public {
-        MockHyperCorePx(HyperCoreConstants.ORACLE_PX_PRECOMPILE).setResult(
-            MARKET_KEY, 1e18, uint64(block.timestamp - 600)
+    function test_shortReturn_reverts() public {
+        MockHyperCorePx(HyperCoreConstants.ORACLE_PX_PRECOMPILE).setShortResult(MARKET_KEY, uint64(1));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                OracleAdapterHC.HyperCoreInvalidResponse.selector,
+                HyperCoreConstants.ORACLE_PX_PRECOMPILE,
+                uint256(8)
+            )
         );
-        IOracleAdapterHC.MidResult memory res = adapter.readMidAndAge();
-        assertTrue(res.success, "mid success");
-        assertEq(res.ageSec, 600, "age");
+        adapter.readMidAndAge();
     }
 
     function test_spreadCap_rejects_when_bid_ask_bad() public {
         MockHyperCoreBbo(HyperCoreConstants.BBO_PRECOMPILE).setResult(
-            MARKET_KEY, 900e14, 1200e14
+            MARKET_KEY, uint64(900e14), uint64(1200e14)
         );
         IOracleAdapterHC.BidAskResult memory res = adapter.readBidAsk();
         assertTrue(res.success, "bidask success");
@@ -70,7 +73,7 @@ contract OracleAdapterHCTest is Test {
         IOracleAdapterHC.MidResult memory res = adapter.readMidEmaFallback();
         assertTrue(res.success, "ema success");
         assertEq(res.mid, 1e18, "ema mid");
-        assertEq(res.ageSec, 3, "ema age");
+        assertEq(res.ageSec, type(uint256).max, "ema age sentinel");
     }
 
     function test_decimals_scaling_rounds() public {
@@ -78,7 +81,9 @@ contract OracleAdapterHCTest is Test {
         uint256 diff = (mid * 2) / 1000; // 0.2%
         uint256 bid = mid - diff / 2;
         uint256 ask = mid + diff / 2;
-        MockHyperCoreBbo(HyperCoreConstants.BBO_PRECOMPILE).setResult(MARKET_KEY, bid, ask);
+        MockHyperCoreBbo(HyperCoreConstants.BBO_PRECOMPILE).setResult(
+            MARKET_KEY, uint64(bid), uint64(ask)
+        );
         IOracleAdapterHC.BidAskResult memory res = adapter.readBidAsk();
         assertTrue(res.success, "bidask success");
         assertEq(res.spreadBps, 20, "spread rounding");

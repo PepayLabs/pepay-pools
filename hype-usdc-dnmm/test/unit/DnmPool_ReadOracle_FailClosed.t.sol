@@ -13,7 +13,7 @@ import {FeePolicy} from "../../contracts/lib/FeePolicy.sol";
 import {HyperCoreConstants} from "../../contracts/oracle/HyperCoreConstants.sol";
 
 contract RevertingHyperCore {
-    fallback(bytes calldata) external pure {
+    fallback() external {
         revert("HC fail");
     }
 }
@@ -34,8 +34,8 @@ contract DnmPoolReadOracleFailClosedTest is Test {
         quoteToken = new MockERC20("USDC", "USDC", 6, 1_000_000_000000, address(this));
         pyth = new MockOraclePyth();
 
-        RevertingHyperCore core = new RevertingHyperCore();
-        vm.etch(HyperCoreConstants.ORACLE_PX_PRECOMPILE, address(core).code);
+        address core = address(new RevertingHyperCore());
+        vm.etch(HyperCoreConstants.ORACLE_PX_PRECOMPILE, core.code);
         adapter = new OracleAdapterHC(
             HyperCoreConstants.ORACLE_PX_PRECOMPILE,
             bytes32("HYPE"),

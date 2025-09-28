@@ -18,6 +18,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
     uint256 private constant ONE = 1e18;
     uint256 private constant BPS = 10_000;
+    uint256 private constant HC_AGE_UNKNOWN = type(uint256).max;
 
     enum ParamKind {
         Oracle,
@@ -592,14 +593,17 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             }
         }
 
-        bool midFresh = midRes.mid > 0 && midRes.ageSec <= cfg.maxAgeSec;
+        bool midAgeKnown = midRes.ageSec != HC_AGE_UNKNOWN;
+        bool midFresh = midRes.mid > 0 && midAgeKnown && midRes.ageSec <= cfg.maxAgeSec;
         bool spreadAcceptable = baRes.spreadBps <= cfg.confCapBpsSpot;
         bool spreadRejected = midFresh && spreadAvailable && !spreadAcceptable;
         IOracleAdapterHC.MidResult memory emaRes;
         bool emaFresh;
         if (cfg.allowEmaFallback) {
             emaRes = ORACLE_HC_.readMidEmaFallback();
-            emaFresh = emaRes.mid > 0 && emaRes.ageSec <= cfg.maxAgeSec && emaRes.ageSec <= cfg.stallWindowSec;
+            bool emaAgeKnown = emaRes.ageSec != HC_AGE_UNKNOWN;
+            emaFresh = emaRes.mid > 0 && emaAgeKnown && emaRes.ageSec <= cfg.maxAgeSec
+                && emaRes.ageSec <= cfg.stallWindowSec;
         }
 
         if (midFresh && spreadAvailable && spreadAcceptable) {

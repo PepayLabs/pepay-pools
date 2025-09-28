@@ -12,8 +12,7 @@ interface IReentrancyHook {
 
 contract MockHyperCorePx {
     struct Result {
-        uint256 px;
-        uint64 timestamp;
+        uint64 px;
         bool configured;
         bool success;
         bool shortReturn;
@@ -22,37 +21,16 @@ contract MockHyperCorePx {
 
     mapping(uint32 => Result) internal results;
 
-    function setResult(uint32 key, uint256 px, uint64 ts) external {
-        results[key] = Result({
-            px: px,
-            timestamp: ts,
-            configured: true,
-            success: true,
-            shortReturn: false,
-            revertData: ""
-        });
+    function setResult(uint32 key, uint64 px) external {
+        results[key] = Result({px: px, configured: true, success: true, shortReturn: false, revertData: ""});
     }
 
-    function setShortResult(uint32 key, uint256 px) external {
-        results[key] = Result({
-            px: px,
-            timestamp: 0,
-            configured: true,
-            success: true,
-            shortReturn: true,
-            revertData: ""
-        });
+    function setShortResult(uint32 key, uint64 px) external {
+        results[key] = Result({px: px, configured: true, success: true, shortReturn: true, revertData: ""});
     }
 
     function setFailure(uint32 key, bytes calldata revertData) external {
-        results[key] = Result({
-            px: 0,
-            timestamp: 0,
-            configured: true,
-            success: false,
-            shortReturn: false,
-            revertData: revertData
-        });
+        results[key] = Result({px: 0, configured: true, success: false, shortReturn: false, revertData: revertData});
     }
 
     fallback(bytes calldata data) external returns (bytes memory) {
@@ -70,16 +48,16 @@ contract MockHyperCorePx {
             }
         }
         if (res.shortReturn) {
-            return abi.encode(res.px);
+            return abi.encodePacked(res.px);
         }
-        return abi.encode(res.px, res.timestamp);
+        return abi.encode(res.px);
     }
 }
 
 contract MockHyperCoreBbo {
     struct Result {
-        uint256 bid;
-        uint256 ask;
+        uint64 bid;
+        uint64 ask;
         bool configured;
         bool success;
         bool shortReturn;
@@ -87,11 +65,11 @@ contract MockHyperCoreBbo {
 
     mapping(uint32 => Result) internal results;
 
-    function setResult(uint32 key, uint256 bid_, uint256 ask_) external {
+    function setResult(uint32 key, uint64 bid_, uint64 ask_) external {
         results[key] = Result({bid: bid_, ask: ask_, configured: true, success: true, shortReturn: false});
     }
 
-    function setShortResult(uint32 key, uint256 bid_) external {
+    function setShortResult(uint32 key, uint64 bid_) external {
         results[key] = Result({bid: bid_, ask: 0, configured: true, success: true, shortReturn: true});
     }
 
@@ -109,7 +87,7 @@ contract MockHyperCoreBbo {
         if (!res.configured) revert("MockHyperCoreBbo:missing");
         if (!res.success) revert("MockHyperCoreBbo:fail");
         if (res.shortReturn) {
-            return abi.encode(res.bid);
+            return abi.encodePacked(res.bid);
         }
         return abi.encode(res.bid, res.ask);
     }

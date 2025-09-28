@@ -16,6 +16,8 @@ contract OracleAdapterHC is IOracleAdapterHC {
     uint32 internal immutable BASE_ASSET_KEY_;
     uint32 internal immutable QUOTE_ASSET_KEY_;
 
+    uint256 private constant AGE_UNKNOWN = type(uint256).max;
+
     error HyperCoreAddressMismatch(address provided);
     error HyperCoreCallFailed(address target, bytes data);
     error HyperCoreInvalidResponse(address target, uint256 length);
@@ -59,12 +61,11 @@ contract OracleAdapterHC is IOracleAdapterHC {
 
     function readMidAndAge() external view override returns (MidResult memory result) {
         bytes memory callData = abi.encode(MARKET_KEY_);
-        // AUDIT:HCABI-001 canonical oraclePx precompile (raw 32-byte calldata)
-        bytes memory data = _callHyperCore(HyperCoreConstants.ORACLE_PX_PRECOMPILE, callData, 64);
+        // AUDIT:HCABI-001 canonical oraclePx precompile (returns single uint64 word)
+        bytes memory data = _callHyperCore(HyperCoreConstants.ORACLE_PX_PRECOMPILE, callData, 32);
 
-        (uint256 mid, uint64 timestamp) = abi.decode(data, (uint256, uint64));
-        uint256 age = block.timestamp > timestamp ? block.timestamp - timestamp : 0;
-        return MidResult(mid, age, true);
+        uint64 midWord = abi.decode(data, (uint64));
+        return MidResult(uint256(midWord), AGE_UNKNOWN, true);
     }
 
     function readBidAsk() external view override returns (BidAskResult memory result) {
@@ -72,7 +73,9 @@ contract OracleAdapterHC is IOracleAdapterHC {
         // AUDIT:HCABI-001 canonical bbo precompile for bid/ask spread
         bytes memory data = _callHyperCore(HyperCoreConstants.BBO_PRECOMPILE, callData, 64);
 
-        (uint256 bid, uint256 ask) = abi.decode(data, (uint256, uint256));
+        (uint64 bidWord, uint64 askWord) = abi.decode(data, (uint64, uint64));
+        uint256 bid = uint256(bidWord);
+        uint256 ask = uint256(askWord);
         uint256 spreadBps = OracleUtils.computeSpreadBps(bid, ask);
         return BidAskResult(bid, ask, spreadBps, true);
     }
@@ -80,11 +83,10 @@ contract OracleAdapterHC is IOracleAdapterHC {
     function readMidEmaFallback() external view override returns (MidResult memory result) {
         bytes memory callData = abi.encode(MARKET_KEY_);
         // AUDIT:HCABI-001 canonical markPx precompile used as EMA fallback
-        bytes memory data = _callHyperCore(HyperCoreConstants.MARK_PX_PRECOMPILE, callData, 64);
+        bytes memory data = _callHyperCore(HyperCoreConstants.MARK_PX_PRECOMPILE, callData, 32);
 
-        (uint256 emaMid, uint64 timestamp) = abi.decode(data, (uint256, uint64));
-        uint256 age = block.timestamp > timestamp ? block.timestamp - timestamp : 0;
-        return MidResult(emaMid, age, true);
+        uint64 emaMidWord = abi.decode(data, (uint64));
+        return MidResult(uint256(emaMidWord), AGE_UNKNOWN, true);
     }
 
     function _callHyperCore(address target, bytes memory callData, uint256 minLength)

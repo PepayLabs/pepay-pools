@@ -14,7 +14,8 @@ contract HyperCoreReverter {
 
 contract HyperCoreShortReturn {
     fallback(bytes calldata data) external returns (bytes memory) {
-        return abi.encode(uint256(1));
+        data;
+        return abi.encodePacked(uint64(1));
     }
 }
 
@@ -58,7 +59,7 @@ contract OracleAdapterHCFailClosedTest is Test {
             abi.encodeWithSelector(
                 OracleAdapterHC.HyperCoreInvalidResponse.selector,
                 HyperCoreConstants.ORACLE_PX_PRECOMPILE,
-                uint256(32)
+                uint256(8)
             )
         );
         adapter.readMidAndAge();

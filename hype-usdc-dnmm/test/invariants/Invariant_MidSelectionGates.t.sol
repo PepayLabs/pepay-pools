@@ -30,7 +30,7 @@ contract InvariantMidSelectionGates is StdInvariant, BaseTest {
                 selector := mload(add(err, 32))
             }
             assertTrue(
-                selector == Errors.OracleStale.selector || selector == Errors.OracleDivergence.selector,
+                selector == Errors.OracleStale.selector || selector == Errors.OracleDiverged.selector,
                 "unexpected error"
             );
         } else {

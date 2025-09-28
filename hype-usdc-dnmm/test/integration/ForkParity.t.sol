@@ -272,7 +272,7 @@ contract ForkParityTest is BaseTest {
 
             bool expectsRevert = deltaBps > divergenceCap;
             if (expectsRevert) {
-                vm.expectRevert(Errors.OracleDivergence.selector);
+                vm.expectRevert(Errors.OracleDiverged.selector);
                 quote(15 ether, true, IDnmPool.OracleMode.Spot);
                 unchecked {
                     ++divergenceRejections;

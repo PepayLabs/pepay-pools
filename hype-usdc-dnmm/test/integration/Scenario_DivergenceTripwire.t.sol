@@ -15,7 +15,7 @@ contract ScenarioDivergenceTripwireTest is BaseTest {
     function test_divergence_blocks_and_resumes() public {
         updatePyth(12e17, 1e18, 0, 0, 20, 20);
 
-        vm.expectRevert(Errors.OracleDivergence.selector);
+        vm.expectRevert(Errors.OracleDiverged.selector);
         quote(1_000 ether, true, IDnmPool.OracleMode.Spot);
 
         updatePyth(1005e15, 1e18, 0, 0, 20, 20);

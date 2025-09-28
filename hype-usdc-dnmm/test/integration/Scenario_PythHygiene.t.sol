@@ -66,11 +66,11 @@ contract ScenarioPythHygieneTest is BaseTest {
         updateEma(1e18, 3, true);
         updatePyth(1_120e15, 1e18, 1, 1, 30, 30);
 
-        vm.expectRevert(Errors.OracleDivergence.selector);
+        vm.expectRevert(Errors.OracleDiverged.selector);
         quote(10 ether, true, IDnmPool.OracleMode.Spot);
 
         vm.prank(alice);
-        vm.expectRevert(Errors.OracleDivergence.selector);
+        vm.expectRevert(Errors.OracleDiverged.selector);
         pool.swapExactIn(10 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 5);
 
         vm.roll(block.number + 1);

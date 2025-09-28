@@ -39,6 +39,7 @@ Holds production token metadata for HYPE and USDC. Replace placeholder addresses
 Tracks HyperCore asset/market IDs and Pyth price IDs.
 - `hypercore.precompile` should point to `0x0000000000000000000000000000000000000807`, the published HyperCore oracle precompile.
 - `pyth.*` entries map to the feed IDs for HYPE/USD and USDC/USD.
+- Asset / market identifiers are ABI-encoded as 32-byte words. The adapter slices the first four bytes (big-endian) to obtain the `uint32` index required by the HyperCore precompiles—keep those prefixes in sync with HyperCore's `L1Read.sol` constants.
 
 ### Fee Policy Bounds (Audit ORFQ-002)
 - Governance must keep `capBps < 10_000` (100%). Any higher value reverts via `FeeCapTooHigh`.

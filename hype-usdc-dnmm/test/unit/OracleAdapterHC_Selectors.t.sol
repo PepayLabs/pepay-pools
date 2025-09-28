@@ -5,24 +5,20 @@ import {Test} from "forge-std/Test.sol";
 
 import {HyperCoreConstants} from "../../contracts/oracle/HyperCoreConstants.sol";
 
-contract OracleAdapterHCSelectorsTest is Test {
-    function test_spotSelectorPinned() external {
-        bytes4 expected = bytes4(keccak256("getSpotOraclePrice(bytes32,bytes32)"));
-        assertEq(HyperCoreConstants.SEL_GET_SPOT_ORACLE_PRICE, expected, "spot selector");
+contract OracleAdapterHCPrecompileAddressesTest is Test {
+    function test_markPxPrecompilePinned() external {
+        assertEq(HyperCoreConstants.MARK_PX_PRECOMPILE, address(0x0806), "mark precompile");
     }
 
-    function test_orderbookSelectorPinned() external {
-        bytes4 expected = bytes4(keccak256("getTopOfBook(bytes32)"));
-        assertEq(HyperCoreConstants.SEL_GET_TOP_OF_BOOK, expected, "book selector");
+    function test_oraclePxPrecompilePinned() external {
+        assertEq(HyperCoreConstants.ORACLE_PX_PRECOMPILE, address(0x0807), "oracle precompile");
     }
 
-    function test_emaSelectorPinned() external {
-        bytes4 expected = bytes4(keccak256("getEmaOraclePrice(bytes32,bytes32)"));
-        assertEq(HyperCoreConstants.SEL_GET_EMA_ORACLE_PRICE, expected, "ema selector");
+    function test_spotPxPrecompilePinned() external {
+        assertEq(HyperCoreConstants.SPOT_PX_PRECOMPILE, address(0x0808), "spot precompile");
     }
 
-    function test_oraclePrecompileAddressPinned() external {
-        assertEq(HyperCoreConstants.ORACLE_PRECOMPILE, address(0x0807), "oracle precompile address");
+    function test_bboPrecompilePinned() external {
+        assertEq(HyperCoreConstants.BBO_PRECOMPILE, address(0x080e), "bbo precompile");
     }
 }
-

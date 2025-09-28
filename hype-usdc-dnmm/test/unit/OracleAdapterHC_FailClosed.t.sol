@@ -20,19 +20,25 @@ contract HyperCoreShortReturn {
 }
 
 contract OracleAdapterHCFailClosedTest is Test {
-    bytes32 internal constant ASSET_BASE = keccak256("HYPE");
-    bytes32 internal constant ASSET_QUOTE = keccak256("USDC");
-    bytes32 internal constant MARKET = keccak256("HYPE/USDC");
+    bytes32 internal constant ASSET_BASE = bytes32("HYPE");
+    bytes32 internal constant ASSET_QUOTE = bytes32("USDC");
+    bytes32 internal constant MARKET = bytes32("HYPE");
 
     function test_revertsWhenStaticcallFails() external {
         HyperCoreReverter core = new HyperCoreReverter();
-        OracleAdapterHC adapter = new OracleAdapterHC(address(core), ASSET_BASE, ASSET_QUOTE, MARKET);
+        vm.etch(HyperCoreConstants.ORACLE_PX_PRECOMPILE, address(core).code);
+        OracleAdapterHC adapter = new OracleAdapterHC(
+            HyperCoreConstants.ORACLE_PX_PRECOMPILE,
+            ASSET_BASE,
+            ASSET_QUOTE,
+            MARKET
+        );
 
         bytes memory revertData = abi.encodeWithSignature("Error(string)", "HC fail");
         vm.expectRevert(
             abi.encodeWithSelector(
                 OracleAdapterHC.HyperCoreCallFailed.selector,
-                HyperCoreConstants.SEL_GET_SPOT_ORACLE_PRICE,
+                HyperCoreConstants.ORACLE_PX_PRECOMPILE,
                 revertData
             )
         );
@@ -41,16 +47,21 @@ contract OracleAdapterHCFailClosedTest is Test {
 
     function test_revertsOnShortResponse() external {
         HyperCoreShortReturn core = new HyperCoreShortReturn();
-        OracleAdapterHC adapter = new OracleAdapterHC(address(core), ASSET_BASE, ASSET_QUOTE, MARKET);
+        vm.etch(HyperCoreConstants.ORACLE_PX_PRECOMPILE, address(core).code);
+        OracleAdapterHC adapter = new OracleAdapterHC(
+            HyperCoreConstants.ORACLE_PX_PRECOMPILE,
+            ASSET_BASE,
+            ASSET_QUOTE,
+            MARKET
+        );
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 OracleAdapterHC.HyperCoreInvalidResponse.selector,
-                HyperCoreConstants.SEL_GET_SPOT_ORACLE_PRICE,
+                HyperCoreConstants.ORACLE_PX_PRECOMPILE,
                 uint256(32)
             )
         );
         adapter.readMidAndAge();
     }
 }
-

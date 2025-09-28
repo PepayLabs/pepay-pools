@@ -35,11 +35,12 @@ contract DnmPoolReadOracleFailClosedTest is Test {
         pyth = new MockOraclePyth();
 
         RevertingHyperCore core = new RevertingHyperCore();
+        vm.etch(HyperCoreConstants.ORACLE_PX_PRECOMPILE, address(core).code);
         adapter = new OracleAdapterHC(
-            address(core),
-            keccak256("HYPE"),
-            keccak256("USDC"),
-            keccak256("HYPE/USDC")
+            HyperCoreConstants.ORACLE_PX_PRECOMPILE,
+            bytes32("HYPE"),
+            bytes32("USDC"),
+            bytes32("HYPE")
         );
 
         DnmPool.InventoryConfig memory inventoryCfg = DnmPool.InventoryConfig({
@@ -113,11 +114,10 @@ contract DnmPoolReadOracleFailClosedTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(
                 OracleAdapterHC.HyperCoreCallFailed.selector,
-                HyperCoreConstants.SEL_GET_SPOT_ORACLE_PRICE,
+                HyperCoreConstants.ORACLE_PX_PRECOMPILE,
                 revertData
             )
         );
         pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
     }
 }
-

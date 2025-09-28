@@ -1,8 +1,8 @@
 {
   "hypercore": {
-    "assetIdHype": "0x484f5045ffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "assetIdHype": "0x48595045ffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
     "assetIdUsdc": "0x55534443ffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-    "marketIdHypeUsdc": "0x484f50455f55534443ffffffffffffffffffffffffffffffffffffffffffffff",
+    "marketIdHypeUsdc": "0x485950455f55534443ffffffffffffffffffffffffffffffffffffffffffffff",
     "precompile": "0x0000000000000000000000000000000000000807"
   },
   "pyth": {

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Script} from "forge-std/Script.sol";
 import {DnmPool} from "../contracts/DnmPool.sol";
 import {OracleAdapterHC} from "../contracts/oracle/OracleAdapterHC.sol";
+import {HyperCoreConstants} from "../contracts/oracle/HyperCoreConstants.sol";
 import {OracleAdapterPyth} from "../contracts/oracle/OracleAdapterPyth.sol";
 import {FeePolicy} from "../contracts/lib/FeePolicy.sol";
 
@@ -12,7 +13,7 @@ contract Deploy is Script {
         vm.startBroadcast();
 
         // TODO: replace with live addresses
-        address hyperCorePrecompile = address(0x1234);
+        address hyperCorePrecompile = HyperCoreConstants.ORACLE_PX_PRECOMPILE;
         bytes32 assetIdHype = bytes32("HYPE");
         bytes32 assetIdUsdc = bytes32("USDC");
         bytes32 marketId = bytes32("HYPE_USDC");

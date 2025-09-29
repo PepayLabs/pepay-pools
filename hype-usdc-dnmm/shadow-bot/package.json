@@ -1,0 +1,32 @@
+{
+  "name": "dnmm-shadow-bot",
+  "version": "2.0.0",
+  "description": "Enterprise-grade shadow bot for HYPE/USDC DNMM protocol simulation",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node --loader ts-node/esm shadow-bot.ts",
+    "analyze": "node --loader ts-node/esm analysis.ts",
+    "build": "tsc",
+    "dev": "nodemon --watch '*.ts' --exec 'node --loader ts-node/esm' shadow-bot.ts",
+    "test": "echo 'No tests configured'",
+    "clean": "rm -f *.csv shadow_*.csv",
+    "monitor": "node --loader ts-node/esm monitor.ts"
+  },
+  "dependencies": {
+    "csv-parse": "^5.5.0",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.15.0",
+    "node-fetch": "^3.3.2",
+    "prom-client": "^15.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "nodemon": "^3.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

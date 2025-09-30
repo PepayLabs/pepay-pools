@@ -12,12 +12,16 @@ contract Deploy is Script {
     function run() external {
         vm.startBroadcast();
 
-        address hyperCorePrecompile = vm.envOr("DNMM_HYPERCORE_PRECOMPILE", HyperCoreConstants.ORACLE_PX_PRECOMPILE);
+        // Default to SPOT_PX (0x0808) for spot markets, ORACLE_PX (0x0807) for perp
+        bool isSpot = vm.envOr("DNMM_HYPERCORE_IS_SPOT", true);
+        address hyperCorePrecompile = isSpot
+            ? vm.envOr("DNMM_HYPERCORE_PRECOMPILE", HyperCoreConstants.SPOT_PX_PRECOMPILE)
+            : vm.envOr("DNMM_HYPERCORE_PRECOMPILE", HyperCoreConstants.ORACLE_PX_PRECOMPILE);
         bytes32 assetIdHype = vm.envOr("DNMM_HYPERCORE_ASSET_ID_HYPE", bytes32("HYPE"));
         bytes32 assetIdUsdc = vm.envOr("DNMM_HYPERCORE_ASSET_ID_USDC", bytes32("USDC"));
         bytes32 marketId = vm.envOr("DNMM_HYPERCORE_MARKET_ID", bytes32("HYPE_USDC"));
 
-        OracleAdapterHC hc = new OracleAdapterHC(hyperCorePrecompile, assetIdHype, assetIdUsdc, marketId);
+        OracleAdapterHC hc = new OracleAdapterHC(hyperCorePrecompile, assetIdHype, assetIdUsdc, marketId, isSpot);
 
         address pythContract = vm.envAddress("DNMM_PYTH_CONTRACT");
         bytes32 priceIdHypeUsd = vm.envBytes32("DNMM_PYTH_PRICE_ID_HYPE_USD");

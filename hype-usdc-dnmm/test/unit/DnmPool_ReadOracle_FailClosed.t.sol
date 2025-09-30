@@ -37,7 +37,7 @@ contract DnmPoolReadOracleFailClosedTest is Test {
         address core = address(new RevertingHyperCore());
         vm.etch(HyperCoreConstants.ORACLE_PX_PRECOMPILE, core.code);
         adapter = new OracleAdapterHC(
-            HyperCoreConstants.ORACLE_PX_PRECOMPILE, bytes32("HYPE"), bytes32("USDC"), bytes32("HYPE")
+            HyperCoreConstants.ORACLE_PX_PRECOMPILE, bytes32("HYPE"), bytes32("USDC"), bytes32("HYPE"), false
         );
 
         DnmPool.InventoryConfig memory inventoryCfg =

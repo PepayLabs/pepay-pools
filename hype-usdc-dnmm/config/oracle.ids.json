@@ -3,11 +3,12 @@
     "assetIdHype": "0x48595045ffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
     "assetIdUsdc": "0x55534443ffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
     "marketIdHypeUsdc": "0x485950455f55534443ffffffffffffffffffffffffffffffffffffffffffffff",
-    "precompile": "0x0000000000000000000000000000000000000807"
+    "precompile": "0x0000000000000000000000000000000000000808",
+    "isSpot": true
   },
   "pyth": {
-    "contract": "0x0000000000000000000000000000000000000000",
-    "priceIdHypeUsd": "0x0000000000000000000000000000000000000000000000000000000000000000",
-    "priceIdUsdcUsd": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    "contract": "0xe9d69CdD6Fe41e7B621B4A688C5D1a68cB5c8ADc",
+    "priceIdHypeUsd": "4279e31cc369bbcc2faf022b382b080e32a8e689ff20fbc530d2a603eb6cd98b",
+    "priceIdUsdcUsd": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a"
   }
 }

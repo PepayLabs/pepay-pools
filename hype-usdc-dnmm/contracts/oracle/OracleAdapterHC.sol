@@ -15,8 +15,12 @@ contract OracleAdapterHC is IOracleAdapterHC {
     uint32 internal immutable MARKET_KEY_;
     uint32 internal immutable BASE_ASSET_KEY_;
     uint32 internal immutable QUOTE_ASSET_KEY_;
+    uint256 internal immutable PRICE_SCALE_DIVISOR_;
+    bool internal immutable IS_SPOT_MARKET_;
 
     uint256 private constant AGE_UNKNOWN = type(uint256).max;
+    uint256 private constant WAD = 1e18;
+    uint256 private constant SPOT_SCALE_MULTIPLIER = 1e12; // Scale 10^6 → 10^18 WAD for spot
 
     error HyperCoreAddressMismatch(address provided);
     error HyperCoreCallFailed(address target, bytes data);
@@ -25,14 +29,29 @@ contract OracleAdapterHC is IOracleAdapterHC {
     error AssetIdZero();
     error MarketIdZero();
 
-    constructor(address _precompile, bytes32 _assetIdBase, bytes32 _assetIdQuote, bytes32 _marketId) {
+    constructor(
+        address _precompile,
+        bytes32 _assetIdBase,
+        bytes32 _assetIdQuote,
+        bytes32 _marketId,
+        bool _isSpot
+    ) {
         if (_precompile == address(0)) revert PrecompileZero();
-        if (_precompile != HyperCoreConstants.ORACLE_PX_PRECOMPILE) {
-            // AUDIT:HCABI-001 enforce canonical oracle precompile wiring
-            revert HyperCoreAddressMismatch(_precompile);
+
+        // AUDIT:HCABI-001 enforce canonical oracle precompile wiring based on market type
+        if (_isSpot) {
+            if (_precompile != HyperCoreConstants.SPOT_PX_PRECOMPILE) {
+                revert HyperCoreAddressMismatch(_precompile);
+            }
+        } else {
+            if (_precompile != HyperCoreConstants.ORACLE_PX_PRECOMPILE) {
+                revert HyperCoreAddressMismatch(_precompile);
+            }
         }
+
         if (_assetIdBase == bytes32(0) || _assetIdQuote == bytes32(0)) revert AssetIdZero();
         if (_marketId == bytes32(0)) revert MarketIdZero();
+        IS_SPOT_MARKET_ = _isSpot;
         ASSET_ID_BASE_ = _assetIdBase;
         ASSET_ID_QUOTE_ = _assetIdQuote;
         MARKET_ID_ = _marketId;
@@ -44,7 +63,9 @@ contract OracleAdapterHC is IOracleAdapterHC {
     }
 
     function hyperCorePrecompile() external view returns (address) {
-        return HyperCoreConstants.ORACLE_PX_PRECOMPILE;
+        return IS_SPOT_MARKET_
+            ? HyperCoreConstants.SPOT_PX_PRECOMPILE
+            : HyperCoreConstants.ORACLE_PX_PRECOMPILE;
     }
 
     function assetIdBase() external view returns (bytes32) {
@@ -61,8 +82,12 @@ contract OracleAdapterHC is IOracleAdapterHC {
 
     function readMidAndAge() external view override returns (MidResult memory result) {
         bytes memory callData = abi.encodePacked(MARKET_KEY_);
-        // AUDIT:HCABI-001 canonical oraclePx precompile (returns single uint64 word)
-        bytes memory data = _callHyperCore(HyperCoreConstants.ORACLE_PX_PRECOMPILE, callData, 8);
+        // AUDIT:HCABI-001 canonical precompile selection: SPOT_PX (0x0808) for spot, ORACLE_PX (0x0807) for perp
+        address precompile = IS_SPOT_MARKET_
+            ? HyperCoreConstants.SPOT_PX_PRECOMPILE
+            : HyperCoreConstants.ORACLE_PX_PRECOMPILE;
+
+        bytes memory data = _callHyperCore(precompile, callData, 8);
 
         uint64 midWord;
         if (data.length == 8) {
@@ -70,9 +95,15 @@ contract OracleAdapterHC is IOracleAdapterHC {
         } else if (data.length == 32) {
             midWord = abi.decode(data, (uint64));
         } else {
-            revert HyperCoreInvalidResponse(HyperCoreConstants.ORACLE_PX_PRECOMPILE, data.length);
+            revert HyperCoreInvalidResponse(precompile, data.length);
         }
-        return MidResult(uint256(midWord), AGE_UNKNOWN, true);
+
+        // Scale spot prices: HyperCore returns 10^6, contract expects 10^18 WAD
+        uint256 scaledMid = IS_SPOT_MARKET_
+            ? uint256(midWord) * SPOT_SCALE_MULTIPLIER
+            : uint256(midWord);
+
+        return MidResult(scaledMid, AGE_UNKNOWN, true);
     }
 
     function readBidAsk() external view override returns (BidAskResult memory result) {
@@ -93,15 +124,27 @@ contract OracleAdapterHC is IOracleAdapterHC {
         } else {
             revert HyperCoreInvalidResponse(HyperCoreConstants.BBO_PRECOMPILE, data.length);
         }
-        uint256 bid = uint256(bidWord);
-        uint256 ask = uint256(askWord);
+
+        // Scale spot prices: HyperCore returns 10^6, contract expects 10^18 WAD
+        uint256 bid = IS_SPOT_MARKET_
+            ? uint256(bidWord) * SPOT_SCALE_MULTIPLIER
+            : uint256(bidWord);
+        uint256 ask = IS_SPOT_MARKET_
+            ? uint256(askWord) * SPOT_SCALE_MULTIPLIER
+            : uint256(askWord);
+
         uint256 spreadBps = OracleUtils.computeSpreadBps(bid, ask);
         return BidAskResult(bid, ask, spreadBps, true);
     }
 
     function readMidEmaFallback() external view override returns (MidResult memory result) {
+        // AUDIT:HCABI-001 EMA fallback (MARK_PX) only works for perp markets, not spot
+        if (IS_SPOT_MARKET_) {
+            return MidResult(0, 0, false);
+        }
+
         bytes memory callData = abi.encodePacked(MARKET_KEY_);
-        // AUDIT:HCABI-001 canonical markPx precompile used as EMA fallback
+        // AUDIT:HCABI-001 canonical markPx precompile used as EMA fallback for perp markets
         bytes memory data = _callHyperCore(HyperCoreConstants.MARK_PX_PRECOMPILE, callData, 8);
 
         uint64 emaMidWord;

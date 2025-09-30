@@ -28,7 +28,7 @@ contract OracleAdapterHCFailClosedTest is Test {
         address core = address(new HyperCoreReverter());
         vm.etch(HyperCoreConstants.ORACLE_PX_PRECOMPILE, core.code);
         OracleAdapterHC adapter =
-            new OracleAdapterHC(HyperCoreConstants.ORACLE_PX_PRECOMPILE, ASSET_BASE, ASSET_QUOTE, MARKET);
+            new OracleAdapterHC(HyperCoreConstants.ORACLE_PX_PRECOMPILE, ASSET_BASE, ASSET_QUOTE, MARKET, false);
 
         bytes memory revertData = abi.encodeWithSignature("Error(string)", "HC fail");
         vm.expectRevert(
@@ -43,7 +43,7 @@ contract OracleAdapterHCFailClosedTest is Test {
         address core = address(new HyperCoreShortReturn());
         vm.etch(HyperCoreConstants.ORACLE_PX_PRECOMPILE, core.code);
         OracleAdapterHC adapter =
-            new OracleAdapterHC(HyperCoreConstants.ORACLE_PX_PRECOMPILE, ASSET_BASE, ASSET_QUOTE, MARKET);
+            new OracleAdapterHC(HyperCoreConstants.ORACLE_PX_PRECOMPILE, ASSET_BASE, ASSET_QUOTE, MARKET, false);
 
         vm.expectRevert(
             abi.encodeWithSelector(

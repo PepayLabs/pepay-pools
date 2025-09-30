@@ -21,7 +21,7 @@ contract OracleAdapterHCTest is Test {
         _installPrecompile(address(new MockHyperCorePx()), HyperCoreConstants.MARK_PX_PRECOMPILE);
         _installPrecompile(address(new MockHyperCoreBbo()), HyperCoreConstants.BBO_PRECOMPILE);
 
-        adapter = new OracleAdapterHC(HyperCoreConstants.ORACLE_PX_PRECOMPILE, ASSET_BASE, ASSET_QUOTE, MARKET);
+        adapter = new OracleAdapterHC(HyperCoreConstants.ORACLE_PX_PRECOMPILE, ASSET_BASE, ASSET_QUOTE, MARKET, false);
 
         MockHyperCorePx(HyperCoreConstants.ORACLE_PX_PRECOMPILE).setResult(MARKET_KEY, uint64(1e18));
         MockHyperCorePx(HyperCoreConstants.MARK_PX_PRECOMPILE).setResult(MARKET_KEY, uint64(1e18));

@@ -34,6 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-09-30: Implemented automatic + manual `targetBaseXstar` rebalancing (`lastRebalancePrice`, `_checkAndRebalanceAuto`, `rebalanceTarget`), added unit coverage, refreshed docs (`REBALANCING_IMPLEMENTATION.md`, `ARCHITECTURE.md`, `RUNBOOK.md`).
 - 2025-09-28: Hardened divergence gating (symmetric Pyth<->HyperCore delta + debug emit), reworked inventory solvers for floor-safe partial fills, handled zero-confidence Pyth confidence scaling, refreshed Quick Start script paths/docs for invariants and parity reports, and parameterised deployment scripts via `DNMM_*` env variables.
 - 2024-05-24: Folder initialized with contracts, docs, and Foundry harness.
 - 2024-05-25: Synced fee/oracle config, added Inventory/Fee libraries, extended tests and tooling.

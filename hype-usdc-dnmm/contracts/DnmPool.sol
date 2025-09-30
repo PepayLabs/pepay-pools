@@ -116,6 +116,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
     uint256 public lastMid;
     uint64 public lastMidTimestamp;
+    uint256 public lastRebalancePrice;
 
     FeatureFlags public featureFlags;
     ConfidenceState private confidenceState;
@@ -142,6 +143,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     event Paused(address indexed caller);
     event Unpaused(address indexed caller);
     event TargetBaseXstarUpdated(uint128 oldTarget, uint128 newTarget, uint256 mid, uint64 timestamp);
+    event ManualRebalanceExecuted(address indexed caller, uint256 price, uint64 timestamp);
     event TokenFeeUnsupported(address indexed user, bool isBaseIn, uint256 expectedAmountIn, uint256 receivedAmountIn);
     event ConfidenceDebug(
         uint256 confSpreadBps,
@@ -427,7 +429,39 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         if (deviationBps < inventoryConfig.recenterThresholdPct) revert Errors.RecenterThreshold();
         uint128 oldTarget = inventoryConfig.targetBaseXstar;
         inventoryConfig.targetBaseXstar = newTarget;
+        lastRebalancePrice = lastMid;
         emit TargetBaseXstarUpdated(oldTarget, newTarget, lastMid, uint64(block.timestamp));
+    }
+
+    /**
+     * @dev Manual, permissionless trigger that mirrors the automatic rebalance path.
+     * Reverts when price drift since the last rebalance does not exceed `recenterThresholdPct`.
+     */
+    function rebalanceTarget() external {
+        IOracleAdapterHC.MidResult memory midRes = ORACLE_HC_.readMidAndAge();
+        OracleConfig memory oracleCfg = oracleConfig;
+
+        bool ageKnown = midRes.ageSec != HC_AGE_UNKNOWN;
+        if (!(midRes.success && ageKnown && midRes.ageSec <= oracleCfg.maxAgeSec && midRes.mid > 0)) {
+            revert Errors.OracleStale();
+        }
+
+        uint256 currentPrice = midRes.mid;
+        uint256 previousPrice = lastRebalancePrice;
+        if (previousPrice == 0) {
+            lastRebalancePrice = currentPrice;
+            return;
+        }
+
+        uint16 thresholdBps = inventoryConfig.recenterThresholdPct;
+        uint256 priceChange = FixedPointMath.absDiff(currentPrice, previousPrice);
+        uint256 priceChangeBps = FixedPointMath.toBps(priceChange, previousPrice);
+        if (priceChangeBps < thresholdBps) revert Errors.RecenterThreshold();
+
+        bool updated = _performRebalance(currentPrice, thresholdBps);
+        if (!updated) revert Errors.RecenterThreshold();
+
+        emit ManualRebalanceExecuted(msg.sender, currentPrice, uint64(block.timestamp));
     }
 
     function pause() external onlyPauser {
@@ -522,6 +556,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             usedFallback: outcome.usedFallback,
             reason: reason != REASON_NONE ? reason : outcome.reason
         });
+
+        if (shouldSettleFee) {
+            _checkAndRebalanceAuto(outcome.mid);
+        }
     }
 
     function _computeSwapAmounts(
@@ -548,6 +586,61 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         reason = didPartial ? REASON_FLOOR : REASON_NONE;
+    }
+
+    function _checkAndRebalanceAuto(uint256 currentPrice) internal {
+        if (currentPrice == 0) return;
+
+        uint256 previousPrice = lastRebalancePrice;
+        if (previousPrice == 0) {
+            lastRebalancePrice = currentPrice;
+            return;
+        }
+
+        uint16 thresholdBps = inventoryConfig.recenterThresholdPct;
+        uint256 priceChange = FixedPointMath.absDiff(currentPrice, previousPrice);
+        if (FixedPointMath.toBps(priceChange, previousPrice) < thresholdBps) {
+            return;
+        }
+
+        _performRebalance(currentPrice, thresholdBps);
+    }
+
+    function _performRebalance(uint256 currentPrice, uint16 thresholdBps) internal returns (bool updated) {
+        if (currentPrice == 0) return false;
+
+        TokenConfig memory tokenCfg = tokenConfig;
+        uint256 baseReservesLocal = uint256(reserves.baseReserves);
+        uint256 quoteReservesLocal = uint256(reserves.quoteReserves);
+
+        uint256 baseReservesWad = FixedPointMath.mulDivDown(baseReservesLocal, ONE, tokenCfg.baseScale);
+        uint256 quoteReservesWad = FixedPointMath.mulDivDown(quoteReservesLocal, ONE, tokenCfg.quoteScale);
+        uint256 baseNotionalWad = FixedPointMath.mulDivDown(baseReservesWad, currentPrice, ONE);
+        uint256 totalNotionalWad = quoteReservesWad + baseNotionalWad;
+
+        uint256 targetValueWad = totalNotionalWad / 2;
+        if (targetValueWad == 0) {
+            lastRebalancePrice = currentPrice;
+            return false;
+        }
+
+        uint256 newTargetWad = FixedPointMath.mulDivDown(targetValueWad, ONE, currentPrice);
+        uint128 newTarget = uint128(FixedPointMath.mulDivDown(newTargetWad, tokenCfg.baseScale, ONE));
+
+        InventoryConfig storage invCfg = inventoryConfig;
+        uint256 currentTarget = invCfg.targetBaseXstar == 0 ? 1 : invCfg.targetBaseXstar;
+        uint256 targetDeviation = FixedPointMath.absDiff(uint256(newTarget), currentTarget);
+        if (FixedPointMath.toBps(targetDeviation, currentTarget) < thresholdBps) {
+            lastRebalancePrice = currentPrice;
+            return false;
+        }
+
+        uint128 oldTarget = invCfg.targetBaseXstar;
+        invCfg.targetBaseXstar = newTarget;
+        lastRebalancePrice = currentPrice;
+
+        emit TargetBaseXstarUpdated(oldTarget, newTarget, currentPrice, uint64(block.timestamp));
+        return true;
     }
 
     function _inventoryTokens() internal view returns (Inventory.Tokens memory invTokens) {

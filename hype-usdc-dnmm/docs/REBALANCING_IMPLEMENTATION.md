@@ -1,6 +1,6 @@
 # Automated Inventory Target Rebalancing - Implementation Spec
 
-**Status**: Production-Ready Design
+**Status**: Implemented (2025-09-30)
 **Lifinity Parity**: 100% (Matches Lifinity V2 dual rebalancing system)
 **Gas Impact**: +2k average (+0.9% per swap)
 
@@ -72,6 +72,13 @@ Layer 2: Manual Rebalancing (Separate Function)
 
 ## Code Changes Required
 
+### Implementation Summary (2025-09-30)
+
+- ✅ `contracts/DnmPool.sol`: introduced `lastRebalancePrice`, automatic `_checkAndRebalanceAuto`, shared `_performRebalance`, permissionless `rebalanceTarget`, and `ManualRebalanceExecuted` telemetry.
+- ✅ `contracts/interfaces/IDnmPool.sol`: surfaced the new `rebalanceTarget()` entrypoint for keepers and tests.
+- ✅ `test/unit/DnmPool_Rebalance.t.sol`: added regression coverage for automatic triggers, manual fallback, threshold guards, and revert paths.
+- ✅ Updated docs/runbooks (this file, `docs/ARCHITECTURE.md`, `RUNBOOK.md`) to describe the dual-layer system post implementation.
+
 ### 1. Add State Variable
 
 **Location**: `contracts/DnmPool.sol` after line 118
@@ -89,20 +96,7 @@ uint256 public lastRebalancePrice;  // Price at last rebalance (18 decimals)
 
 **Location**: `contracts/DnmPool.sol:452-525` (`_quoteInternal`)
 
-**Current code** (line 524):
-```solidity
-        result = QuoteResult({
-            amountOut: amountOut,
-            midUsed: outcome.mid,
-            feeBpsUsed: feeBps,
-            partialFillAmountIn: appliedAmountIn < amountIn ? appliedAmountIn : 0,
-            usedFallback: outcome.usedFallback,
-            reason: reason != REASON_NONE ? reason : outcome.reason
-        });
-    }
-```
-
-**ADD AFTER line 524 (before closing brace)**:
+**Implemented code**:
 ```solidity
         result = QuoteResult({
             amountOut: amountOut,
@@ -113,16 +107,16 @@ uint256 public lastRebalancePrice;  // Price at last rebalance (18 decimals)
             reason: reason != REASON_NONE ? reason : outcome.reason
         });
 
-        // 🔥 NEW: Automatic rebalancing check (after swap calculation, matches Lifinity)
-        _checkAndRebalanceAuto(outcome.mid);
+        if (shouldSettleFee) {
+            _checkAndRebalanceAuto(outcome.mid);
+        }
     }
 ```
 
-**Why here? (Critical Change)**
-- ✅ Matches Lifinity's order: calculate swap FIRST, rebalance AFTER
-- ✅ This swap uses current target, next swap uses updated target
-- ✅ Rebalances based on the price used for this swap
-- ✅ 1-swap lag (acceptable, same as Lifinity)
+**Notes**
+- Guarded by `shouldSettleFee` so preview/quote calls stay read-only.
+- Swap executes against the previous target; rebalance (if any) lands before the next swap.
+- Keeps ordering parity with Lifinity while preventing dry-run calls from mutating state.
 
 ---
 
@@ -131,83 +125,63 @@ uint256 public lastRebalancePrice;  // Price at last rebalance (18 decimals)
 **Location**: Add new internal function after line 549 (after `_computeSwapAmounts`)
 
 ```solidity
-/**
- * @dev Automatic rebalancing check (called during every swap)
- * @param currentPrice Current oracle price (18 decimals)
- *
- * Rebalances targetBaseXstar if price moved >7.5% since last rebalance.
- * Matches Lifinity V2 auto-rebalancing behavior.
- *
- * Gas: ~2k when check passes, ~15k when rebalance executes
- */
 function _checkAndRebalanceAuto(uint256 currentPrice) internal {
-    // Initialize on first call
-    if (lastRebalancePrice == 0) {
+    if (currentPrice == 0) return;
+
+    uint256 previousPrice = lastRebalancePrice;
+    if (previousPrice == 0) {
         lastRebalancePrice = currentPrice;
         return;
     }
 
-    // Calculate price deviation in basis points
-    uint256 priceChange = FixedPointMath.absDiff(currentPrice, lastRebalancePrice);
-    uint256 priceChangeBps = FixedPointMath.toBps(priceChange, lastRebalancePrice);
-
-    // Check threshold (recenterThresholdPct is in bps, e.g., 750 = 7.5%)
-    if (priceChangeBps < inventoryConfig.recenterThresholdPct) {
-        return;  // No rebalance needed
+    uint16 thresholdBps = inventoryConfig.recenterThresholdPct;
+    uint256 priceChange = FixedPointMath.absDiff(currentPrice, previousPrice);
+    if (FixedPointMath.toBps(priceChange, previousPrice) < thresholdBps) {
+        return;
     }
 
-    // Rebalance needed - calculate new optimal target
-    _performRebalance(currentPrice);
+    _performRebalance(currentPrice, thresholdBps);
 }
 
-/**
- * @dev Execute rebalancing logic (shared by auto and manual)
- * @param currentPrice Current oracle price (18 decimals)
- */
-function _performRebalance(uint256 currentPrice) internal {
-    // Calculate total pool notional value
-    uint256 baseReservesWad = FixedPointMath.mulDivDown(
-        uint256(reserves.baseReserves),
-        ONE,
-        tokenConfig.baseScale
-    );
-    uint256 quoteReservesWad = FixedPointMath.mulDivDown(
-        uint256(reserves.quoteReserves),
-        ONE,
-        tokenConfig.quoteScale
-    );
+function _performRebalance(uint256 currentPrice, uint16 thresholdBps) internal returns (bool updated) {
+    if (currentPrice == 0) return false;
+
+    TokenConfig memory tokenCfg = tokenConfig;
+    uint256 baseReservesLocal = uint256(reserves.baseReserves);
+    uint256 quoteReservesLocal = uint256(reserves.quoteReserves);
+
+    uint256 baseReservesWad = FixedPointMath.mulDivDown(baseReservesLocal, ONE, tokenCfg.baseScale);
+    uint256 quoteReservesWad = FixedPointMath.mulDivDown(quoteReservesLocal, ONE, tokenCfg.quoteScale);
     uint256 baseNotionalWad = FixedPointMath.mulDivDown(baseReservesWad, currentPrice, ONE);
     uint256 totalNotionalWad = quoteReservesWad + baseNotionalWad;
 
-    // New target: 50% of total value divided by price
-    // This maintains 50/50 value split at current price
     uint256 targetValueWad = totalNotionalWad / 2;
-    uint256 newTargetWad = FixedPointMath.mulDivDown(targetValueWad, ONE, currentPrice);
-    uint128 newTarget = uint128(
-        FixedPointMath.mulDivDown(newTargetWad, tokenConfig.baseScale, ONE)
-    );
-
-    // Validate deviation meets threshold (prevents spam)
-    uint256 currentTarget = inventoryConfig.targetBaseXstar == 0
-        ? 1
-        : inventoryConfig.targetBaseXstar;
-    uint256 targetDeviationBps = FixedPointMath.toBps(
-        FixedPointMath.absDiff(uint256(newTarget), currentTarget),
-        currentTarget
-    );
-
-    if (targetDeviationBps < inventoryConfig.recenterThresholdPct) {
-        return;  // Deviation too small
+    if (targetValueWad == 0) {
+        lastRebalancePrice = currentPrice;
+        return false;
     }
 
-    // Update state
-    uint128 oldTarget = inventoryConfig.targetBaseXstar;
-    inventoryConfig.targetBaseXstar = newTarget;
+    uint256 newTargetWad = FixedPointMath.mulDivDown(targetValueWad, ONE, currentPrice);
+    uint128 newTarget = uint128(FixedPointMath.mulDivDown(newTargetWad, tokenCfg.baseScale, ONE));
+
+    InventoryConfig storage invCfg = inventoryConfig;
+    uint256 currentTarget = invCfg.targetBaseXstar == 0 ? 1 : invCfg.targetBaseXstar;
+    uint256 targetDeviation = FixedPointMath.absDiff(uint256(newTarget), currentTarget);
+    if (FixedPointMath.toBps(targetDeviation, currentTarget) < thresholdBps) {
+        lastRebalancePrice = currentPrice;
+        return false;
+    }
+
+    uint128 oldTarget = invCfg.targetBaseXstar;
+    invCfg.targetBaseXstar = newTarget;
     lastRebalancePrice = currentPrice;
 
     emit TargetBaseXstarUpdated(oldTarget, newTarget, currentPrice, uint64(block.timestamp));
+    return true;
 }
 ```
+
+**Deviation guard**: When price drift crosses the outer threshold but rounding keeps the target within tolerance, we still update `lastRebalancePrice` so successive swaps don't repeatedly recompute the same branch.
 
 **Key Design Decisions**:
 1. **Two-step separation**: `_checkAndRebalanceAuto` (threshold check) + `_performRebalance` (execution)
@@ -222,39 +196,29 @@ function _performRebalance(uint256 currentPrice) internal {
 **Location**: Add public function after line 431 (after `setTargetBaseXstar`)
 
 ```solidity
-/**
- * @dev Manual rebalancing trigger (permissionless)
- *
- * Allows anyone to trigger rebalancing when:
- * - Price has moved >7.5% since last rebalance
- * - No recent swaps occurred (automatic rebalancing didn't trigger)
- *
- * Use case: Price moves significantly during low trading periods.
- * Gas cost: Paid by caller (~30-40k gas)
- *
- * Matches Lifinity's manual RebalanceV2 instruction (discriminator 0xaf0f4e9c4e6d1a5e)
- */
 function rebalanceTarget() external {
-    if (lastMid == 0) revert Errors.MidUnset();
+    IOracleAdapterHC.MidResult memory midRes = ORACLE_HC_.readMidAndAge();
+    OracleConfig memory oracleCfg = oracleConfig;
 
-    // Use last known mid price (updated by most recent swap/quote)
-    uint256 currentPrice = lastMid;
+    bool ageKnown = midRes.ageSec != HC_AGE_UNKNOWN;
+    if (!(midRes.success && ageKnown && midRes.ageSec <= oracleCfg.maxAgeSec && midRes.mid > 0)) {
+        revert Errors.OracleStale();
+    }
 
-    // Check if rebalance needed
-    if (lastRebalancePrice == 0) {
+    uint256 currentPrice = midRes.mid;
+    uint256 previousPrice = lastRebalancePrice;
+    if (previousPrice == 0) {
         lastRebalancePrice = currentPrice;
         return;
     }
 
-    uint256 priceChange = FixedPointMath.absDiff(currentPrice, lastRebalancePrice);
-    uint256 priceChangeBps = FixedPointMath.toBps(priceChange, lastRebalancePrice);
+    uint16 thresholdBps = inventoryConfig.recenterThresholdPct;
+    uint256 priceChange = FixedPointMath.absDiff(currentPrice, previousPrice);
+    uint256 priceChangeBps = FixedPointMath.toBps(priceChange, previousPrice);
+    if (priceChangeBps < thresholdBps) revert Errors.RecenterThreshold();
 
-    if (priceChangeBps < inventoryConfig.recenterThresholdPct) {
-        revert Errors.RecenterThreshold();
-    }
-
-    // Execute rebalance (shared logic with automatic)
-    _performRebalance(currentPrice);
+    bool updated = _performRebalance(currentPrice, thresholdBps);
+    if (!updated) revert Errors.RecenterThreshold();
 
     emit ManualRebalanceExecuted(msg.sender, currentPrice, uint64(block.timestamp));
 }
@@ -265,6 +229,7 @@ function rebalanceTarget() external {
 - Threshold validation prevents spam
 - Caller pays gas (no protocol cost)
 - Lifinity uses this model successfully
+- Reads the HyperCore spot oracle directly, so keepers do not need a priming swap/quote during quiet periods
 
 ---
 

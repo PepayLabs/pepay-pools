@@ -7,6 +7,7 @@
 
 > **Implementation Update (2025-10-01):** The rebalancing automation described here (including cooldown + fresh-mid guards) is now live. See `docs/REBALANCING_IMPLEMENTATION.md` for the implemented Solidity + tests.
 
+
 ---
 
 ## Executive Summary - Reality Check

@@ -9,6 +9,7 @@
 - docs: add `ROUTER_INTEGRATION.md` for volume tiers/off-path routing and update `CONFIG.md`, `FEES_AND_INVENTORY.md`, `OBSERVABILITY.md`, `RUNBOOK.md`, and `CHANGELOG.md` for rebates, timelock operations, autopause, and preview freshness.
 
 ## 2025-10-01
+- perf(pool): collapsed feature flag reads into a cached bitmask for quote/swap/preview hot paths; exposed `featureFlagMask()` view + parity tests to keep governance toggles in sync.
 - feat(pool): add AOMQ micro-quote pipeline behind `enableAOMQ`, including min-notional clamps, soft-divergence triggers, and clamp telemetry.
 - feat(pool): introduce preview snapshot + fee APIs (`refreshPreviewSnapshot`, `previewFees`, `previewLadder`, `previewFeesFresh`) sharing the on-chain fee pipeline without mutating state.
 - chore(config): add preview configuration knobs (`previewMaxAgeSec`, `snapshotCooldownSec`, `revertOnStalePreview`, `enablePreviewFresh`).

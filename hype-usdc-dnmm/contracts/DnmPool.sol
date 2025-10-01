@@ -23,6 +23,16 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     uint16 private constant MAX_REBATE_BPS = 3;
     uint32 private constant MAX_TIMELOCK_DELAY = 7 days;
     uint32 private constant MIN_TIMELOCK_DELAY = 1 hours;
+    uint32 private constant FLAG_BLEND_ON = 1 << 0;
+    uint32 private constant FLAG_PARITY_CI_ON = 1 << 1;
+    uint32 private constant FLAG_DEBUG_EMIT = 1 << 2;
+    uint32 private constant FLAG_ENABLE_SOFT_DIVERGENCE = 1 << 3;
+    uint32 private constant FLAG_ENABLE_SIZE_FEE = 1 << 4;
+    uint32 private constant FLAG_ENABLE_BBO_FLOOR = 1 << 5;
+    uint32 private constant FLAG_ENABLE_INV_TILT = 1 << 6;
+    uint32 private constant FLAG_ENABLE_AOMQ = 1 << 7;
+    uint32 private constant FLAG_ENABLE_REBATES = 1 << 8;
+    uint32 private constant FLAG_ENABLE_AUTO_RECENTER = 1 << 9;
 
     struct TokenConfig {
         address baseToken;
@@ -198,6 +208,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     uint32 public recenterCooldownSec = 120;
 
     FeatureFlags public featureFlags;
+    uint32 private _featureFlagMask;
     ConfidenceState private confidenceState;
     SoftDivergenceState private softDivergenceState;
     uint8 private autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
@@ -367,6 +378,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         makerConfig = makerConfig_;
         aomqConfig = aomqConfig_;
         featureFlags = featureFlags_;
+        _featureFlagMask = _encodeFeatureFlagMask(featureFlags_);
         guardians = guardians_;
         _governanceConfig = GovernanceConfig({timelockDelaySec: 0});
         previewConfig = previewConfig_;
@@ -466,7 +478,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             revert Errors.InvalidOrderbook();
         }
 
-        FeatureFlags memory flags = featureFlags;
+        uint32 flags = _featureFlagMask;
         uint256 confBps = _previewConfidenceView(
             cfg, flags, OracleMode.Spot, midRes.mid, baRes.spreadBps, baRes.success, false, 0, false
         );
@@ -515,6 +527,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
     function aggregatorDiscount(address executor) external view returns (uint16) {
         return _aggregatorDiscountBps[executor];
+    }
+
+    function featureFlagMask() external view returns (uint32) {
+        return _featureFlagMask;
     }
 
     function getSoftDivergenceState()
@@ -672,6 +688,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             FeatureFlags memory oldFlags = featureFlags;
             FeatureFlags memory newFlags = abi.decode(data, (FeatureFlags));
             featureFlags = newFlags;
+            _featureFlagMask = _encodeFeatureFlagMask(newFlags);
             if (!oldFlags.enableAutoRecenter && newFlags.enableAutoRecenter) {
                 autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
             }
@@ -812,7 +829,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         if (amountIn == 0) revert Errors.ZeroAmount();
         if (block.timestamp < lastMidTimestamp) revert Errors.InvalidTimestamp();
 
-        FeatureFlags memory flags = featureFlags;
+        uint32 flags = _featureFlagMask;
         OracleConfig memory oracleCfg = oracleConfig;
         OracleOutcome memory outcome = _readOracle(mode, oracleData, flags, oracleCfg);
 
@@ -856,7 +873,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             aomqCfg
         );
 
-        if (flags.debugEmit) {
+        if (_isFlagEnabled(flags, FLAG_DEBUG_EMIT)) {
             uint256 feeBaseComponent = feeCfg.baseBps;
             uint256 feeVolComponent = feeCfg.alphaConfDenominator == 0
                 ? 0
@@ -917,7 +934,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             reason: finalReason
         });
 
-        if (shouldSettleFee && flags.enableAutoRecenter) {
+        if (shouldSettleFee && _isFlagEnabled(flags, FLAG_ENABLE_AUTO_RECENTER)) {
             _checkAndRebalanceAuto(outcome.mid);
         }
 
@@ -988,7 +1005,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             if (block.timestamp < nextAllowed) revert PreviewSnapshotCooldown(nextAllowed);
         }
 
-        FeatureFlags memory flags = featureFlags;
+        uint32 flags = _featureFlagMask;
         OracleOutcome memory outcome = _readOracle(mode, oracleData, flags, oracleConfig);
         // The explicit refresh path does not execute the swap pipeline, so mark AOMQ metadata via existing state.
         _persistPreviewSnapshot(
@@ -1029,7 +1046,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         returns (uint256[] memory askFeeBps, uint256[] memory bidFeeBps)
     {
         if (!previewConfig.enablePreviewFresh) revert PreviewFreshDisabled();
-        FeatureFlags memory flags = featureFlags;
+        uint32 flags = _featureFlagMask;
         OracleOutcome memory outcome = _readOracleView(mode, oracleData, flags, oracleConfig);
         (askFeeBps, bidFeeBps,,) = _computePreviewFees(outcome, sizesBaseWad);
     }
@@ -1106,7 +1123,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             bool[] memory bidClamped
         )
     {
-        FeatureFlags memory flags = featureFlags;
+        uint32 flags = _featureFlagMask;
         InventoryConfig memory invCfg = inventoryConfig;
         MakerConfig memory makerCfg = makerConfig;
         AomqConfig memory aomqCfg = aomqConfig;
@@ -1141,39 +1158,39 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             if (sizeWad == 0) continue;
 
             uint256 baseAmount = FixedPointMath.mulDivDown(sizeWad, invTokens.baseScale, ONE);
-        (uint16 askFee,, AomqDecision memory askDecision) = _applyFeePipeline(
-            true,
-            baseAmount,
-            baseFeeBps,
-            outcome,
-            flags,
-            feeCfg,
-            invCfg,
-            invTokens,
-            baseReservesLocal,
-            quoteReservesLocal,
-            makerCfg,
-            aomqCfg
-        );
+            (uint16 askFee,, AomqDecision memory askDecision) = _applyFeePipeline(
+                true,
+                baseAmount,
+                baseFeeBps,
+                outcome,
+                flags,
+                feeCfg,
+                invCfg,
+                invTokens,
+                baseReservesLocal,
+                quoteReservesLocal,
+                makerCfg,
+                aomqCfg
+            );
             askFeeBps[i] = askFee;
             askClamped[i] = askDecision.triggered && askDecision.clamp;
 
             uint256 quoteNotionalWad = FixedPointMath.mulDivUp(sizeWad, outcome.mid, ONE);
             uint256 quoteAmount = FixedPointMath.mulDivUp(quoteNotionalWad, invTokens.quoteScale, ONE);
-        (uint16 bidFee,, AomqDecision memory bidDecision) = _applyFeePipeline(
-            false,
-            quoteAmount,
-            baseFeeBps,
-            outcome,
-            flags,
-            feeCfg,
-            invCfg,
-            invTokens,
-            baseReservesLocal,
-            quoteReservesLocal,
-            makerCfg,
-            aomqCfg
-        );
+            (uint16 bidFee,, AomqDecision memory bidDecision) = _applyFeePipeline(
+                false,
+                quoteAmount,
+                baseFeeBps,
+                outcome,
+                flags,
+                feeCfg,
+                invCfg,
+                invTokens,
+                baseReservesLocal,
+                quoteReservesLocal,
+                makerCfg,
+                aomqCfg
+            );
             bidFeeBps[i] = bidFee;
             bidClamped[i] = bidDecision.triggered && bidDecision.clamp;
         }
@@ -1549,7 +1566,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 amountIn,
         uint16 baseFeeBps,
         OracleOutcome memory outcome,
-        FeatureFlags memory flags,
+        uint32 flags,
         FeePolicy.FeeConfig memory feeCfg,
         InventoryConfig memory invCfg,
         Inventory.Tokens memory invTokens,
@@ -1562,7 +1579,13 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         feeBps = baseFeeBps;
         workingAmountIn = amountIn;
 
-        if (flags.enableSizeFee && feeCfg.sizeFeeCapBps > 0 && makerCfg.s0Notional > 0) {
+        bool sizeFeeEnabled = _isFlagEnabled(flags, FLAG_ENABLE_SIZE_FEE);
+        bool invTiltEnabled = _isFlagEnabled(flags, FLAG_ENABLE_INV_TILT);
+        bool rebatesEnabled = _isFlagEnabled(flags, FLAG_ENABLE_REBATES);
+        bool bboFloorEnabled = _isFlagEnabled(flags, FLAG_ENABLE_BBO_FLOOR);
+        bool aomqEnabled = _isFlagEnabled(flags, FLAG_ENABLE_AOMQ);
+
+        if (sizeFeeEnabled && feeCfg.sizeFeeCapBps > 0 && makerCfg.s0Notional > 0) {
             uint16 sizeFeeBps = _computeSizeFeeBps(workingAmountIn, isBaseIn, outcome.mid, feeCfg, makerCfg.s0Notional);
             if (sizeFeeBps > 0) {
                 uint256 updated = uint256(feeBps) + sizeFeeBps;
@@ -1570,7 +1593,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             }
         }
 
-        if (flags.enableInvTilt) {
+        if (invTiltEnabled) {
             int256 tiltAdj = _computeInventoryTiltBps(
                 isBaseIn,
                 outcome.mid,
@@ -1597,7 +1620,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             feeBps = adjusted > feeCfg.capBps ? feeCfg.capBps : uint16(adjusted);
         }
 
-        if (flags.enableRebates) {
+        if (rebatesEnabled) {
             uint16 discountBps = _aggregatorDiscountBps[msg.sender];
             if (discountBps > 0) {
                 if (discountBps >= feeBps) {
@@ -1608,7 +1631,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             }
         }
 
-        if (flags.enableBboFloor) {
+        if (bboFloorEnabled) {
             uint16 floorBps = _computeBboFloor(outcome.spreadBps, makerCfg);
             if (floorBps > feeCfg.capBps) {
                 floorBps = feeCfg.capBps;
@@ -1618,7 +1641,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             }
         }
 
-        if (!flags.enableAOMQ || aomqCfg.minQuoteNotional == 0) {
+        if (!aomqEnabled || aomqCfg.minQuoteNotional == 0) {
             aomqDecision.targetAmountIn = workingAmountIn;
             return (feeBps, workingAmountIn, aomqDecision);
         }
@@ -1636,7 +1659,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
                 quoteReservesLocal,
                 feeBps,
                 makerCfg,
-                flags.enableBboFloor
+                bboFloorEnabled
             );
 
             if (decision.clamp && decision.targetAmountIn < workingAmountIn && iter == 0) {
@@ -1764,7 +1787,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     function _readOracle(
         OracleMode mode,
         bytes calldata oracleData,
-        FeatureFlags memory flags,
+        uint32 flags,
         OracleConfig memory cfg
     ) internal returns (OracleOutcome memory outcome)
     {
@@ -1854,9 +1877,9 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             uint256 divergenceBps = OracleUtils.computeDivergenceBps(outcome.mid, pythMid);
             outcome.divergenceBps = divergenceBps;
 
-            if (flags.enableSoftDivergence) {
+            if (_isFlagEnabled(flags, FLAG_ENABLE_SOFT_DIVERGENCE)) {
                 (uint16 acceptBps, uint16 softBps, uint16 hardBps) = _resolveDivergenceThresholds(cfg);
-                if (flags.debugEmit && hardBps > 0) {
+                if (_isFlagEnabled(flags, FLAG_DEBUG_EMIT) && hardBps > 0) {
                     emit OracleDivergenceChecked(pythMid, outcome.mid, divergenceBps, hardBps);
                 }
                 (uint16 appliedHaircut, bool activeAfter) = _processSoftDivergence(
@@ -1873,7 +1896,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
                     outcome.reason = REASON_HAIRCUT;
                 }
             } else if (cfg.divergenceBps > 0 && divergenceBps > cfg.divergenceBps) {
-                if (flags.debugEmit) {
+                if (_isFlagEnabled(flags, FLAG_DEBUG_EMIT)) {
                     emit OracleDivergenceChecked(pythMid, outcome.mid, divergenceBps, cfg.divergenceBps);
                 }
                 revert Errors.OracleDiverged(divergenceBps, cfg.divergenceBps);
@@ -1886,7 +1909,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     function _readOracleView(
         OracleMode mode,
         bytes calldata oracleData,
-        FeatureFlags memory flags,
+        uint32 flags,
         OracleConfig memory cfg
     ) internal view returns (OracleOutcome memory outcome) {
         IOracleAdapterHC.MidResult memory midRes = ORACLE_HC_.readMidAndAge();
@@ -1972,7 +1995,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             uint256 divergenceBps = OracleUtils.computeDivergenceBps(outcome.mid, pythMid);
             outcome.divergenceBps = divergenceBps;
 
-            if (flags.enableSoftDivergence) {
+            if (_isFlagEnabled(flags, FLAG_ENABLE_SOFT_DIVERGENCE)) {
                 (uint16 acceptBps, uint16 softBps, uint16 hardBps) = _resolveDivergenceThresholds(cfg);
                 (uint16 haircutBps, bool activeAfter) = _previewSoftDivergence(
                     divergenceBps,
@@ -2049,7 +2072,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
     function _computeConfidencePreview(
         OracleConfig memory cfg,
-        FeatureFlags memory flags,
+        uint32 flags,
         OracleMode mode,
         uint256 mid,
         uint256 spreadBps,
@@ -2074,7 +2097,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
         uint256 fallbackConf = pythFresh && pythUsed ? pythConf : 0;
 
-        if (!flags.blendOn) {
+        if (!_isFlagEnabled(flags, FLAG_BLEND_ON)) {
             uint256 primary = spreadAvailable ? spreadBps : 0;
             confBps = primary;
             if (fallbackConf > confBps) confBps = fallbackConf;
@@ -2190,7 +2213,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
     function _computeConfidence(
         OracleConfig memory cfg,
-        FeatureFlags memory flags,
+        uint32 flags,
         OracleMode mode,
         uint256 mid,
         uint256 spreadBps,
@@ -2215,7 +2238,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
         uint256 fallbackConf = pythFresh && pythUsed ? pythConf : 0;
 
-        if (!flags.blendOn) {
+        if (!_isFlagEnabled(flags, FLAG_BLEND_ON)) {
             uint256 primary = spreadAvailable ? spreadBps : 0;
             confBps = primary;
             if (fallbackConf > confBps) confBps = fallbackConf;
@@ -2327,7 +2350,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
     function _previewConfidenceView(
         OracleConfig memory cfg,
-        FeatureFlags memory flags,
+        uint32 flags,
         OracleMode mode,
         uint256 mid,
         uint256 spreadBps,
@@ -2348,7 +2371,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
         uint256 fallbackConf = (pythFresh && pythUsed) ? pythConf : 0;
 
-        if (!flags.blendOn) {
+        if (!_isFlagEnabled(flags, FLAG_BLEND_ON)) {
             uint256 conf = spreadAvailable ? spreadBps : 0;
             if (fallbackConf > conf) conf = fallbackConf;
             if (cap > 0 && conf > cap) conf = cap;
@@ -2369,6 +2392,23 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         if (confSigma > confBps) confBps = confSigma;
         if (confPyth > confBps) confBps = confPyth;
         if (cap > 0 && confBps > cap) confBps = cap;
+    }
+
+    function _encodeFeatureFlagMask(FeatureFlags memory flags) internal pure returns (uint32 mask) {
+        if (flags.blendOn) mask |= FLAG_BLEND_ON;
+        if (flags.parityCiOn) mask |= FLAG_PARITY_CI_ON;
+        if (flags.debugEmit) mask |= FLAG_DEBUG_EMIT;
+        if (flags.enableSoftDivergence) mask |= FLAG_ENABLE_SOFT_DIVERGENCE;
+        if (flags.enableSizeFee) mask |= FLAG_ENABLE_SIZE_FEE;
+        if (flags.enableBboFloor) mask |= FLAG_ENABLE_BBO_FLOOR;
+        if (flags.enableInvTilt) mask |= FLAG_ENABLE_INV_TILT;
+        if (flags.enableAOMQ) mask |= FLAG_ENABLE_AOMQ;
+        if (flags.enableRebates) mask |= FLAG_ENABLE_REBATES;
+        if (flags.enableAutoRecenter) mask |= FLAG_ENABLE_AUTO_RECENTER;
+    }
+
+    function _isFlagEnabled(uint32 mask, uint32 flag) private pure returns (bool) {
+        return mask & flag != 0;
     }
 
     function _pow10(uint8 exp) private pure returns (uint256) {

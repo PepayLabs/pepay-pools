@@ -91,6 +91,8 @@ interface IDnmPool {
 
     function aggregatorDiscount(address executor) external view returns (uint16);
 
+    function featureFlagMask() external view returns (uint32);
+
     function setRecenterCooldownSec(uint32 newCooldownSec) external;
 
     function setPauser(address newPauser) external;

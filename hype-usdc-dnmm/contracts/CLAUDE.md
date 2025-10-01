@@ -34,6 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-01: Added governance config scaffolding (`governanceConfig()` accessor, timelock delay slot) and executor discount ledger getters in `DnmPool` to stage F09/F11 without changing behaviour (defaults remain zero/off).
 - 2025-10-01: Added BBO-aware fee floor enforcement (F05) behind `enableBboFloor`, clamping swap/preview fees to `max(betaFloorBps, alphaBboBps * spread)` while respecting the global cap.
 - 2025-10-01: Added inventory tilt incentives (F06) behind `enableInvTilt`, computing signed adjustments from instantaneous `x*` deviation with spread/conf weighting and symmetric caps.
 - 2025-10-01: Extended configuration structs (inventory tilt weights, maker BBO floor coefficients, `AomqConfig`), introduced `ParamKind.Aomq` with bounds checks, and surfaced `aomqConfig` getter to unblock F05–F07 plumbing.

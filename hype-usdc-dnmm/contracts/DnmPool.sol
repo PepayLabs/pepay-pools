@@ -85,6 +85,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint16 floorEpsilonBps;
     }
 
+    struct GovernanceConfig {
+        uint32 timelockDelaySec; // seconds; 0 == immediate
+    }
+
     struct FeatureFlags {
         bool blendOn;
         bool parityCiOn;
@@ -116,6 +120,12 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         bool active;
     }
 
+    struct AomqActivationState {
+        uint64 lastActivatedAt;
+        bytes32 lastTrigger;
+        bool active;
+    }
+
     struct OracleOutcome {
         uint256 mid;
         uint256 confBps;
@@ -132,6 +142,15 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         bool softDivergenceActive;
     }
 
+    struct AomqDecision {
+        bool triggered;
+        bool clamp;
+        uint256 targetAmountIn;
+        bytes32 trigger;
+        uint16 spreadFloorBps;
+        uint256 targetQuoteNotional;
+    }
+
     TokenConfig public tokenConfig;
     Reserves public reserves;
     InventoryConfig public inventoryConfig;
@@ -140,6 +159,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     MakerConfig public makerConfig;
     AomqConfig public aomqConfig;
     Guardians public guardians;
+    GovernanceConfig private _governanceConfig;
 
     IOracleAdapterHC internal immutable ORACLE_HC_;
     IOracleAdapterPyth internal immutable ORACLE_PYTH_;
@@ -162,12 +182,20 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     SoftDivergenceState private softDivergenceState;
     uint8 private autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
 
+    mapping(address => uint16) private _aggregatorDiscountBps;
+    AomqActivationState private _aomqAskState;
+    AomqActivationState private _aomqBidState;
+
     bytes32 private constant REASON_NONE = bytes32(0);
     bytes32 private constant REASON_FLOOR = bytes32("FLOOR");
     bytes32 private constant REASON_EMA = bytes32("EMA");
     bytes32 private constant REASON_PYTH = bytes32("PYTH");
     bytes32 private constant REASON_SPREAD = bytes32("SPREAD");
     bytes32 private constant REASON_HAIRCUT = bytes32("HAIRCUT");
+    bytes32 private constant REASON_AOMQ = bytes32("AOMQ");
+    bytes32 private constant AOMQ_TRIGGER_SOFT = bytes32("SOFT");
+    bytes32 private constant AOMQ_TRIGGER_FLOOR = bytes32("FLOOR");
+    bytes32 private constant AOMQ_TRIGGER_FALLBACK = bytes32("FALLBACK");
     uint8 private constant SOFT_DIVERGENCE_RECOVERY_STREAK = 3;
 
     event SwapExecuted(
@@ -204,6 +232,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     event OracleDivergenceChecked(uint256 pythMid, uint256 hcMid, uint256 deltaBps, uint256 maxBps);
     event DivergenceHaircut(uint256 deltaBps, uint256 extraFeeBps);
     event DivergenceRejected(uint256 deltaBps);
+    event AomqActivated(bytes32 trigger, bool isBaseIn, uint256 amountIn, uint256 quoteNotional, uint16 spreadBps);
 
     modifier onlyGovernance() {
         if (msg.sender != guardians.governance) revert Errors.NotGovernance();
@@ -290,6 +319,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         aomqConfig = aomqConfig_;
         featureFlags = featureFlags_;
         guardians = guardians_;
+        _governanceConfig = GovernanceConfig({timelockDelaySec: 0});
     }
 
     function oracleAdapterHC() public view returns (IOracleAdapterHC) {
@@ -427,6 +457,14 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     {
         TokenConfig memory cfg = tokenConfig;
         return (cfg.baseToken, cfg.quoteToken, cfg.baseDecimals, cfg.quoteDecimals, cfg.baseScale, cfg.quoteScale);
+    }
+
+    function governanceConfig() external view returns (GovernanceConfig memory) {
+        return _governanceConfig;
+    }
+
+    function aggregatorDiscount(address executor) external view returns (uint16) {
+        return _aggregatorDiscountBps[executor];
     }
 
     function getSoftDivergenceState()
@@ -639,69 +677,153 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 feeCfgPacked = feeConfigPacked;
         FeePolicy.FeeConfig memory feeCfg = FeePolicy.unpack(feeCfgPacked);
         MakerConfig memory makerCfg = makerConfig;
-        uint16 feeBps;
+        AomqConfig memory aomqCfg = aomqConfig;
+
+        uint16 baseFeeBps;
         if (shouldSettleFee) {
-            feeBps = FeePolicy.settlePacked(feeState, feeCfgPacked, outcome.confBps, invDevBps);
+            baseFeeBps = FeePolicy.settlePacked(feeState, feeCfgPacked, outcome.confBps, invDevBps);
         } else {
             FeePolicy.FeeState memory state =
                 FeePolicy.FeeState({lastBlock: feeState.lastBlock, lastFeeBps: feeState.lastFeeBps});
             FeePolicy.FeeState memory previewState;
-            (feeBps, previewState) =
+            (baseFeeBps, previewState) =
                 FeePolicy.previewPacked(state, feeCfgPacked, outcome.confBps, invDevBps, block.number);
-            if (previewState.lastFeeBps != feeBps) revert Errors.FeePreviewInvariant();
+            if (previewState.lastFeeBps != baseFeeBps) revert Errors.FeePreviewInvariant();
         }
 
-        if (flags.enableSizeFee && feeCfg.sizeFeeCapBps > 0 && makerCfg.s0Notional > 0) {
-            uint16 sizeFeeBps = _computeSizeFeeBps(amountIn, isBaseIn, outcome.mid, feeCfg, makerCfg.s0Notional);
-            if (sizeFeeBps > 0) {
-                uint256 updated = uint256(feeBps) + sizeFeeBps;
-                if (updated > feeCfg.capBps) {
-                    feeBps = feeCfg.capBps;
-                } else {
-                    feeBps = uint16(updated);
+        uint256 workingAmountIn = amountIn;
+        AomqDecision memory aomqDecision;
+        bool aomqClampActivated;
+        uint16 feeBps;
+        for (uint8 iter = 0; iter < 2; ++iter) {
+            feeBps = baseFeeBps;
+
+            if (flags.enableSizeFee && feeCfg.sizeFeeCapBps > 0 && makerCfg.s0Notional > 0) {
+                uint16 sizeFeeBps = _computeSizeFeeBps(workingAmountIn, isBaseIn, outcome.mid, feeCfg, makerCfg.s0Notional);
+                if (sizeFeeBps > 0) {
+                    uint256 updated = uint256(feeBps) + sizeFeeBps;
+                    feeBps = updated > feeCfg.capBps ? feeCfg.capBps : uint16(updated);
                 }
             }
-        }
 
-        if (flags.enableInvTilt) {
-            int256 tiltAdj = _computeInventoryTiltBps(
+            if (flags.enableInvTilt) {
+                int256 tiltAdj = _computeInventoryTiltBps(
+                    isBaseIn,
+                    outcome.mid,
+                    outcome.spreadBps,
+                    outcome.confBps,
+                    inventoryConfig,
+                    invTokens,
+                    baseReservesLocal,
+                    quoteReservesLocal
+                );
+                if (tiltAdj != 0) {
+                    if (tiltAdj > 0) {
+                        uint256 increased = uint256(feeBps) + uint256(tiltAdj);
+                        feeBps = increased > feeCfg.capBps ? feeCfg.capBps : uint16(increased);
+                    } else {
+                        uint256 decrease = uint256(-tiltAdj);
+                        feeBps = decrease >= feeBps ? 0 : uint16(uint256(feeBps) - decrease);
+                    }
+                }
+            }
+
+            if (outcome.divergenceHaircutBps > 0) {
+                uint256 adjusted = uint256(feeBps) + outcome.divergenceHaircutBps;
+                feeBps = adjusted > feeCfg.capBps ? feeCfg.capBps : uint16(adjusted);
+            }
+
+            if (flags.enableBboFloor) {
+                uint16 floorBps = _computeBboFloor(outcome.spreadBps, makerCfg);
+                if (floorBps > feeCfg.capBps) {
+                    floorBps = feeCfg.capBps;
+                }
+                if (feeBps < floorBps) {
+                    feeBps = floorBps;
+                }
+            }
+
+            if (!flags.enableAOMQ || aomqCfg.minQuoteNotional == 0) {
+                break;
+            }
+
+            AomqDecision memory decision = _evaluateAomq(
+                workingAmountIn,
                 isBaseIn,
-                outcome.mid,
-                outcome.spreadBps,
-                outcome.confBps,
-                inventoryConfig,
+                outcome,
+                invCfg,
+                aomqCfg,
                 invTokens,
                 baseReservesLocal,
-                quoteReservesLocal
+                quoteReservesLocal,
+                feeBps,
+                makerCfg,
+                flags.enableBboFloor
             );
-            if (tiltAdj != 0) {
-                if (tiltAdj > 0) {
-                    uint256 increased = uint256(feeBps) + uint256(tiltAdj);
-                    feeBps = increased > feeCfg.capBps ? feeCfg.capBps : uint16(increased);
+
+            if (decision.clamp && decision.targetAmountIn < workingAmountIn && iter == 0) {
+                workingAmountIn = decision.targetAmountIn;
+                aomqDecision = decision;
+                aomqClampActivated = true;
+                continue;
+            }
+
+            if (decision.triggered) {
+                if (aomqClampActivated) {
+                    aomqDecision.triggered = true;
+                    aomqDecision.clamp = true;
+                    aomqDecision.targetAmountIn = workingAmountIn;
+                    aomqDecision.trigger = decision.trigger;
+                    if (decision.targetQuoteNotional > 0) {
+                        aomqDecision.targetQuoteNotional = decision.targetQuoteNotional;
+                    }
+                    if (decision.spreadFloorBps > aomqDecision.spreadFloorBps) {
+                        aomqDecision.spreadFloorBps = decision.spreadFloorBps;
+                    }
                 } else {
-                    uint256 decrease = uint256(-tiltAdj);
-                    feeBps = decrease >= feeBps ? 0 : uint16(uint256(feeBps) - decrease);
+                    aomqDecision = decision;
                 }
+
+                if (decision.spreadFloorBps > feeBps) {
+                    feeBps = decision.spreadFloorBps > feeCfg.capBps ? feeCfg.capBps : decision.spreadFloorBps;
+                }
+            } else if (!aomqClampActivated && !aomqDecision.triggered) {
+                aomqDecision = decision;
             }
+
+            break;
         }
 
-        if (outcome.divergenceHaircutBps > 0) {
-            uint256 adjusted = uint256(feeBps) + outcome.divergenceHaircutBps;
-            if (adjusted > feeCfg.capBps) {
-                feeBps = feeCfg.capBps;
-            } else {
-                feeBps = uint16(adjusted);
+        if (aomqClampActivated && aomqDecision.targetQuoteNotional > 0) {
+            if (isBaseIn) {
+                uint256 recalculated =
+                    _baseInForQuoteNotional(aomqDecision.targetQuoteNotional, outcome.mid, feeBps, invTokens);
+                if (recalculated > 0 && recalculated < workingAmountIn) {
+                    workingAmountIn = recalculated;
+                }
+                uint256 simulatedQuote =
+                    _netQuoteFromBase(workingAmountIn, outcome.mid, feeBps, invTokens);
+                if (simulatedQuote < aomqDecision.targetQuoteNotional) {
+                    uint256 deficit = aomqDecision.targetQuoteNotional - simulatedQuote;
+                    uint256 extraBase = _baseInForQuoteNotional(deficit, outcome.mid, feeBps, invTokens);
+                    if (extraBase == 0) extraBase = 1;
+                    workingAmountIn += extraBase;
+                    simulatedQuote = _netQuoteFromBase(workingAmountIn, outcome.mid, feeBps, invTokens);
+                    if (simulatedQuote < aomqDecision.targetQuoteNotional) {
+                        workingAmountIn += 1;
+                    }
+                }
+                if (workingAmountIn > amountIn) {
+                    workingAmountIn = amountIn;
+                }
+            } else if (aomqDecision.targetQuoteNotional < workingAmountIn) {
+                workingAmountIn = aomqDecision.targetQuoteNotional;
             }
+            aomqDecision.targetAmountIn = workingAmountIn;
         }
 
-        if (flags.enableBboFloor) {
-            uint16 floorBps = _computeBboFloor(outcome.spreadBps, makerCfg);
-            if (floorBps > feeCfg.capBps) {
-                floorBps = feeCfg.capBps;
-            }
-            if (feeBps < floorBps) {
-                feeBps = floorBps;
-            }
+        if (aomqDecision.targetAmountIn == 0) {
+            aomqDecision.targetAmountIn = workingAmountIn;
         }
 
         if (flags.debugEmit) {
@@ -730,8 +852,31 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 appliedAmountIn;
         bytes32 reason;
         (amountOut, appliedAmountIn, reason) = _computeSwapAmounts(
-            amountIn, isBaseIn, outcome.mid, feeBps, invTokens, baseReservesLocal, quoteReservesLocal, invCfg.floorBps
+            workingAmountIn,
+            isBaseIn,
+            outcome.mid,
+            feeBps,
+            invTokens,
+            baseReservesLocal,
+            quoteReservesLocal,
+            invCfg.floorBps
         );
+
+        bytes32 finalReason = reason != REASON_NONE ? reason : outcome.reason;
+        if (aomqDecision.triggered && aomqDecision.clamp && appliedAmountIn > 0) {
+            finalReason = REASON_AOMQ;
+            uint256 quoteNotional = isBaseIn ? amountOut : appliedAmountIn;
+            _handleAomqState(
+                isBaseIn,
+                aomqDecision.trigger,
+                appliedAmountIn,
+                quoteNotional,
+                aomqDecision.spreadFloorBps,
+                feeCfg.capBps
+            );
+        } else {
+            _deactivateAomqState(isBaseIn);
+        }
 
         result = QuoteResult({
             amountOut: amountOut,
@@ -739,7 +884,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             feeBpsUsed: feeBps,
             partialFillAmountIn: appliedAmountIn < amountIn ? appliedAmountIn : 0,
             usedFallback: outcome.usedFallback,
-            reason: reason != REASON_NONE ? reason : outcome.reason
+            reason: finalReason
         });
 
         if (shouldSettleFee && flags.enableAutoRecenter) {
@@ -771,6 +916,194 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         reason = didPartial ? REASON_FLOOR : REASON_NONE;
+    }
+
+    function _handleAomqState(
+        bool isBaseIn,
+        bytes32 trigger,
+        uint256 amountInExecuted,
+        uint256 quoteNotional,
+        uint16 spreadBps,
+        uint16 capBps
+    ) internal {
+        if (spreadBps > capBps) {
+            spreadBps = capBps;
+        }
+
+        AomqActivationState storage state = isBaseIn ? _aomqAskState : _aomqBidState;
+        if (!state.active || state.lastTrigger != trigger) {
+            state.active = true;
+            state.lastTrigger = trigger;
+            state.lastActivatedAt = uint64(block.timestamp);
+            emit AomqActivated(trigger, isBaseIn, amountInExecuted, quoteNotional, spreadBps);
+        }
+    }
+
+    function _deactivateAomqState(bool isBaseIn) internal {
+        AomqActivationState storage state = isBaseIn ? _aomqAskState : _aomqBidState;
+        if (state.active) {
+            state.active = false;
+            state.lastTrigger = bytes32(0);
+        }
+    }
+
+    function _evaluateAomq(
+        uint256 workingAmountIn,
+        bool isBaseIn,
+        OracleOutcome memory outcome,
+        InventoryConfig memory invCfg,
+        AomqConfig memory aomqCfg,
+        Inventory.Tokens memory invTokens,
+        uint256 baseReservesLocal,
+        uint256 quoteReservesLocal,
+        uint16 feeBps,
+        MakerConfig memory makerCfg,
+        bool bboFloorEnabled
+    ) internal pure returns (AomqDecision memory decision) {
+        decision.targetAmountIn = workingAmountIn;
+
+        if (aomqCfg.minQuoteNotional == 0 || outcome.mid == 0) {
+            return decision;
+        }
+
+        bool softActive = outcome.softDivergenceActive;
+        bool fallbackActive = outcome.usedFallback && (outcome.reason == REASON_EMA || outcome.reason == REASON_PYTH);
+        bool nearFloor;
+        if (aomqCfg.floorEpsilonBps > 0 && makerCfg.s0Notional > 0) {
+            if (isBaseIn) {
+                uint256 availableQuote = Inventory.availableInventory(quoteReservesLocal, invCfg.floorBps);
+                if (availableQuote > 0) {
+                    uint256 slackBps = FixedPointMath.toBps(availableQuote, uint256(makerCfg.s0Notional));
+                    nearFloor = slackBps <= aomqCfg.floorEpsilonBps;
+                }
+            } else {
+                uint256 availableBase = Inventory.availableInventory(baseReservesLocal, invCfg.floorBps);
+                if (availableBase > 0) {
+                    uint256 availableQuoteNotional = FixedPointMath.mulDivDown(availableBase, outcome.mid, invTokens.baseScale);
+                    if (availableQuoteNotional > 0) {
+                        uint256 slackBps = FixedPointMath.toBps(availableQuoteNotional, uint256(makerCfg.s0Notional));
+                        nearFloor = slackBps <= aomqCfg.floorEpsilonBps;
+                    }
+                }
+            }
+        }
+
+        decision.triggered = softActive || nearFloor || fallbackActive;
+        if (!decision.triggered) {
+            return decision;
+        }
+
+        if (softActive) {
+            decision.trigger = AOMQ_TRIGGER_SOFT;
+        } else if (nearFloor) {
+            decision.trigger = AOMQ_TRIGGER_FLOOR;
+        } else {
+            decision.trigger = AOMQ_TRIGGER_FALLBACK;
+        }
+
+        uint16 spreadFloor = aomqCfg.emergencySpreadBps;
+        if (bboFloorEnabled) {
+            uint16 bboFloor = _computeBboFloor(outcome.spreadBps, makerCfg);
+            if (bboFloor > spreadFloor) {
+                spreadFloor = bboFloor;
+            }
+        }
+        decision.spreadFloorBps = spreadFloor;
+
+        uint256 minQuote = uint256(aomqCfg.minQuoteNotional);
+        if (minQuote == 0) {
+            decision.triggered = false;
+            decision.trigger = bytes32(0);
+            return decision;
+        }
+
+        if (isBaseIn) {
+            uint256 availableQuote = Inventory.availableInventory(quoteReservesLocal, invCfg.floorBps);
+            if (availableQuote == 0) {
+                decision.triggered = false;
+                decision.trigger = bytes32(0);
+                return decision;
+            }
+            if (availableQuote < minQuote) {
+                minQuote = availableQuote;
+            }
+            if (minQuote == 0) {
+                decision.triggered = false;
+                decision.trigger = bytes32(0);
+                return decision;
+            }
+
+            uint256 targetAmount = _baseInForQuoteNotional(minQuote, outcome.mid, feeBps, invTokens);
+            if (targetAmount == 0) {
+                decision.triggered = false;
+                decision.trigger = bytes32(0);
+                return decision;
+            }
+            if (targetAmount < workingAmountIn) {
+                decision.clamp = true;
+                decision.targetAmountIn = targetAmount;
+                decision.targetQuoteNotional = minQuote;
+            }
+        } else {
+            uint256 availableBase = Inventory.availableInventory(baseReservesLocal, invCfg.floorBps);
+            if (availableBase == 0) {
+                decision.triggered = false;
+                decision.trigger = bytes32(0);
+                return decision;
+            }
+
+            uint256 targetAmount = minQuote;
+            if (targetAmount > workingAmountIn) {
+                targetAmount = workingAmountIn;
+            }
+            if (targetAmount < workingAmountIn) {
+                decision.clamp = true;
+                decision.targetAmountIn = targetAmount;
+                decision.targetQuoteNotional = targetAmount;
+            }
+        }
+
+        if (!decision.clamp) {
+            decision.targetAmountIn = workingAmountIn;
+        }
+
+        return decision;
+    }
+
+    function _baseInForQuoteNotional(
+        uint256 quoteNotional,
+        uint256 mid,
+        uint16 feeBps,
+        Inventory.Tokens memory invTokens
+    ) internal pure returns (uint256) {
+        if (mid == 0 || quoteNotional == 0) return 0;
+
+        uint256 netQuoteWad = FixedPointMath.mulDivDown(quoteNotional, ONE, invTokens.quoteScale);
+        if (netQuoteWad == 0) return 0;
+
+        uint256 grossQuoteWad = feeBps == 0 ? netQuoteWad : FixedPointMath.mulDivUp(netQuoteWad, BPS, BPS - feeBps);
+        uint256 baseWad = FixedPointMath.mulDivUp(grossQuoteWad, ONE, mid);
+        if (baseWad == 0) return 0;
+
+        return FixedPointMath.mulDivUp(baseWad, invTokens.baseScale, ONE);
+    }
+
+    function _netQuoteFromBase(
+        uint256 amountIn,
+        uint256 mid,
+        uint16 feeBps,
+        Inventory.Tokens memory invTokens
+    ) internal pure returns (uint256) {
+        if (amountIn == 0 || mid == 0) return 0;
+        uint256 amountInWad = FixedPointMath.mulDivDown(amountIn, ONE, invTokens.baseScale);
+        if (amountInWad == 0) return 0;
+
+        uint256 grossQuoteWad = FixedPointMath.mulDivDown(amountInWad, mid, ONE);
+        if (grossQuoteWad == 0) return 0;
+
+        uint256 feeWad = feeBps == 0 ? 0 : FixedPointMath.mulDivDown(grossQuoteWad, feeBps, BPS);
+        uint256 netQuoteWad = grossQuoteWad - feeWad;
+        return FixedPointMath.mulDivDown(netQuoteWad, invTokens.quoteScale, ONE);
     }
 
     function _computeSizeFeeBps(

@@ -16,6 +16,8 @@ library EventRecorder {
         keccak256("ConfidenceDebug(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)");
     bytes32 internal constant ORACLE_SNAPSHOT_SIG =
         keccak256("OracleSnapshot(bytes32,uint256,uint256,uint256,uint256,uint256,bool,bool,bool)");
+    bytes32 internal constant AOMQ_ACTIVATED_SIG =
+        keccak256("AomqActivated(bytes32,bool,uint256,uint256,uint16)");
 
     bytes32 internal constant REASON_NONE = bytes32(0);
     bytes32 internal constant REASON_FLOOR = bytes32("FLOOR");
@@ -90,6 +92,14 @@ library EventRecorder {
         bool hcSuccess;
         bool bookSuccess;
         bool pythSuccess;
+    }
+
+    struct AomqEvent {
+        bytes32 trigger;
+        bool isBaseIn;
+        uint256 amountIn;
+        uint256 quoteNotional;
+        uint16 spreadBps;
     }
 
     function decodeSwapEvents(Vm.Log[] memory entries) internal pure returns (SwapEvent[] memory swaps) {
@@ -321,6 +331,33 @@ library EventRecorder {
             } else if (evt.reason == REASON_SPREAD) {
                 counts.spread += 1;
             }
+        }
+    }
+
+    function decodeAomqEvents(Vm.Log[] memory entries) internal pure returns (AomqEvent[] memory events) {
+        uint256 count;
+        for (uint256 i = 0; i < entries.length; ++i) {
+            if (entries[i].topics.length > 0 && entries[i].topics[0] == AOMQ_ACTIVATED_SIG) {
+                ++count;
+            }
+        }
+
+        events = new AomqEvent[](count);
+        uint256 ptr;
+        for (uint256 i = 0; i < entries.length; ++i) {
+            Vm.Log memory logEntry = entries[i];
+            if (logEntry.topics.length == 0 || logEntry.topics[0] != AOMQ_ACTIVATED_SIG) continue;
+
+            (bytes32 trigger, bool isBaseIn, uint256 amountIn, uint256 quoteNotional, uint16 spreadBps) =
+                abi.decode(logEntry.data, (bytes32, bool, uint256, uint256, uint16));
+
+            events[ptr++] = AomqEvent({
+                trigger: trigger,
+                isBaseIn: isBaseIn,
+                amountIn: amountIn,
+                quoteNotional: quoteNotional,
+                spreadBps: spreadBps
+            });
         }
     }
 

@@ -10,6 +10,14 @@ contract ConfigSchemaTest is BaseTest {
         setUpBase();
     }
 
+    function test_featureFlagsExposeAomqAndRebates() public view {
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+
+        assertEq(flags.enableAOMQ, false, "AOMQ default");
+        assertEq(flags.enableRebates, false, "Rebates default");
+        assertEq(flags.enableAutoRecenter, false, "Auto recenter default");
+    }
+
     function test_inventoryConfigExposesTiltFields() public view {
         (
             uint128 target,
@@ -50,6 +58,17 @@ contract ConfigSchemaTest is BaseTest {
         assertEq(minQuoteNotional, 0, "min quote default");
         assertEq(emergencySpreadBps, 0, "emergency spread default");
         assertEq(floorEpsilonBps, 0, "floor epsilon default");
+    }
+
+    function test_governanceConfigExposesTimelockDelay() public view {
+        DnmPool.GovernanceConfig memory cfg = pool.governanceConfig();
+
+        assertEq(cfg.timelockDelaySec, 0, "timelock default");
+    }
+
+    function test_rebateDefaultsAreZero() public view {
+        assertEq(pool.aggregatorDiscount(alice), 0, "alice discount default");
+        assertEq(pool.aggregatorDiscount(bob), 0, "bob discount default");
     }
 
     function test_updateInventoryRejectsTiltBounds() public {

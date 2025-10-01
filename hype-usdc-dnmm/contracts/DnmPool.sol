@@ -20,16 +20,9 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     uint256 private constant BPS = 10_000;
     uint256 private constant HC_AGE_UNKNOWN = type(uint256).max;
     uint8 private constant AUTO_RECENTER_HEALTHY_REQUIRED = 3;
-
-    enum ParamKind {
-        Oracle,
-        Fee,
-        Inventory,
-        Maker,
-        Feature,
-        Aomq,
-        Preview
-    }
+    uint16 private constant MAX_REBATE_BPS = 3;
+    uint32 private constant MAX_TIMELOCK_DELAY = 7 days;
+    uint32 private constant MIN_TIMELOCK_DELAY = 1 hours;
 
     struct TokenConfig {
         address baseToken;
@@ -146,6 +139,12 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         bool active;
     }
 
+    struct PendingParam {
+        bytes data;
+        uint40 eta;
+        address proposer;
+    }
+
     struct OracleOutcome {
         uint256 mid;
         uint256 confBps;
@@ -204,6 +203,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     uint8 private autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
 
     mapping(address => uint16) private _aggregatorDiscountBps;
+    mapping(IDnmPool.ParamKind => PendingParam) private _pendingParams;
     AomqActivationState private _aomqAskState;
     AomqActivationState private _aomqBidState;
     PreviewSnapshot private _previewSnapshot;
@@ -273,6 +273,12 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     event DivergenceHaircut(uint256 deltaBps, uint256 extraFeeBps);
     event DivergenceRejected(uint256 deltaBps);
     event AomqActivated(bytes32 trigger, bool isBaseIn, uint256 amountIn, uint256 quoteNotional, uint16 spreadBps);
+    event AggregatorDiscountUpdated(address indexed executor, uint16 discountBps);
+    event PauserUpdated(address indexed oldPauser, address indexed newPauser);
+    event ParamsQueued(bytes32 indexed kind, uint40 eta, address indexed proposer, bytes32 dataHash);
+    event ParamsExecuted(bytes32 indexed kind, bytes32 dataHash);
+    event ParamsCanceled(bytes32 indexed kind);
+    event TimelockDelayUpdated(uint32 oldDelay, uint32 newDelay);
 
     modifier onlyGovernance() {
         if (msg.sender != guardians.governance) revert Errors.NotGovernance();
@@ -558,8 +564,66 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
     // --- Governance ---
 
-    function updateParams(ParamKind kind, bytes calldata data) external onlyGovernance {
-        if (kind == ParamKind.Oracle) {
+    function updateParams(IDnmPool.ParamKind kind, bytes calldata data) external onlyGovernance {
+        GovernanceConfig memory gov = _governanceConfig;
+        if (_requiresTimelock(kind) && gov.timelockDelaySec > 0) {
+            revert Errors.TimelockRequired();
+        }
+
+        bytes memory payload = data;
+        _applyParamUpdate(kind, payload);
+    }
+
+    function queueParams(IDnmPool.ParamKind kind, bytes calldata data) external onlyGovernance returns (uint40 eta) {
+        GovernanceConfig memory gov = _governanceConfig;
+        if (!_requiresTimelock(kind) || gov.timelockDelaySec == 0) {
+            bytes memory payloadImmediate = data;
+            _applyParamUpdate(kind, payloadImmediate);
+            return 0;
+        }
+
+        PendingParam storage pending = _pendingParams[kind];
+        if (pending.eta != 0) revert Errors.ParamPending();
+
+        eta = uint40(block.timestamp + gov.timelockDelaySec);
+        bytes memory payload = data;
+        pending.data = payload;
+        pending.eta = eta;
+        pending.proposer = msg.sender;
+
+        emit ParamsQueued(_paramKindLabel(kind), eta, msg.sender, keccak256(payload));
+    }
+
+    function executeParams(IDnmPool.ParamKind kind) external onlyGovernance {
+        PendingParam storage pending = _pendingParams[kind];
+        if (pending.eta == 0) revert Errors.ParamNotQueued();
+        if (block.timestamp < pending.eta) revert Errors.TimelockNotElapsed(pending.eta);
+
+        bytes memory payload = pending.data;
+        bytes32 hash = keccak256(payload);
+        delete _pendingParams[kind];
+
+        _applyParamUpdate(kind, payload);
+        emit ParamsExecuted(_paramKindLabel(kind), hash);
+    }
+
+    function cancelParams(IDnmPool.ParamKind kind) external onlyGovernance {
+        PendingParam storage pending = _pendingParams[kind];
+        if (pending.eta == 0) revert Errors.ParamNotQueued();
+        delete _pendingParams[kind];
+        emit ParamsCanceled(_paramKindLabel(kind));
+    }
+
+    function setAggregatorDiscount(address executor, uint16 discountBps) external onlyGovernance {
+        if (executor == address(0)) revert Errors.InvalidConfig();
+        if (discountBps > MAX_REBATE_BPS) revert Errors.RebateTooLarge(discountBps, MAX_REBATE_BPS);
+
+        _aggregatorDiscountBps[executor] = discountBps;
+        emit AggregatorDiscountUpdated(executor, discountBps);
+    }
+
+    function _applyParamUpdate(IDnmPool.ParamKind kind, bytes memory data) internal {
+        if (kind == IDnmPool.ParamKind.Oracle) {
             OracleConfig memory oldCfg = oracleConfig;
             OracleConfig memory newCfg = abi.decode(data, (OracleConfig));
             if (newCfg.confCapBpsStrict > newCfg.confCapBpsSpot) revert Errors.InvalidConfig();
@@ -578,7 +642,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             if (maxHaircut >= BPS) revert Errors.InvalidConfig();
             oracleConfig = newCfg;
             emit ParamsUpdated("ORACLE", abi.encode(oldCfg), data);
-        } else if (kind == ParamKind.Fee) {
+        } else if (kind == IDnmPool.ParamKind.Fee) {
             FeePolicy.FeeConfig memory oldCfg = FeePolicy.unpack(feeConfigPacked);
             FeePolicy.FeeConfig memory newCfg = abi.decode(data, (FeePolicy.FeeConfig));
             if (newCfg.capBps >= 10_000) revert FeePolicy.FeeCapTooHigh(newCfg.capBps); // AUDIT:ORFQ-002 enforce <100%
@@ -587,7 +651,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             }
             feeConfigPacked = FeePolicy.pack(newCfg);
             emit ParamsUpdated("FEE", abi.encode(oldCfg), data);
-        } else if (kind == ParamKind.Inventory) {
+        } else if (kind == IDnmPool.ParamKind.Inventory) {
             InventoryConfig memory oldCfg = inventoryConfig;
             InventoryConfig memory newCfg = abi.decode(data, (InventoryConfig));
             if (newCfg.floorBps > 5000) revert Errors.InvalidConfig();
@@ -597,14 +661,14 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             if (newCfg.tiltSpreadWeightBps > BPS) revert Errors.InvalidConfig();
             inventoryConfig = newCfg;
             emit ParamsUpdated("INVENTORY", abi.encode(oldCfg), data);
-        } else if (kind == ParamKind.Maker) {
+        } else if (kind == IDnmPool.ParamKind.Maker) {
             MakerConfig memory oldCfg = makerConfig;
             MakerConfig memory newCfg = abi.decode(data, (MakerConfig));
             if (newCfg.alphaBboBps > BPS) revert Errors.InvalidConfig();
             if (newCfg.betaFloorBps > BPS) revert Errors.InvalidConfig();
             makerConfig = newCfg;
             emit ParamsUpdated("MAKER", abi.encode(oldCfg), data);
-        } else if (kind == ParamKind.Feature) {
+        } else if (kind == IDnmPool.ParamKind.Feature) {
             FeatureFlags memory oldFlags = featureFlags;
             FeatureFlags memory newFlags = abi.decode(data, (FeatureFlags));
             featureFlags = newFlags;
@@ -612,23 +676,51 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
                 autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
             }
             emit ParamsUpdated("FEATURE", abi.encode(oldFlags), data);
-        } else if (kind == ParamKind.Aomq) {
+        } else if (kind == IDnmPool.ParamKind.Aomq) {
             AomqConfig memory oldCfg = aomqConfig;
             AomqConfig memory newCfg = abi.decode(data, (AomqConfig));
             if (newCfg.emergencySpreadBps > BPS) revert Errors.InvalidConfig();
             if (newCfg.floorEpsilonBps > BPS) revert Errors.InvalidConfig();
             aomqConfig = newCfg;
             emit ParamsUpdated("AOMQ", abi.encode(oldCfg), data);
-        } else if (kind == ParamKind.Preview) {
+        } else if (kind == IDnmPool.ParamKind.Preview) {
             PreviewConfig memory oldCfg = previewConfig;
             PreviewConfig memory newCfg = abi.decode(data, (PreviewConfig));
             if (newCfg.maxAgeSec == 0) revert Errors.InvalidConfig();
             if (newCfg.snapshotCooldownSec > newCfg.maxAgeSec) revert Errors.InvalidConfig();
             previewConfig = newCfg;
             emit ParamsUpdated("PREVIEW", abi.encode(oldCfg), data);
+        } else if (kind == IDnmPool.ParamKind.Governance) {
+            GovernanceConfig memory oldCfg = _governanceConfig;
+            GovernanceConfig memory newCfg = abi.decode(data, (GovernanceConfig));
+            uint32 delay = newCfg.timelockDelaySec;
+            if (delay > MAX_TIMELOCK_DELAY) revert Errors.InvalidConfig();
+            if (delay != 0 && delay < MIN_TIMELOCK_DELAY) revert Errors.InvalidConfig();
+            _governanceConfig = newCfg;
+            emit TimelockDelayUpdated(oldCfg.timelockDelaySec, delay);
+            emit ParamsUpdated("GOVERNANCE", abi.encode(oldCfg), data);
         } else {
             revert Errors.InvalidParamKind();
         }
+    }
+
+    function _requiresTimelock(IDnmPool.ParamKind kind) internal pure returns (bool) {
+        if (kind == IDnmPool.ParamKind.Preview || kind == IDnmPool.ParamKind.Governance) {
+            return false;
+        }
+        return true;
+    }
+
+    function _paramKindLabel(IDnmPool.ParamKind kind) internal pure returns (bytes32) {
+        if (kind == IDnmPool.ParamKind.Oracle) return bytes32("ORACLE");
+        if (kind == IDnmPool.ParamKind.Fee) return bytes32("FEE");
+        if (kind == IDnmPool.ParamKind.Inventory) return bytes32("INVENTORY");
+        if (kind == IDnmPool.ParamKind.Maker) return bytes32("MAKER");
+        if (kind == IDnmPool.ParamKind.Feature) return bytes32("FEATURE");
+        if (kind == IDnmPool.ParamKind.Aomq) return bytes32("AOMQ");
+        if (kind == IDnmPool.ParamKind.Preview) return bytes32("PREVIEW");
+        if (kind == IDnmPool.ParamKind.Governance) return bytes32("GOVERNANCE");
+        return bytes32("UNKNOWN");
     }
 
     function setTargetBaseXstar(uint128 newTarget) external onlyGovernance {
@@ -654,6 +746,13 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint32 oldCooldown = recenterCooldownSec;
         recenterCooldownSec = newCooldownSec;
         emit RecenterCooldownSet(oldCooldown, newCooldownSec);
+    }
+
+    function setPauser(address newPauser) external onlyGovernance {
+        if (newPauser == address(0)) revert Errors.InvalidConfig();
+        address oldPauser = guardians.pauser;
+        guardians.pauser = newPauser;
+        emit PauserUpdated(oldPauser, newPauser);
     }
 
     /**
@@ -931,7 +1030,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     {
         if (!previewConfig.enablePreviewFresh) revert PreviewFreshDisabled();
         FeatureFlags memory flags = featureFlags;
-        OracleOutcome memory outcome = _readOraclePreview(mode, oracleData, flags, oracleConfig);
+        OracleOutcome memory outcome = _readOracleView(mode, oracleData, flags, oracleConfig);
         (askFeeBps, bidFeeBps,,) = _computePreviewFees(outcome, sizesBaseWad);
     }
 
@@ -1498,6 +1597,17 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             feeBps = adjusted > feeCfg.capBps ? feeCfg.capBps : uint16(adjusted);
         }
 
+        if (flags.enableRebates) {
+            uint16 discountBps = _aggregatorDiscountBps[msg.sender];
+            if (discountBps > 0) {
+                if (discountBps >= feeBps) {
+                    feeBps = 0;
+                } else {
+                    feeBps = uint16(uint256(feeBps) - discountBps);
+                }
+            }
+        }
+
         if (flags.enableBboFloor) {
             uint16 floorBps = _computeBboFloor(outcome.spreadBps, makerCfg);
             if (floorBps > feeCfg.capBps) {
@@ -1720,6 +1830,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
         if (outcome.mid == 0) {
             if (spreadRejected) revert Errors.OracleSpread();
+            bool midUnset = midRes.mid == 0;
+            bool emaUnset = !emaFresh || emaRes.mid == 0;
+            bool pythUnset = !pythFresh || pythMid == 0;
+            if (midUnset && emaUnset && pythUnset) revert Errors.MidUnset();
             revert Errors.OracleStale();
         }
 
@@ -1769,7 +1883,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         return outcome;
     }
 
-    function _readOraclePreview(
+    function _readOracleView(
         OracleMode mode,
         bytes calldata oracleData,
         FeatureFlags memory flags,
@@ -1834,6 +1948,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
         if (outcome.mid == 0) {
             if (spreadRejected) revert Errors.OracleSpread();
+            bool midUnset = midRes.mid == 0;
+            bool emaUnset = !emaFresh || emaRes.mid == 0;
+            bool pythUnset = !pythFresh || pythMid == 0;
+            if (midUnset && emaUnset && pythUnset) revert Errors.MidUnset();
             revert Errors.OracleStale();
         }
 

@@ -171,7 +171,7 @@ contract DivergencePolicyTest is Test {
             enableAutoRecenter: false
         });
         vm.prank(GOV);
-        pool.updateParams(DnmPool.ParamKind.Feature, abi.encode(flags));
+        pool.updateParams(IDnmPool.ParamKind.Feature, abi.encode(flags));
 
         _primeHyperCore(1_070_000_000_000_000_000, 5, 1_069_000_000_000_000_000, 1_071_000_000_000_000_000, 20);
         uint256 expectedDeltaBps = 654;

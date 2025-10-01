@@ -147,7 +147,7 @@ contract GasSnapshotsTest is BaseTest {
             enablePreviewFresh: false
         });
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Preview, abi.encode(previewCfg));
+        pool.updateParams(IDnmPool.ParamKind.Preview, abi.encode(previewCfg));
         pool.refreshPreviewSnapshot(IDnmPool.OracleMode.Spot, bytes(""));
         uint256[] memory sizes = new uint256[](1);
         sizes[0] = 1e18;
@@ -165,7 +165,7 @@ contract GasSnapshotsTest is BaseTest {
             enablePreviewFresh: false
         });
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Preview, abi.encode(previewCfg));
+        pool.updateParams(IDnmPool.ParamKind.Preview, abi.encode(previewCfg));
         pool.refreshPreviewSnapshot(IDnmPool.OracleMode.Spot, bytes(""));
         uint256 gasBefore = gasleft();
         pool.previewLadder(0);

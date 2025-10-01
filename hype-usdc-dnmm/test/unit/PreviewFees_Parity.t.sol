@@ -25,7 +25,7 @@ contract PreviewFeesParityTest is BaseTest {
             enablePreviewFresh: false
         });
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Preview, abi.encode(previewCfg));
+        pool.updateParams(IDnmPool.ParamKind.Preview, abi.encode(previewCfg));
 
         approveAll(alice);
         approveAll(bob);
@@ -42,7 +42,7 @@ contract PreviewFeesParityTest is BaseTest {
         feeCfg.gammaSizeQuadBps = 5;
         feeCfg.sizeFeeCapBps = 90;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Fee, abi.encode(feeCfg));
+        pool.updateParams(IDnmPool.ParamKind.Fee, abi.encode(feeCfg));
 
         DnmPool.InventoryConfig memory invCfg = defaultInventoryConfig();
         invCfg.invTiltBpsPer1pct = 200;
@@ -50,20 +50,20 @@ contract PreviewFeesParityTest is BaseTest {
         invCfg.tiltConfWeightBps = 5000;
         invCfg.tiltSpreadWeightBps = 5000;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Inventory, abi.encode(invCfg));
+        pool.updateParams(IDnmPool.ParamKind.Inventory, abi.encode(invCfg));
 
         DnmPool.MakerConfig memory makerCfg = defaultMakerConfig();
         makerCfg.alphaBboBps = 5_000; // 50% of spread
         makerCfg.betaFloorBps = 15;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Maker, abi.encode(makerCfg));
+        pool.updateParams(IDnmPool.ParamKind.Maker, abi.encode(makerCfg));
 
         DnmPool.AomqConfig memory aomqCfg = defaultAomqConfig();
         aomqCfg.minQuoteNotional = 50_000000; // 50 quote units
         aomqCfg.emergencySpreadBps = 120;
         aomqCfg.floorEpsilonBps = 200;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Aomq, abi.encode(aomqCfg));
+        pool.updateParams(IDnmPool.ParamKind.Aomq, abi.encode(aomqCfg));
 
         DnmPool.FeatureFlags memory flags = getFeatureFlags();
         flags.enableSizeFee = true;

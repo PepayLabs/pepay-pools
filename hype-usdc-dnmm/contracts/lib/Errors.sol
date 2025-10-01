@@ -29,4 +29,9 @@ library Errors {
     error FeeCapExceeded();
     error FeePreviewInvariant();
     error DivergenceHard(uint256 deltaBps, uint256 hardBps);
+    error RebateTooLarge(uint16 providedBps, uint16 maxBps);
+    error TimelockRequired();
+    error ParamPending();
+    error ParamNotQueued();
+    error TimelockNotElapsed(uint40 eta);
 }

@@ -30,7 +30,7 @@ contract InventoryTiltTest is BaseTest {
         invCfg.tiltConfWeightBps = 0;
         invCfg.tiltSpreadWeightBps = 0;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Inventory, abi.encode(invCfg));
+        pool.updateParams(IDnmPool.ParamKind.Inventory, abi.encode(invCfg));
 
         DnmPool.FeatureFlags memory flags = getFeatureFlags();
         flags.enableInvTilt = false;
@@ -65,7 +65,7 @@ contract InventoryTiltTest is BaseTest {
         invCfg.tiltConfWeightBps = 0;
         invCfg.tiltSpreadWeightBps = 10_000; // weight spread 1:1
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Inventory, abi.encode(invCfg));
+        pool.updateParams(IDnmPool.ParamKind.Inventory, abi.encode(invCfg));
 
         DnmPool.FeatureFlags memory flags = getFeatureFlags();
         flags.enableInvTilt = false;

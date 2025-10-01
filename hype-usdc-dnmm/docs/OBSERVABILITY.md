@@ -1,20 +1,25 @@
 # Observability & Telemetry Hooks
 
 ## Metrics
-- `effective_price_bps` – Swap execution vs. oracle mid (compute off-chain from `SwapExecuted`).
-- `fee_bps` – Emitted in `SwapExecuted`; combine with configuration to derive α/β components.
-- `conf_bps` – Reconstruct from HyperCore spread / Pyth confidence stored alongside swap context.
-- `inventory_deviation_bps` – Available from view helpers; track target vs actual inventory.
-- `partial_fill_ratio` – Partial fill notional vs. requested (from `SwapExecuted.partial` + `partialFillAmountIn`).
-- `oracle_mode` – Spot/EMA/Pyth fallback; use `reason` field (`"EMA"`, `"PYTH"`, etc.).
-- `reject_reason` – Count occurrences of `Errors.Oracle*` and `Errors.FloorBreach()` via revert tracking.
-- `fee_state_decay` – Monitor gap between `feeConfig.baseBps` and emitted `feeBps` across blocks for decay health.
-- Parity exports (`mid_event_vs_precompile_mid_bps.csv`, `canary_deltas.csv`, `divergence_rate.csv`, `divergence_histogram.csv`) – snapshot oracle parity, fallback reasons, and divergence guard hit-rates per Δ bucket.
-- Load test artefacts (`load_burst_summary.csv`, `load_fee_decay_series.csv`) – failure-rate, average fee, and recorded `fee_cap_bps` for the stress harness.
-- `preview_snapshot_age_sec` / `preview_snapshot_timestamp` – expose the age of the cached oracle outcome (0 when unset). Age > `previewMaxAgeSec` should trigger either a refresh or stale handling by routers.
-- `preview_stale_reverts_total` – counter incremented when clients hit `PreviewSnapshotStale`; useful to detect keeper outages.
-- `preview_ladder_ask_bps{bucket}` / `preview_ladder_bid_bps{bucket}` – gauges for the standard ladder sizes (`bucket ∈ {S0,2S0,5S0,10S0}`) to trend fee shape over time.
-- `preview_clamp_flags{bucket,side}` – boolean gauges (0/1) indicating when AOMQ clamps the ask/bid side for the given ladder bucket.
+- **Oracle alignment**
+  - `delta_bps` – |HyperCore mid − Pyth mid| in basis points.
+  - `pyth_conf_bps` – Pyth confidence scaled to BPS.
+  - `hc_spread_bps` – Live HyperCore order-book spread in BPS.
+  - `decision{decision}` – Counter labelling accept / haircut / reject / aomq outcomes.
+- **Economics**
+  - `fee_ask_bps`, `fee_bid_bps` – Applied fees per side after discounts/floors.
+  - `size_bucket{bucket}` – Counter for trade notional buckets (`<=S0`, `S0..2S0`, `>2S0`).
+  - `ladder_points{bucket,side}` – Gauge exposing `previewFees` for `[S0,2S0,5S0,10S0]` buckets.
+  - `rebates_applied_total` – Counter bump when an allow-listed executor receives a rebate.
+- **Inventory & reliability**
+  - `inventory_dev_bps` – Absolute deviation vs `targetBaseXstar`.
+  - `recenter_commits_total` – Count of `TargetBaseXstarUpdated` events.
+  - `two_sided_uptime_pct` – Rolling % of time both sides retain post-floor inventory.
+  - `preview_snapshot_age_sec` – Age of the cached preview snapshot; pair with
+    `preview_stale_reverts_total` (reverts surfaced to routers).
+- **Canary artefacts**
+  - Parity CSVs (`mid_event_vs_precompile_mid_bps.csv`, `canary_deltas.csv`, `divergence_histogram.csv`) continue to backfill dashboards.
+  - Load-test exports (`load_burst_summary.csv`, `load_fee_decay_series.csv`) track decay drift and failure envelopes.
 
 ## Logs & Events
 - `SwapExecuted(user, isBaseIn, amountIn, amountOut, mid, feeBps, partial, reason)` – Primary execution telemetry.
@@ -28,6 +33,7 @@
 - `OracleSnapshot(label, mid, ageSec, spreadBps, pythMid, deltaBps, hcSuccess, bookSuccess, pythSuccess)` – Emitted by the on-chain observer canary; mirrors pool oracle reads for block-synchronous parity dashboards.
 - `OracleAlert(source, kind, value, threshold, critical)` – Emitted by `OracleWatcher` when observed age, divergence, or fallback usage violates configured thresholds. `kind` enumerates `Age`, `Divergence`, `Fallback`.
 - `AutoPauseRequested(source, handlerCalled, handlerData)` – Fired by `OracleWatcher` whenever auto-pause is enabled and a critical alert is detected. The optional pause handler hook is invoked first; `handlerCalled` captures the call outcome, while `handlerData` surfaces revert payloads for debugging.
+- `AutoPaused(watcher, reason, timestamp)` – Emitted by `DnmPauseHandler` once the watcher-driven pause succeeds; pairs with `Paused(pauser)` from the pool for operator acknowledgement.
 
 ## Dashboards
 - **Liquidity Health** – Track inventory deviation, floor breaches, partial percentages.
@@ -38,12 +44,15 @@
 - **Preview & Ladder** – Track snapshot age vs. max-age, the current ask/bid ladder, and clamp flags to surface impending stale previews before routers hit them.
 
 ## Alerting Baselines
-- Divergence rejections > 3% of calls within 5 minutes.
+- `reject_rate_pct_5m > 0.5` – either router misconfiguration or oracle stress; auto-escalate.
+- `delta_bps_p95_15m > divergenceSoftBps` – parity risk; verify HyperCore + Pyth feeds.
+- `precompile_error_rate > 0.1` – HyperCore read instability.
+- `two_sided_uptime_pct < 98.5` – points to AOMQ / floor exhaustion.
+- `abs(mid / lastRebalancePrice - 1) > divergenceHard && recenter_commits_total == 0` within 24h – recenter automation gap.
+- `preview_snapshot_age_sec > previewMaxAgeSec` for two consecutive samples.
+- `preview_stale_reverts_total` derivative > 0.5/min – routers hitting stale snapshots; check keepers.
 - Partial fills > 10% of swap notional in an hour.
 - `reason` = `"PYTH"` or `"EMA"` exceeding baseline (oracle degradation).
-- `SwapExecuted` absence for >1 minute when maker S0 expected (RFQ degradation signal).
-- `preview_snapshot_age_sec > 2 × previewMaxAgeSec` for more than two consecutive samples.
-- `preview_stale_reverts_total` derivative > 0.5 / min (indicates routers regularly hitting stale previews).
 
 ## Telemetry Integration
 - Ingest events via an indexer (e.g., Subsquid on HyperEVM) and push to Prometheus/Grafana.

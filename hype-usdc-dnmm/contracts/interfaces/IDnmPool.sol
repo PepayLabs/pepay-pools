@@ -7,6 +7,17 @@ interface IDnmPool {
         Strict
     }
 
+    enum ParamKind {
+        Oracle,
+        Fee,
+        Inventory,
+        Maker,
+        Feature,
+        Aomq,
+        Preview,
+        Governance
+    }
+
     struct QuoteResult {
         uint256 amountOut;
         uint256 midUsed;
@@ -68,7 +79,21 @@ interface IDnmPool {
 
     function rebalanceTarget() external;
 
+    function updateParams(ParamKind kind, bytes calldata data) external;
+
+    function queueParams(ParamKind kind, bytes calldata data) external returns (uint40 eta);
+
+    function executeParams(ParamKind kind) external;
+
+    function cancelParams(ParamKind kind) external;
+
+    function setAggregatorDiscount(address executor, uint16 discountBps) external;
+
+    function aggregatorDiscount(address executor) external view returns (uint16);
+
     function setRecenterCooldownSec(uint32 newCooldownSec) external;
+
+    function setPauser(address newPauser) external;
 
     function tokens()
         external

@@ -34,7 +34,7 @@ contract SoftDivergenceTest is BaseTest {
         cfg.haircutSlopeBps = thresholds.slope;
 
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(cfg));
+        pool.updateParams(IDnmPool.ParamKind.Oracle, abi.encode(cfg));
 
         DnmPool.FeatureFlags memory flags = getFeatureFlags();
         flags.blendOn = true;

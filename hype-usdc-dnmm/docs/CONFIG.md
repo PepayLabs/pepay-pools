@@ -40,8 +40,9 @@ Derived from Lifinity's SOL/USDC configuration (see `lifinity-contract/CONFIGURA
 | `aomq.minQuoteNotional` | Minimum emergency quote notional emitted under AOMQ. | `0` |
 | `aomq.emergencySpreadBps` | Spread (bps) applied to AOMQ micro quotes. | `0` |
 | `aomq.floorEpsilonBps` | Additional epsilon above the configured floor when AOMQ is active. | `0` |
-| `rebates.allowlist` | List of `{executor, discountBps}` entries granted maker rebates. | `[]` |
-| `governance.timelockDelaySec` | Global timelock (seconds) for sensitive param commits. | `0` |
+| `rebates.allowlist` | List of `{executor, discountBps}` entries granted maker rebates. The contract enforces `discountBps ≤ 3` and clamps at the fee cap/floor. | `[]` |
+| `governance.timelockDelaySec` | Global timelock (seconds) for sensitive param commits. Must be `0` (disabled) or ≥ 3600 and ≤ 7 days when enabled. | `0` |
+| `.preview.enablePreviewFresh` | Enables live oracle reads in `previewFeesFresh`. Must coincide with `maxAgeSec > 0`. | `false` |
 | `featureFlags.*` | Deployment-time feature toggles (zero-default). | All `false` |
 
 ### Feature Flags
@@ -59,6 +60,15 @@ Derived from Lifinity's SOL/USDC configuration (see `lifinity-contract/CONFIGURA
 | `enableAOMQ` | Enables adaptive micro quotes in degraded states (F07). | `false` |
 | `enableRebates` | Allows maker rebates / RFQ discounts (F09). | `false` |
 | `enableAutoRecenter` | Allows autonomous recenter commits under governance-approved policy. | `false` |
+
+### Governance Timelock & Param Lifecycle
+- **Queue** sensitive updates via `queueParams(kind, data)` once `governance.timelockDelaySec > 0`. Immediate application still works for non-sensitive kinds (`Preview`, `Governance`) or when the delay is `0`.
+- **Execute** after `block.timestamp ≥ eta`; the contract revalidates bounds inside `_applyParamUpdate` before writing and emits both `ParamsExecuted` and `ParamsUpdated`.
+- **Cancel** via `cancelParams(kind)` if the change needs to be abandoned (clears the payload + ETA).
+- **Sensitive kinds** requiring timelock: `Oracle`, `Fee`, `Inventory`, `Maker`, `Feature`, `Aomq`.
+- **Gating helpers**: `TimelockDelayUpdated` fires when governance changes the delay; `ParamsQueued(kind, eta, proposer, keccak256(data))` allows off-chain monitors to reconcile queue/execution.
+- **Pauser rotation**: use `setPauser(newPauser)` to point `guardians.pauser` at the autopause handler once deployed. Governance retains override via `pause/unpause`.
+- **Rebates**: stage allowlist changes with `queueParams(Feature)` (if enabling flag) and `setAggregatorDiscount(executor, bps)`; every update emits `AggregatorDiscountUpdated` for audit.
 
 ### `tokens.hyper.json`
 Holds production token metadata for HYPE and USDC. Replace placeholder addresses with HyperEVM deployments.

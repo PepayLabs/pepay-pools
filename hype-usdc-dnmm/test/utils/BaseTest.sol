@@ -214,7 +214,7 @@ abstract contract BaseTest is MathAsserts {
 
     function defaultPreviewConfig() internal pure returns (DnmPool.PreviewConfig memory) {
         return DnmPool.PreviewConfig({
-            maxAgeSec: 0,
+            maxAgeSec: 60,
             snapshotCooldownSec: 0,
             revertOnStalePreview: false,
             enablePreviewFresh: false
@@ -266,7 +266,7 @@ abstract contract BaseTest is MathAsserts {
 
     function setFeatureFlags(DnmPool.FeatureFlags memory flags) internal {
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Feature, abi.encode(flags));
+        pool.updateParams(IDnmPool.ParamKind.Feature, abi.encode(flags));
     }
 
     function enableBlend() internal {
@@ -282,7 +282,7 @@ abstract contract BaseTest is MathAsserts {
 
         vm.prank(gov);
         pool.updateParams(
-            DnmPool.ParamKind.Inventory,
+            IDnmPool.ParamKind.Inventory,
             abi.encode(
                 DnmPool.InventoryConfig({
                     targetBaseXstar: uint128(cfg.baseLiquidity),

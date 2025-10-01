@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 import {Errors} from "../../contracts/lib/Errors.sol";
@@ -86,7 +87,7 @@ contract ConfigSchemaTest is BaseTest {
 
         vm.prank(gov);
         vm.expectRevert(Errors.InvalidConfig.selector);
-        pool.updateParams(DnmPool.ParamKind.Inventory, abi.encode(cfg));
+        pool.updateParams(IDnmPool.ParamKind.Inventory, abi.encode(cfg));
     }
 
     function test_updateMakerRejectsAlphaAboveOne() public {
@@ -95,7 +96,7 @@ contract ConfigSchemaTest is BaseTest {
 
         vm.prank(gov);
         vm.expectRevert(Errors.InvalidConfig.selector);
-        pool.updateParams(DnmPool.ParamKind.Maker, abi.encode(cfg));
+        pool.updateParams(IDnmPool.ParamKind.Maker, abi.encode(cfg));
     }
 
     function test_updateAomqRejectsSpreadAboveOne() public {
@@ -104,6 +105,6 @@ contract ConfigSchemaTest is BaseTest {
 
         vm.prank(gov);
         vm.expectRevert(Errors.InvalidConfig.selector);
-        pool.updateParams(DnmPool.ParamKind.Aomq, abi.encode(cfg));
+        pool.updateParams(IDnmPool.ParamKind.Aomq, abi.encode(cfg));
     }
 }

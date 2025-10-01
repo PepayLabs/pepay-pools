@@ -34,4 +34,5 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-02: Added `DnmPauseHandler` contract to bridge `OracleWatcher` autopause alerts into `DnmPool.pause()` with governance-controlled watcher + cooldown.
 - 2025-09-22: Added DnmOracleObserver for canary parity snapshots aligned with DNMM oracle usage.

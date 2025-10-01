@@ -181,7 +181,7 @@ contract DnmPoolSwapTest is BaseTest {
 
         vm.prank(gov);
         poolLocal.updateParams(
-            DnmPool.ParamKind.Inventory,
+            IDnmPool.ParamKind.Inventory,
             abi.encode(
                 DnmPool.InventoryConfig({
                     targetBaseXstar: 100_000 ether,

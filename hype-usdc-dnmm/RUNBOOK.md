@@ -42,12 +42,31 @@
 - Wire the parity freshness check after any long invariant run: execute `script/run_invariants.sh` (or `script/check_invariants_and_parity.sh`) and verify `reports/metrics/freshness_report.json` reports `status=pass` for all parity CSVs.
 - Deploy `OracleWatcher` alongside the pool, configure thresholds, and run `scripts/watch_oracles.ts` to stream `OracleAlert` / `AutoPauseRequested`. Route `critical=true` alerts to on-call and wire the optional pause handler contract if using auto-pause. Track `lastRebalancePrice`, `lastRebalanceAt`, and cooldown adherence (time since last rebalance vs `recenterCooldownSec`) in dashboards/alerts.
 
-## 7. Incident Response
+## 7. Timelock Operations
+1. If enabling the timelock, queue `updateParams(ParamKind.Governance, abi.encode({timelockDelaySec: <seconds>}))` while delay is `0`.
+2. For sensitive changes (`Oracle`, `Fee`, `Inventory`, `Maker`, `Feature`, `Aomq`):
+   - `pool.queueParams(kind, abi.encode(newConfig))` – record `ParamsQueued(kind, eta, proposer, dataHash)`.
+   - Wait until `block.timestamp ≥ eta`; monitors should confirm via Prometheus (`dnmm_params_eta_seconds`).
+   - `pool.executeParams(kind)` – expect `ParamsExecuted` followed by `ParamsUpdated`.
+3. To abort: `pool.cancelParams(kind)`; alerts should reset on `ParamsCanceled`.
+4. Always archive the calldata + resulting events in the governance drive to preserve audit trail.
+
+## 8. Autopause Handler Wiring
+1. Deploy `DnmPauseHandler` with `(pool, governance, cooldownSec)` once watcher thresholds are signed off.
+2. `pool.queueParams(ParamKind.Feature, ...)` to enable `enableAutoRecenter`/`enableSoftDivergence` if required for policy.
+3. `governance` calls `pool.setPauser(address(handler))` to delegate pause authority.
+4. `governance` calls `handler.setWatcher(address(watcher))` and (optionally) tunes cooldown via `handler.setCooldown(newCooldown)`. All changes emit events for dashboards.
+5. Verify end-to-end by:
+   - Forcing an over-age oracle sample → `OracleWatcher` emits `OracleAlert` + `AutoPauseRequested`.
+   - Confirm `handler` emits `AutoPaused` and the pool logs `Paused(pauser)`.
+   - Ensure `Unpaused` path remains governance-only.
+
+## 9. Incident Response
 - Use `pause()` to halt swaps on oracle divergence or vault issues.
 - Investigate telemetry, adjust parameters through `updateParams` (emit new change logs).
 - Unpause once post-mortem complete and governance approves.
 
-## 8. Performance & Metric Validation
+## 10. Performance & Metric Validation
 - Execute `forge test --match-path test/perf` to capture gas profiles (`metrics/gas_snapshots.csv`, `gas-snapshots.txt`) and burst reliability metrics (`metrics/load_burst_summary.csv`).
 - Run `script/run_slither_ci.sh` to emit `reports/security/slither_findings.json`; review and clear any Medium/High severity issues before promotion.
 - Ensure tuple/decimal sweep outputs (`metrics/tuple_decimal_sweep.csv`), fee dynamics series (`metrics/fee_B*.csv`), and preview ladders (`metrics/preview_ladder_*.csv` if generated) are reviewed before deployment to detect scaling regressions.

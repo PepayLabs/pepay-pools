@@ -36,6 +36,12 @@
 - `Errors.FloorBreach()` protects against attempts that would empty the vault.
 - Governance may tune α/β/cap/decay via `updateParams(ParamKind.Fee, ...)`; bounds checks ensure cap ≥ base and decay ≤ 100.
 - Fee-on-transfer tokens are not supported: inbound transfers must deliver the full requested notional or the swap reverts with `Errors.TokenFeeUnsupported()`. The pool emits `TokenFeeUnsupported(user, isBaseIn, expectedIn, receivedIn)` before reverting to simplify alerting.
+- **Aggregator rebates (F09)**: When `featureFlags.enableRebates` is true and `setAggregatorDiscount(executor, bps)` has been queued/executed via the timelock, the fee pipeline applies the discount *after* size/tilt/divergence adjustments but *before* BBO floor enforcement. Formally,
+  ```
+  fee_final = max(floor_bps(outcome), fee_pipeline - rebate_bps(executor))
+  ```
+  with `rebate_bps ≤ 3`. The mapping lives alongside the fee state so previews (`previewFees`, `previewFeesFresh`, `previewLadder`) expose discounted quotes for allow‑listed executors without mutating state. `AggregatorDiscountUpdated(executor, bps)` is emitted on every change for audit.
+- **Invariants**: `rebate_bps` is enforced ≤ 3 and clamped by the cap, so `fee_final ∈ [floor_bps, cap_bps]` for all pipelines. See `test/unit/Rebates_FloorPreserve.t.sol` and the extended invariants for coverage.
 
 Refer to `test/unit/FeePolicy.t.sol` and `test/unit/Inventory.t.sol` for coverage of these behaviours.
 

@@ -67,7 +67,7 @@ contract FailurePathGasTest is BaseTest {
         cfg.allowEmaFallback = false;
         cfg.maxAgeSec = 30;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(cfg));
+        pool.updateParams(IDnmPool.ParamKind.Oracle, abi.encode(cfg));
 
         // make spot stale and disable Pyth
         updateSpot(1e18, 120, true);
@@ -99,7 +99,7 @@ contract FailurePathGasTest is BaseTest {
         cfg.divergenceBps = 25;
         cfg.allowEmaFallback = false;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(cfg));
+        pool.updateParams(IDnmPool.ParamKind.Oracle, abi.encode(cfg));
 
         updateSpot(1e18, 2, true);
         updateBidAsk(998e15, 1_002e15, 20, true);

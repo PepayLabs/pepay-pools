@@ -34,6 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-02: Added `Rebates_FloorPreserve` (F09), `DnmPool_GovernanceTimelock` (F11), `ReadOracle_MidUnset_Coverage`, `Preview_ViewPurity`, and `OracleWatcher_PauseHandler` suites exercising rebates, timelock queue/execute/cancel, fail-closed oracle paths, view purity, and autopause wiring.
 - 2025-10-01: Added `Scenario_AOMQ` integration coverage (soft divergence activation, oracle-hard fault guard, floor-adjacent micro quotes, BBO spread enforcement) validating the new F07 pipeline end-to-end.
 - 2025-10-01: Added `PreviewFees_Parity` unit suite and `Scenario_Preview_AOMQ` integration flow to guarantee snapshot previews remain bit-exact with quotes (including AOMQ clamps) and to assert staleness handling.
 - 2025-10-01: Extended `ConfigSchemaTest` to assert feature-flag defaults (AOMQ/Rebates/AutoRecenter), governance timelock scaffolding, preview config defaults, and executor discount accessors to gate upcoming F07–F12 work.

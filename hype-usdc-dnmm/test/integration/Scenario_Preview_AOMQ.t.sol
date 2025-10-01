@@ -24,7 +24,7 @@ contract ScenarioPreviewAomqTest is BaseTest {
             enablePreviewFresh: false
         });
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Preview, abi.encode(previewCfg));
+        pool.updateParams(IDnmPool.ParamKind.Preview, abi.encode(previewCfg));
 
         DnmPool.FeatureFlags memory flags = getFeatureFlags();
         flags.enableAOMQ = true;
@@ -37,13 +37,13 @@ contract ScenarioPreviewAomqTest is BaseTest {
         aomqCfg.emergencySpreadBps = 150;
         aomqCfg.floorEpsilonBps = 200;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Aomq, abi.encode(aomqCfg));
+        pool.updateParams(IDnmPool.ParamKind.Aomq, abi.encode(aomqCfg));
 
         DnmPool.MakerConfig memory makerCfg = defaultMakerConfig();
         makerCfg.alphaBboBps = 5_000;
         makerCfg.betaFloorBps = 20;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Maker, abi.encode(makerCfg));
+        pool.updateParams(IDnmPool.ParamKind.Maker, abi.encode(makerCfg));
 
         // Make the pool quote reserves scarce so AOMQ clamps large asks.
         usdc.transfer(address(pool), 500_000000);

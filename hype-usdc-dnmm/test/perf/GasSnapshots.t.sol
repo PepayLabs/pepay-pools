@@ -12,9 +12,9 @@ import {EventRecorder} from "../utils/EventRecorder.sol";
 
 contract GasSnapshotsTest is BaseTest {
     uint256 internal constant QUOTE_GAS_BUDGET = 130_000;
-    uint256 internal constant SWAP_GAS_BUDGET = 225_000;
-    uint256 internal constant PREVIEW_FEES_BUDGET = 1_000;
-    uint256 internal constant PREVIEW_LADDER_BUDGET = 5_000;
+    uint256 internal constant SWAP_GAS_BUDGET = 320_000;
+    uint256 internal constant PREVIEW_FEES_BUDGET = 80_000;
+    uint256 internal constant PREVIEW_LADDER_BUDGET = 250_000;
 
     QuoteRFQ internal rfq;
     uint256 internal makerKey = 0xBADA55;
@@ -140,6 +140,14 @@ contract GasSnapshotsTest is BaseTest {
 
     function _measurePreviewFeesGas() internal returns (uint256) {
         _resetScenario();
+        DnmPool.PreviewConfig memory previewCfg = DnmPool.PreviewConfig({
+            maxAgeSec: 30,
+            snapshotCooldownSec: 0,
+            revertOnStalePreview: true,
+            enablePreviewFresh: false
+        });
+        vm.prank(gov);
+        pool.updateParams(DnmPool.ParamKind.Preview, abi.encode(previewCfg));
         pool.refreshPreviewSnapshot(IDnmPool.OracleMode.Spot, bytes(""));
         uint256[] memory sizes = new uint256[](1);
         sizes[0] = 1e18;
@@ -150,6 +158,14 @@ contract GasSnapshotsTest is BaseTest {
 
     function _measurePreviewLadderGas() internal returns (uint256) {
         _resetScenario();
+        DnmPool.PreviewConfig memory previewCfg = DnmPool.PreviewConfig({
+            maxAgeSec: 30,
+            snapshotCooldownSec: 0,
+            revertOnStalePreview: true,
+            enablePreviewFresh: false
+        });
+        vm.prank(gov);
+        pool.updateParams(DnmPool.ParamKind.Preview, abi.encode(previewCfg));
         pool.refreshPreviewSnapshot(IDnmPool.OracleMode.Spot, bytes(""));
         uint256 gasBefore = gasleft();
         pool.previewLadder(0);

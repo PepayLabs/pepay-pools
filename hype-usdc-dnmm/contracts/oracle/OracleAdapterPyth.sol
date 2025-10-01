@@ -66,6 +66,22 @@ contract OracleAdapterPyth is IOracleAdapterPyth {
         });
     }
 
+    function peekPythUsdMid() external view override returns (PythResult memory) {
+        IPyth.Price memory hype = PYTH_.getPriceUnsafe(PRICE_ID_HYPE_USD_);
+        IPyth.Price memory usdc = PYTH_.getPriceUnsafe(PRICE_ID_USDC_USD_);
+
+        bool success = hype.price > 0 && usdc.price > 0;
+        return PythResult({
+            hypeUsd: success ? _scaleToWad(hype.price, hype.expo) : 0,
+            usdcUsd: success ? _scaleToWad(int64(usdc.price), usdc.expo) : 0,
+            ageSecHype: block.timestamp > hype.publishTime ? block.timestamp - hype.publishTime : 0,
+            ageSecUsdc: block.timestamp > usdc.publishTime ? block.timestamp - usdc.publishTime : 0,
+            confBpsHype: success ? _confidenceToBps(hype) : 0,
+            confBpsUsdc: success ? _confidenceToBps(usdc) : 0,
+            success: success
+        });
+    }
+
     function computePairMid(PythResult memory result)
         external
         pure

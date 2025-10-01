@@ -214,9 +214,9 @@ abstract contract BaseTest is MathAsserts {
 
     function defaultPreviewConfig() internal pure returns (DnmPool.PreviewConfig memory) {
         return DnmPool.PreviewConfig({
-            maxAgeSec: 30,
-            snapshotCooldownSec: 10,
-            revertOnStalePreview: true,
+            maxAgeSec: 0,
+            snapshotCooldownSec: 0,
+            revertOnStalePreview: false,
             enablePreviewFresh: false
         });
     }

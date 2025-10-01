@@ -715,7 +715,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
         FeatureFlags memory flags = featureFlags;
         OracleConfig memory oracleCfg = oracleConfig;
-        OracleOutcome memory outcome = _readOracle(mode, oracleData, flags, oracleCfg, true);
+        OracleOutcome memory outcome = _readOracle(mode, oracleData, flags, oracleCfg);
 
         InventoryConfig memory invCfg = inventoryConfig;
         Inventory.Tokens memory invTokens = _inventoryTokens();
@@ -823,7 +823,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         if (shouldSettleFee) {
-            _persistPreviewSnapshot(outcome, flags, makerCfg, aomqDecision, isBaseIn, msg.sender);
+            _persistPreviewSnapshot(outcome, aomqDecision, isBaseIn, msg.sender);
         }
     }
 
@@ -890,12 +890,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         FeatureFlags memory flags = featureFlags;
-        OracleOutcome memory outcome = _readOracle(mode, oracleData, flags, oracleConfig, false);
-        MakerConfig memory makerCfg = makerConfig;
+        OracleOutcome memory outcome = _readOracle(mode, oracleData, flags, oracleConfig);
+        // The explicit refresh path does not execute the swap pipeline, so mark AOMQ metadata via existing state.
         _persistPreviewSnapshot(
             outcome,
-            flags,
-            makerCfg,
             AomqDecision({
                 triggered: false,
                 clamp: false,
@@ -933,7 +931,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     {
         if (!previewConfig.enablePreviewFresh) revert PreviewFreshDisabled();
         FeatureFlags memory flags = featureFlags;
-        OracleOutcome memory outcome = _readOracle(mode, oracleData, flags, oracleConfig, false);
+        OracleOutcome memory outcome = _readOraclePreview(mode, oracleData, flags, oracleConfig);
         (askFeeBps, bidFeeBps,,) = _computePreviewFees(outcome, sizesBaseWad);
     }
 
@@ -1600,8 +1598,6 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
     function _persistPreviewSnapshot(
         OracleOutcome memory outcome,
-        FeatureFlags memory flags,
-        MakerConfig memory makerCfg,
         AomqDecision memory decision,
         bool isBaseIn,
         address caller
@@ -1659,8 +1655,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         OracleMode mode,
         bytes calldata oracleData,
         FeatureFlags memory flags,
-        OracleConfig memory cfg,
-        bool mutate
+        OracleConfig memory cfg
     ) internal returns (OracleOutcome memory outcome)
     {
         // AUDIT:HCABI-002 adapters now fail-closed; surface reverts instead of success flags
@@ -1729,18 +1724,17 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         (outcome.confBps, outcome.confSpreadBps, outcome.confSigmaBps, outcome.confPythBps, outcome.sigmaBps) =
-        _computeConfidence(
-            cfg,
-            flags,
-            mode,
-            outcome.mid,
-            outcome.spreadBps,
-            spreadAvailable,
-            pythFresh,
-            pythConf,
-            outcome.reason == REASON_PYTH,
-            mutate
-        );
+            _computeConfidence(
+                cfg,
+                flags,
+                mode,
+                outcome.mid,
+                outcome.spreadBps,
+                spreadAvailable,
+                pythFresh,
+                pythConf,
+                outcome.reason == REASON_PYTH
+            );
 
         if (!outcome.usedFallback && pythFresh) {
             uint256 divergenceBps = OracleUtils.computeDivergenceBps(outcome.mid, pythMid);
@@ -1748,25 +1742,24 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
             if (flags.enableSoftDivergence) {
                 (uint16 acceptBps, uint16 softBps, uint16 hardBps) = _resolveDivergenceThresholds(cfg);
-                if (mutate && flags.debugEmit && hardBps > 0) {
+                if (flags.debugEmit && hardBps > 0) {
                     emit OracleDivergenceChecked(pythMid, outcome.mid, divergenceBps, hardBps);
                 }
-                (uint16 haircutBps, bool activeAfter) = _processSoftDivergence(
+                (uint16 appliedHaircut, bool activeAfter) = _processSoftDivergence(
                     divergenceBps,
                     acceptBps,
                     softBps,
                     hardBps,
                     cfg.haircutMinBps,
-                    cfg.haircutSlopeBps,
-                    mutate
+                    cfg.haircutSlopeBps
                 );
-                outcome.divergenceHaircutBps = haircutBps;
+                outcome.divergenceHaircutBps = appliedHaircut;
                 outcome.softDivergenceActive = activeAfter;
-                if (haircutBps > 0 && outcome.reason == REASON_NONE) {
+                if (appliedHaircut > 0 && outcome.reason == REASON_NONE) {
                     outcome.reason = REASON_HAIRCUT;
                 }
             } else if (cfg.divergenceBps > 0 && divergenceBps > cfg.divergenceBps) {
-                if (mutate && flags.debugEmit) {
+                if (flags.debugEmit) {
                     emit OracleDivergenceChecked(pythMid, outcome.mid, divergenceBps, cfg.divergenceBps);
                 }
                 revert Errors.OracleDiverged(divergenceBps, cfg.divergenceBps);
@@ -1774,6 +1767,224 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         return outcome;
+    }
+
+    function _readOraclePreview(
+        OracleMode mode,
+        bytes calldata oracleData,
+        FeatureFlags memory flags,
+        OracleConfig memory cfg
+    ) internal view returns (OracleOutcome memory outcome) {
+        IOracleAdapterHC.MidResult memory midRes = ORACLE_HC_.readMidAndAge();
+        IOracleAdapterHC.BidAskResult memory baRes = ORACLE_HC_.readBidAsk();
+
+        bool spreadAvailable = baRes.bid > 0 && baRes.ask > 0;
+        if (spreadAvailable && baRes.ask <= baRes.bid) revert Errors.InvalidOrderbook();
+
+        uint256 pythMid;
+        uint256 pythAge;
+        uint256 pythConf;
+        bool pythFresh;
+
+        if (address(ORACLE_PYTH_) != address(0)) {
+            oracleData;
+            IOracleAdapterPyth.PythResult memory res = ORACLE_PYTH_.peekPythUsdMid();
+            if (res.success) {
+                (pythMid, pythAge, pythConf) = ORACLE_PYTH_.computePairMid(res);
+                pythFresh = pythMid > 0 && pythAge <= cfg.maxAgeSec;
+            }
+        }
+
+        bool midAgeKnown = midRes.ageSec != HC_AGE_UNKNOWN;
+        bool midFresh = midRes.mid > 0 && midAgeKnown && midRes.ageSec <= cfg.maxAgeSec;
+        bool spreadAcceptable = baRes.spreadBps <= cfg.confCapBpsSpot;
+        bool spreadRejected = midFresh && spreadAvailable && !spreadAcceptable;
+        IOracleAdapterHC.MidResult memory emaRes;
+        bool emaFresh;
+        if (cfg.allowEmaFallback) {
+            emaRes = ORACLE_HC_.readMidEmaFallback();
+            bool emaAgeKnown = emaRes.ageSec != HC_AGE_UNKNOWN;
+            emaFresh =
+                emaRes.mid > 0 && emaAgeKnown && emaRes.ageSec <= cfg.maxAgeSec && emaRes.ageSec <= cfg.stallWindowSec;
+        }
+
+        if (midFresh && spreadAvailable && spreadAcceptable) {
+            outcome.mid = midRes.mid;
+            outcome.spreadBps = baRes.spreadBps;
+            outcome.ageSec = midRes.ageSec;
+            outcome.reason = REASON_NONE;
+        } else if (emaFresh) {
+            outcome.mid = emaRes.mid;
+            outcome.spreadBps = spreadAvailable ? baRes.spreadBps : 0;
+            outcome.ageSec = emaRes.ageSec;
+            outcome.usedFallback = true;
+            outcome.reason = REASON_EMA;
+        }
+
+        if (outcome.mid == 0 && pythFresh) {
+            outcome.mid = pythMid;
+            outcome.spreadBps = 0;
+            outcome.ageSec = pythAge;
+            outcome.usedFallback = true;
+            outcome.reason = REASON_PYTH;
+            spreadAvailable = false;
+        } else {
+            spreadAvailable = spreadAvailable && (outcome.reason != REASON_PYTH);
+        }
+
+        if (outcome.mid == 0) {
+            if (spreadRejected) revert Errors.OracleSpread();
+            revert Errors.OracleStale();
+        }
+
+        (outcome.confBps, outcome.confSpreadBps, outcome.confSigmaBps, outcome.confPythBps, outcome.sigmaBps) =
+            _computeConfidencePreview(
+                cfg,
+                flags,
+                mode,
+                outcome.mid,
+                outcome.spreadBps,
+                spreadAvailable,
+                pythFresh,
+                pythConf,
+                outcome.reason == REASON_PYTH
+            );
+
+        if (!outcome.usedFallback && pythFresh) {
+            uint256 divergenceBps = OracleUtils.computeDivergenceBps(outcome.mid, pythMid);
+            outcome.divergenceBps = divergenceBps;
+
+            if (flags.enableSoftDivergence) {
+                (uint16 acceptBps, uint16 softBps, uint16 hardBps) = _resolveDivergenceThresholds(cfg);
+                (uint16 haircutBps, bool activeAfter) = _previewSoftDivergence(
+                    divergenceBps,
+                    acceptBps,
+                    softBps,
+                    hardBps,
+                    cfg.haircutMinBps,
+                    cfg.haircutSlopeBps
+                );
+                outcome.divergenceHaircutBps = haircutBps;
+                outcome.softDivergenceActive = activeAfter;
+                if (haircutBps > 0 && outcome.reason == REASON_NONE) {
+                    outcome.reason = REASON_HAIRCUT;
+                }
+            } else if (cfg.divergenceBps > 0 && divergenceBps > cfg.divergenceBps) {
+                revert Errors.OracleDiverged(divergenceBps, cfg.divergenceBps);
+            }
+        }
+
+        return outcome;
+    }
+
+    function _previewSoftDivergence(
+        uint256 divergenceBps,
+        uint16 acceptBps,
+        uint16 softBps,
+        uint16 hardBps,
+        uint16 haircutMinBps,
+        uint16 haircutSlopeBps
+    ) internal view returns (uint16 haircutBps, bool activeAfter) {
+        SoftDivergenceState memory working = softDivergenceState;
+        working.lastDeltaBps = divergenceBps > type(uint16).max ? type(uint16).max : uint16(divergenceBps);
+        working.lastSampleAt = uint64(block.timestamp);
+
+        if (hardBps > 0 && divergenceBps > hardBps) {
+            revert Errors.DivergenceHard(divergenceBps, hardBps);
+        }
+
+        if (acceptBps > 0 && divergenceBps > acceptBps) {
+            working.active = true;
+            working.healthyStreak = 0;
+
+            uint256 deltaOverAccept = divergenceBps - acceptBps;
+            if (softBps > acceptBps) {
+                uint256 maxDelta = softBps - acceptBps;
+                if (deltaOverAccept > maxDelta) deltaOverAccept = maxDelta;
+            } else {
+                deltaOverAccept = 0;
+            }
+
+            uint256 haircut = haircutMinBps;
+            if (haircutSlopeBps > 0 && deltaOverAccept > 0) {
+                haircut += uint256(haircutSlopeBps) * deltaOverAccept;
+            }
+            if (haircut >= BPS) haircut = BPS - 1;
+            if (haircut > type(uint16).max) haircut = type(uint16).max;
+
+            return (uint16(haircut), true);
+        }
+
+        if (working.active) {
+            if (working.healthyStreak < SOFT_DIVERGENCE_RECOVERY_STREAK) {
+                working.healthyStreak += 1;
+            }
+            if (working.healthyStreak >= SOFT_DIVERGENCE_RECOVERY_STREAK) {
+                working.active = false;
+            }
+        } else if (working.healthyStreak < SOFT_DIVERGENCE_RECOVERY_STREAK) {
+            working.healthyStreak += 1;
+        }
+
+        return (0, working.active);
+    }
+
+    function _computeConfidencePreview(
+        OracleConfig memory cfg,
+        FeatureFlags memory flags,
+        OracleMode mode,
+        uint256 mid,
+        uint256 spreadBps,
+        bool spreadAvailable,
+        bool pythFresh,
+        uint256 pythConf,
+        bool pythUsed
+    )
+        internal
+        view
+        returns (uint256 confBps, uint256 confSpreadBps, uint256 confSigmaBps, uint256 confPythBps, uint256 sigmaBps)
+    {
+        uint256 capSpot = cfg.confCapBpsSpot;
+        uint256 capStrict = cfg.confCapBpsStrict;
+        uint256 cap = mode == OracleMode.Strict ? capStrict : capSpot;
+        if (pythUsed) {
+            if (capStrict == 0) {
+                cap = 0;
+            } else if (cap == 0 || capStrict < cap) {
+                cap = capStrict;
+            }
+        }
+        uint256 fallbackConf = pythFresh && pythUsed ? pythConf : 0;
+
+        if (!flags.blendOn) {
+            uint256 primary = spreadAvailable ? spreadBps : 0;
+            confBps = primary;
+            if (fallbackConf > confBps) confBps = fallbackConf;
+            if (cap > 0 && confBps > cap) confBps = cap;
+
+            confSpreadBps = FixedPointMath.min(primary, cap);
+            confSigmaBps = 0;
+            confPythBps = FixedPointMath.min(fallbackConf, cap);
+            sigmaBps = confidenceState.sigmaBps;
+            return (confBps, confSpreadBps, confSigmaBps, confPythBps, sigmaBps);
+        }
+
+        uint256 spreadSample = spreadAvailable && cap > 0 ? FixedPointMath.min(spreadBps, cap) : spreadBps;
+        sigmaBps = _previewSigma(cfg, mid, spreadSample);
+
+        uint256 cappedSpread = cap > 0 ? FixedPointMath.min(spreadSample, cap) : spreadSample;
+        confSpreadBps = spreadAvailable ? FixedPointMath.mulDivDown(cappedSpread, cfg.confWeightSpreadBps, BPS) : 0;
+        uint256 cappedSigma = cap > 0 ? FixedPointMath.min(sigmaBps, cap) : sigmaBps;
+        confSigmaBps = cappedSigma > 0 ? FixedPointMath.mulDivDown(cappedSigma, cfg.confWeightSigmaBps, BPS) : 0;
+        uint256 cappedPyth = cap > 0 ? FixedPointMath.min(fallbackConf, cap) : fallbackConf;
+        confPythBps = cappedPyth > 0 ? FixedPointMath.mulDivDown(cappedPyth, cfg.confWeightPythBps, BPS) : 0;
+
+        confBps = confSpreadBps;
+        if (confSigmaBps > confBps) confBps = confSigmaBps;
+        if (confPythBps > confBps) confBps = confPythBps;
+        if (cap > 0 && confBps > cap) confBps = cap;
+
+        return (confBps, confSpreadBps, confSigmaBps, confPythBps, sigmaBps);
     }
 
     function _resolveDivergenceThresholds(OracleConfig memory cfg)
@@ -1799,8 +2010,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint16 softBps,
         uint16 hardBps,
         uint16 haircutMinBps,
-        uint16 haircutSlopeBps,
-        bool mutate
+        uint16 haircutSlopeBps
     ) internal returns (uint16 haircutBps, bool activeAfter) {
         SoftDivergenceState memory working = softDivergenceState;
         working.lastDeltaBps = divergenceBps > type(uint16).max ? type(uint16).max : uint16(divergenceBps);
@@ -1809,10 +2019,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         if (hardBps > 0 && divergenceBps > hardBps) {
             working.active = true;
             working.healthyStreak = 0;
-            if (mutate) {
-                softDivergenceState = working;
-                emit DivergenceRejected(divergenceBps);
-            }
+            softDivergenceState = working;
+            emit DivergenceRejected(divergenceBps);
             revert Errors.DivergenceHard(divergenceBps, hardBps);
         }
 
@@ -1841,10 +2049,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
                 haircut = type(uint16).max;
             }
 
-            if (mutate) {
-                softDivergenceState = working;
-                emit DivergenceHaircut(divergenceBps, haircut);
-            }
+            softDivergenceState = working;
+            emit DivergenceHaircut(divergenceBps, haircut);
             return (uint16(haircut), true);
         }
 
@@ -1859,9 +2065,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             working.healthyStreak += 1;
         }
 
-        if (mutate) {
-            softDivergenceState = working;
-        }
+        softDivergenceState = working;
 
         return (0, working.active);
     }
@@ -1875,8 +2079,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         bool spreadAvailable,
         bool pythFresh,
         uint256 pythConf,
-        bool pythUsed,
-        bool mutate
+        bool pythUsed
     )
         internal
         returns (uint256 confBps, uint256 confSpreadBps, uint256 confSigmaBps, uint256 confPythBps, uint256 sigmaBps)
@@ -1900,28 +2103,17 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             if (fallbackConf > confBps) confBps = fallbackConf;
             if (cap > 0 && confBps > cap) confBps = cap;
 
-            if (flags.debugEmit) {
-                confSpreadBps = FixedPointMath.min(primary, cap);
-                confSigmaBps = 0;
-            }
+            confSpreadBps = FixedPointMath.min(primary, cap);
+            confSigmaBps = 0;
             confPythBps = FixedPointMath.min(fallbackConf, cap);
             ConfidenceState storage storedState = confidenceState;
-            ConfidenceState memory snapshot = ConfidenceState({
-                lastSigmaBlock: storedState.lastSigmaBlock,
-                sigmaBps: storedState.sigmaBps,
-                lastObservedMid: storedState.lastObservedMid
-            });
-            if (mutate) {
-                storedState.lastObservedMid = uint128(mid);
-                sigmaBps = storedState.sigmaBps;
-            } else {
-                sigmaBps = snapshot.sigmaBps;
-            }
+            storedState.lastObservedMid = uint128(mid);
+            sigmaBps = storedState.sigmaBps;
             return (confBps, confSpreadBps, confSigmaBps, confPythBps, sigmaBps);
         }
 
         uint256 spreadSample = spreadAvailable && cap > 0 ? FixedPointMath.min(spreadBps, cap) : spreadBps;
-        sigmaBps = mutate ? _updateSigma(cfg, mid, spreadSample) : _previewSigma(cfg, mid, spreadSample);
+        sigmaBps = _updateSigma(cfg, mid, spreadSample);
 
         uint256 cappedSpread = cap > 0 ? FixedPointMath.min(spreadSample, cap) : spreadSample;
         confSpreadBps = spreadAvailable ? FixedPointMath.mulDivDown(cappedSpread, cfg.confWeightSpreadBps, BPS) : 0;

@@ -49,6 +49,27 @@ Supporting libraries provide fixed-point math, inventory deviation helpers, and 
 - Trades that worsen the deviation (e.g., base-heavy + base-in) receive a fee surcharge, while restorative trades are discounted symmetrically; adjustments never push below zero or above `FeeConfig.capBps`.
 - The helper runs in both swap and preview paths so routers observe matching incentives, and all math is performed in-memory (no extra storage writes).
 
+### Automatic Micro Quotes (F07)
+
+- Configuration (`AomqConfig`) exposes `minQuoteNotional`, `emergencySpreadBps`, and `floorEpsilonBps`, gated by `featureFlags.enableAOMQ`.
+- When soft-divergence is active, the pool is near its inventory floor, or the oracle falls back to EMA/Pyth (but remains within the soft band), the pool synthesises a micro quote instead of hard-rejecting.
+- The clamp size equals `minQuoteNotional` (quote units) or the precise floor gap if that is smaller. Ask-side trades honour the emergency spread floor via `max(emergencySpreadBps, floorDynamic)` so spreads never collapse.
+- Partial executions settle exactly against the inventory floor; the helper emits `AomqActivated(trigger, isBaseIn, amountIn, quoteNotional, spreadBps)` once per activation window and resets when the pool returns to healthy conditions.
+- Hard-divergence faults still revert; AOMQ only operates in ACCEPT/SOFT states, ensuring safety gates remain intact.
+
+### Snapshot-backed Fee Previews (F08)
+
+- A compact `PreviewSnapshot` records oracle mid, confidence/sigma proxies, divergence metadata, and AOMQ flags. It is refreshed after every successful swap (CEI order preserved) and via the permissionless `refreshPreviewSnapshot(mode, oracleData)` call, which respects `snapshotCooldownSec`.
+- `PreviewConfig` (gated via governance) controls `maxAgeSec`, `snapshotCooldownSec`, `revertOnStalePreview`, and `enablePreviewFresh` (live peek without snapshot reliance).
+- `previewFees(uint256[] sizesBaseWad)` replays the full fee pipeline (size curve, tilt, divergence haircut, BBO floor, AOMQ clamps) using the cached snapshot and current reserves. The call is `view` and returns ask/bid fee ladders in bps.
+- `previewLadder(uint256 s0BaseWad)` provides the canonical `[S0, 2S0, 5S0, 10S0]` buckets plus clamp flags, snapshot timestamp, and mid. Routers pre-compute slices without incurring swap gas.
+- `previewFeesFresh` (optional) peeks HyperCore/Pyth via view-only adapters and mirrors swap fee ordering without mutating state, useful for analytics when snapshots are stale but a refresh is undesirable.
++
+### Preview Snapshot Storage & CLA
+
+- Snapshots are designed to fit within a single storage slot (packed `uint96` / `uint64` / `uint32` fields). Activation flags encode soft divergence, fallback usage, and AOMQ ask/bid state.
+- Cooldown-enforced refreshes prevent spamming oracle reads while still allowing keepers to refresh before router usage. Stale snapshots (age > `maxAgeSec`) revert when `revertOnStalePreview` is enabled, signalling routers to refresh or fall back to the fresh path.
+
 ## Storage Layout
 
 | Slot | Component | Notes |
@@ -61,6 +82,7 @@ Supporting libraries provide fixed-point math, inventory deviation helpers, and 
 | 5    | Guardians            | Governance + pauser |
 | 6    | Fee state            | Last fee in bps + last update block |
 | 7    | Cached mid           | Last mid used & timestamp for recentering |
+| 8    | Preview snapshot     | Packed `PreviewSnapshot` (mid/conf/divergence/AOMQ flags) + last refresh timestamp |
 
 ## Contracts & Interfaces
 

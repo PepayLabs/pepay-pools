@@ -18,6 +18,10 @@ contract MockOraclePyth is IOracleAdapterPyth {
         return result;
     }
 
+    function peekPythUsdMid() external view override returns (PythResult memory) {
+        return result;
+    }
+
     function sweep(address payable recipient) external {
         if (recipient == address(0)) revert SweepRecipientZero();
         uint256 bal = address(this).balance;

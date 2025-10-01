@@ -12,12 +12,15 @@
 | `test/unit/DnmPool_Rebalance.t.sol` | Auto/manual recenter gating, cooldown, hysteresis streak, stale oracle guards. |
 | `test/unit/InventoryTiltTest.t.sol` | Inventory tilt incentives (base-heavy/light) and weighting by spread/conf. |
 | `test/unit/BboFloorTest.t.sol` | BBO-aware floor clamp, spread fallback, fee-cap saturation. |
-| `test/unit/ConfigSchema.t.sol` | Config schema coverage for tilt/BBO/AOMQ knobs and governance bounds. |
+| `test/unit/ConfigSchema.t.sol` | Config schema coverage for tilt/BBO/AOMQ/preview knobs and governance bounds. |
+| `test/unit/PreviewFees_Parity.t.sol` | Snapshot-backed preview parity vs. swap math (all flags on/off, staleness checks, AOMQ clamp detection). |
 | `test/unit/DnmPool.t.sol` | Swap happy path, fallback usage, divergence revert. |
 | `test/integration/DnmPoolIntegration.t.sol` | Recenter gating, oracle fallback scenarios. |
+| `test/integration/Scenario_AOMQ.t.sol` | Soft-divergence activation, hard-fault guard, floor-adjacent partial fills under AOMQ. |
+| `test/integration/Scenario_Preview_AOMQ.t.sol` | Preview ladder parity vs swaps with AOMQ clamps + snapshot metadata sanity. |
 | `test/integration/FeeDynamics.t.sol` | Fee surface sweeps with CSV emission for base/volatility/inventory components. |
 | `test/integration/ForkParity.t.sol` | HC/EMA/Pyth parity, divergence/stale guards, parity CSVs (`mid_event_vs_precompile_mid_bps.csv`, `canary_deltas.csv`) and divergence histogram (`divergence_histogram.csv`). |
-| `test/perf/GasSnapshots.t.sol` | Deterministic gas profiling for HC/EMA/Pyth quotes, swap legs, and RFQ settlement (writes `metrics/gas_snapshots.csv`, `gas-snapshots.txt`) with guards enforcing `quote` ≤ 130k gas and `swap` ≤ 225k gas. |
+| `test/perf/GasSnapshots.t.sol` | Deterministic gas profiling for HC/EMA/Pyth quotes, swap legs, RFQ settlement, and preview calls (writes `metrics/gas_snapshots.csv`, `gas-snapshots.txt`) with guards enforcing `quote` ≤ 130k gas, `swap` ≤ 320k gas, `previewFees` ≤ 80k gas, and `previewLadder` ≤ 250k gas. |
 | `test/perf/LoadBurst.t.sol` | Burst/load harness producing failure-rate metrics and fee decay series under stress (`metrics/load_*`). |
 | `test/unit/TupleSweep.t.sol` | Decimal matrix (Matrix G) sweeps covering getter destructuring and floor drift assertions with CSV outputs. |
 | `test/fuzz/DnmPoolFuzz.t.sol` | Randomised amount/reserve checks to enforce floor invariants. |

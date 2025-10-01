@@ -14,6 +14,18 @@ contract ScenarioPreviewAomqTest is BaseTest {
         setUpBase();
         (, , , , baseScale, quoteScale) = pool.tokens();
 
+        approveAll(alice);
+        approveAll(bob);
+
+        DnmPool.PreviewConfig memory previewCfg = DnmPool.PreviewConfig({
+            maxAgeSec: 30,
+            snapshotCooldownSec: 5,
+            revertOnStalePreview: true,
+            enablePreviewFresh: false
+        });
+        vm.prank(gov);
+        pool.updateParams(DnmPool.ParamKind.Preview, abi.encode(previewCfg));
+
         DnmPool.FeatureFlags memory flags = getFeatureFlags();
         flags.enableAOMQ = true;
         flags.enableBboFloor = true;
@@ -41,6 +53,7 @@ contract ScenarioPreviewAomqTest is BaseTest {
         updateBidAsk(999e15, 1_001e15, 200, true);
         updatePyth(1_015e18, 1e18, 0, 0, 5, 5);
 
+        vm.warp(block.timestamp + 20);
         pool.refreshPreviewSnapshot(IDnmPool.OracleMode.Spot, bytes(""));
     }
 
@@ -53,10 +66,9 @@ contract ScenarioPreviewAomqTest is BaseTest {
         uint64 snapshotTsLocal;
         uint96 snapshotMidLocal;
         (sizes, askFees, bidFees, askClamped, bidClamped, snapshotTsLocal, snapshotMidLocal) = pool.previewLadder(0);
-        snapshotTsLocal;
-        snapshotMidLocal;
-        snapshotTsLocal;
-        snapshotMidLocal;
+
+        assertLe(snapshotTsLocal, uint64(block.timestamp), "snapshot timestamp future");
+        assertGt(snapshotMidLocal, 0, "snapshot mid unset");
 
         bool sawClamp;
         for (uint256 i = 0; i < sizes.length; ++i) {

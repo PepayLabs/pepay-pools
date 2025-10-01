@@ -69,9 +69,9 @@ contract ConfigSchemaTest is BaseTest {
     function test_previewConfigDefaults() public view {
         (uint32 maxAgeSec, uint32 cooldownSec, bool revertOnStale, bool enableFresh) = pool.previewConfig();
 
-        assertEq(maxAgeSec, 30, "preview max age");
-        assertEq(cooldownSec, 10, "preview cooldown");
-        assertTrue(revertOnStale, "preview revert on stale");
+        assertEq(maxAgeSec, 0, "preview max age disabled by default");
+        assertEq(cooldownSec, 0, "preview cooldown default");
+        assertFalse(revertOnStale, "preview revert default");
         assertFalse(enableFresh, "preview fresh disabled");
     }
 

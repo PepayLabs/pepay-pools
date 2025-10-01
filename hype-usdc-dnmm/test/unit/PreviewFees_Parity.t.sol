@@ -18,6 +18,18 @@ contract PreviewFeesParityTest is BaseTest {
         baseScale = baseScaleLocal;
         quoteScale = quoteScaleLocal;
 
+        DnmPool.PreviewConfig memory previewCfg = DnmPool.PreviewConfig({
+            maxAgeSec: 30,
+            snapshotCooldownSec: 10,
+            revertOnStalePreview: true,
+            enablePreviewFresh: false
+        });
+        vm.prank(gov);
+        pool.updateParams(DnmPool.ParamKind.Preview, abi.encode(previewCfg));
+
+        approveAll(alice);
+        approveAll(bob);
+
         ladder = new uint256[](4);
         ladder[0] = 5e17; // 0.5 base
         ladder[1] = 1e18; // 1 base
@@ -72,6 +84,7 @@ contract PreviewFeesParityTest is BaseTest {
         vm.prank(bob);
         pool.swapExactIn(1_000_000000, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
 
+        vm.warp(block.timestamp + 20);
         // Capture a fresh snapshot.
         pool.refreshPreviewSnapshot(IDnmPool.OracleMode.Spot, bytes(""));
     }
@@ -83,7 +96,7 @@ contract PreviewFeesParityTest is BaseTest {
             uint256 baseSizeWad = ladder[i];
             if (baseSizeWad == 0) continue;
 
-        uint256 baseAmount = FixedPointMath.mulDivDown(baseSizeWad, baseScale, WAD);
+            uint256 baseAmount = FixedPointMath.mulDivDown(baseSizeWad, baseScale, WAD);
             IDnmPool.QuoteResult memory askQuote =
                 pool.quoteSwapExactIn(baseAmount, true, IDnmPool.OracleMode.Spot, bytes(""));
             assertEq(askQuote.feeBpsUsed, askFees[i], string(abi.encodePacked("ask fee mismatch ", vm.toString(i))));
@@ -97,8 +110,10 @@ contract PreviewFeesParityTest is BaseTest {
     }
 
     function test_previewFeesStalenessRevertsWhenConfigured() public {
-        vm.warp(block.timestamp + 31);
-        vm.expectRevert(DnmPool.PreviewSnapshotStale.selector);
+        (uint32 maxAgeSec,,,) = pool.previewConfig();
+        uint256 warpBy = uint256(maxAgeSec) + 1;
+        vm.warp(block.timestamp + warpBy);
+        vm.expectRevert(abi.encodeWithSelector(DnmPool.PreviewSnapshotStale.selector, warpBy, uint256(maxAgeSec)));
         pool.previewFees(ladder);
     }
 
@@ -125,19 +140,15 @@ contract PreviewFeesParityTest is BaseTest {
     {
         uint64 snapshotTsLocal;
         uint96 snapshotMidLocal;
-        uint256[] memory sizes;
-        uint256[] memory askFeesLocal;
-        uint256[] memory bidFeesLocal;
-        bool[] memory askClampedLocal;
-        bool[] memory bidClampedLocal;
-        (sizes, askFeesLocal, bidFeesLocal, askClampedLocal, bidClampedLocal, snapshotTsLocal, snapshotMidLocal) =
-            pool.previewLadder(0);
-        sizes;
-        snapshotTsLocal;
-        snapshotMidLocal;
-        askFees = askFeesLocal;
-        bidFees = bidFeesLocal;
-        askClamped = askClampedLocal;
-        bidClamped = bidClampedLocal;
+        (,
+            askFees,
+            bidFees,
+            askClamped,
+            bidClamped,
+            snapshotTsLocal,
+            snapshotMidLocal) = pool.previewLadder(0);
+
+        assertLe(snapshotTsLocal, uint64(block.timestamp), "snapshot timestamp future");
+        assertGt(snapshotMidLocal, 0, "snapshot mid unset");
     }
 }

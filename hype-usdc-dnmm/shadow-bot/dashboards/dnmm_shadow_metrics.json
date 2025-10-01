@@ -1,0 +1,61 @@
+{
+  "title": "DNMM Shadow Bot - L3 Observability",
+  "description": "Prometheus dashboard covering oracle health, quote quality, economics, inventory balance, recenter cadence, and preview freshness per DNMM L3 spec.",
+  "panels": [
+    {
+      "title": "Oracles Health",
+      "metrics": [
+        { "expr": "dnmm_delta_bps", "legend": "Δ vs Pyth" },
+        { "expr": "dnmm_pyth_conf_bps", "legend": "Pyth conf" },
+        { "expr": "dnmm_conf_bps", "legend": "Composite conf" }
+      ]
+    },
+    {
+      "title": "Quote Health",
+      "metrics": [
+        { "expr": "dnmm_spread_bps", "legend": "HC spread" },
+        { "expr": "dnmm_fee_ask_bps", "legend": "Ask fee (S0)" },
+        { "expr": "dnmm_fee_bid_bps", "legend": "Bid fee (S0)" },
+        { "expr": "sum by (decision) (rate(dnmm_decisions_total[5m]))", "legend": "Decision rate" }
+      ]
+    },
+    {
+      "title": "Economics by Size Bucket",
+      "metrics": [
+        { "expr": "sum by (bucket) (rate(dnmm_size_bucket_total[15m]))", "legend": "Trade share" },
+        { "expr": "dnmm_ladder_points_bps{side='ask'}", "legend": "Ladder ask fees" },
+        { "expr": "dnmm_ladder_points_bps{side='bid'}", "legend": "Ladder bid fees" }
+      ]
+    },
+    {
+      "title": "Inventory Balance & Tilt",
+      "metrics": [
+        { "expr": "dnmm_inventory_deviation_bps", "legend": "Deviation" },
+        { "expr": "dnmm_two_sided_uptime_pct", "legend": "Two-sided uptime %" },
+        { "expr": "increase(dnmm_recenter_commits_total[24h])", "legend": "Recenter commits" }
+      ]
+    },
+    {
+      "title": "Recenter Activity",
+      "metrics": [
+        { "expr": "increase(dnmm_recenter_commits_total[1h])", "legend": "Hourly commits" },
+        { "expr": "dnmm_two_sided_uptime_pct", "legend": "Uptime" }
+      ]
+    },
+    {
+      "title": "Preview Freshness",
+      "metrics": [
+        { "expr": "dnmm_preview_snapshot_age_sec", "legend": "Snapshot age" },
+        { "expr": "increase(dnmm_preview_stale_reverts_total[15m])", "legend": "Stale reverts" }
+      ]
+    },
+    {
+      "title": "Aggregator Rebates",
+      "metrics": [
+        { "expr": "dnmm_agg_discount_bps", "legend": "Executor discount" },
+        { "expr": "increase(dnmm_rebates_applied_total[1h])", "legend": "Rebates applied" }
+      ]
+    }
+  ],
+  "refresh_interval": "10s"
+}

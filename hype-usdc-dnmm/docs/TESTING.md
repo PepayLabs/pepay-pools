@@ -9,6 +9,7 @@
 |------|----------|
 | `test/unit/FeePolicy.t.sol` | Fee surface math, caps, decay behaviour. |
 | `test/unit/Inventory.t.sol` | Partial fill solver, deviation calculations. |
+| `test/unit/DnmPool_Rebalance.t.sol` | Auto/manual recenter gating, cooldown, hysteresis streak, stale oracle guards. |
 | `test/unit/DnmPool.t.sol` | Swap happy path, fallback usage, divergence revert. |
 | `test/integration/DnmPoolIntegration.t.sol` | Recenter gating, oracle fallback scenarios. |
 | `test/integration/FeeDynamics.t.sol` | Fee surface sweeps with CSV emission for base/volatility/inventory components. |
@@ -25,6 +26,7 @@
 
 ## CI Guidance
 - For PRs run the smoke invariant sweep: `FOUNDRY_INVARIANT_RUNS=2000 forge test --profile ci --match-path test/invariants/Invariant_NoRunDry.t.sol` (depth 64, fail-on-revert disabled).
+- Pin the recenter gating suite: `forge test --match-contract DnmPool_Rebalance` (ensures flag gating + hysteresis stay aligned).
 - Schedule the adaptive long sweep via `script/run_invariants.sh` (samples runtime, shards the 20k run, enforces idle/output budgets). Adjust `TARGET_RUNS`, `SHARDS`, and `BUDGET_SECS` via env vars in CI.
 - Add staged jobs for `terragon-forge.sh test --match-path test/perf` to refresh gas/load CSVs with thresholds `<1%` partial fills and `≤10%` gas regression using emitted artefacts.
 - Persist `metrics/` and `gas-snapshots.txt` as build artefacts and diff against baseline in CI to highlight drift.

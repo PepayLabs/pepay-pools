@@ -34,6 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-01: Refreshed `REBALANCING_IMPLEMENTATION.md` for auto-recenter flag gating + hysteresis, and `TESTING.md` for the new `DnmPool_Rebalance` suite + CI guidance.
 - 2025-10-01: Documented size-aware fee curve (gamma lin/quad coefficients, S0 normalisation, cap) in `ARCHITECTURE.md`.
 - 2025-10-01: Documented soft divergence haircut bands (accept/soft/hard), new events, and hysteresis behaviour across `ARCHITECTURE.md` and `DIVERGENCE_POLICY.md`.
 - 2025-10-01: Updated `CONFIG.md` to cover zero-default feature flags and the new `features` JSON block aligning with DNMM L3 gating plan.

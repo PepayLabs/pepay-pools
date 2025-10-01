@@ -9,6 +9,7 @@ import {BaseTest} from "../utils/BaseTest.sol";
 
 contract DnmPoolRebalanceTest is BaseTest {
     uint256 internal constant ONE = 1e18;
+    uint256 internal constant HEALTHY_FRAMES_REQUIRED = 3;
 
     function setUp() public {
         setUpBase();
@@ -17,6 +18,8 @@ contract DnmPoolRebalanceTest is BaseTest {
     }
 
     function test_autoRebalanceUpdatesTarget() public {
+        _enableAutoRecenter();
+
         // establish baseline so lastRebalancePrice is populated
         vm.prank(alice);
         pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
@@ -38,6 +41,8 @@ contract DnmPoolRebalanceTest is BaseTest {
     }
 
     function test_autoRebalanceSkipsBelowThreshold() public {
+        _enableAutoRecenter();
+
         vm.prank(alice);
         pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
         (uint128 targetBefore,,) = pool.inventoryConfig();
@@ -55,6 +60,8 @@ contract DnmPoolRebalanceTest is BaseTest {
     }
 
     function test_manualRebalancePermissionless() public {
+        _enableAutoRecenter();
+
         vm.prank(alice);
         pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
 
@@ -87,6 +94,8 @@ contract DnmPoolRebalanceTest is BaseTest {
     }
 
     function test_rebalanceRespectsCooldown() public {
+        _enableAutoRecenter();
+
         vm.prank(gov);
         pool.setRecenterCooldownSec(180);
         assertEq(pool.recenterCooldownSec(), 180, "cooldown param set");
@@ -156,6 +165,66 @@ contract DnmPoolRebalanceTest is BaseTest {
         }
 
         // No need to assert post-cooldown behavior here; other tests cover rebalancing success paths.
+    }
+
+    function test_autoRebalanceDisabledWhenFlagOff() public {
+        vm.prank(alice);
+        pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+
+        (uint128 targetBefore,,) = pool.inventoryConfig();
+        uint256 baselinePrice = pool.lastRebalancePrice();
+
+        _setOraclePrice(1_160_000_000_000_000_000); // 16% drift > threshold
+
+        vm.prank(alice);
+        pool.swapExactIn(500 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+
+        (uint128 targetAfter,,) = pool.inventoryConfig();
+        assertEq(targetAfter, targetBefore, "auto recenter disabled keeps target static");
+        assertEq(pool.lastRebalancePrice(), baselinePrice, "baseline price unchanged");
+    }
+
+    function test_autoRebalanceRequiresHealthyFramesBeforeRearming() public {
+        _enableAutoRecenter();
+
+        vm.prank(gov);
+        pool.setRecenterCooldownSec(0);
+
+        vm.prank(alice);
+        pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+
+        _setOraclePrice(1_200_000_000_000_000_000);
+        vm.prank(alice);
+        pool.swapExactIn(400 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        uint256 firstAutoPrice = pool.lastRebalancePrice();
+        uint64 firstAutoAt = pool.lastRebalanceAt();
+        assertEq(firstAutoPrice, 1_200_000_000_000_000_000, "auto recenter committed");
+        assertGt(firstAutoAt, 0, "timestamp seeded");
+
+        _setOraclePrice(1_320_000_000_000_000_000); // still above threshold
+        vm.prank(alice);
+        pool.swapExactIn(350 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        assertEq(pool.lastRebalancePrice(), firstAutoPrice, "hysteresis blocks immediate retrigger");
+
+        // Accumulate healthy frames (deviation below threshold)
+        for (uint256 i = 0; i < HEALTHY_FRAMES_REQUIRED; i++) {
+            _setOraclePrice(1_160_000_000_000_000_000); // ~5% drift < threshold
+            vm.prank(alice);
+            pool.swapExactIn(100 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+            assertEq(pool.lastRebalancePrice(), firstAutoPrice, "no commit while recovering");
+        }
+
+        _setOraclePrice(1_360_000_000_000_000_000);
+        vm.prank(alice);
+        pool.swapExactIn(350 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        assertEq(pool.lastRebalancePrice(), 1_360_000_000_000_000_000, "second auto commit after recovery");
+        assertEq(pool.lastRebalanceAt(), uint64(block.timestamp), "timestamp reflects rearmed commit");
+    }
+
+    function _enableAutoRecenter() internal {
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        flags.enableAutoRecenter = true;
+        setFeatureFlags(flags);
     }
 
     function _currentSpot() internal view returns (uint256) {

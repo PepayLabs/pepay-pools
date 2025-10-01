@@ -34,6 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-01: Extended `DnmPool_Rebalance` coverage for auto recenter flag gating, cooldown suppression, hysteresis streak recovery, and stale-oracle regressions.
 - 2025-10-01: Added `SizeFeeCurveTest` validating linear/quadratic surcharge monotonicity, cap enforcement, and preview↔swap parity.
 - 2025-10-01: Added `SoftDivergenceTest` covering haircut math, hard-band rejections, and hysteresis recovery alongside new `getSoftDivergenceState()` helper.
 - 2025-10-01: Added `FeatureFlagsTest` to enforce zero-default toggles and governance-controlled enablement; updated quote suite bootstrapping for explicit debug/blend opt-ins.

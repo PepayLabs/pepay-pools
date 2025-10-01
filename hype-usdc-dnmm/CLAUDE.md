@@ -34,6 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-01: Hardened auto/manual rebalancing by wiring `enableAutoRecenter`, adding the `autoRecenterHealthyFrames` hysteresis counter, updating docs/tests, and keeping zero-default posture.
 - 2025-10-01: Added size-aware fee curve (linear/quadratic surcharge with cap, parity tests, config plumbing) gated by `enableSizeFee`.
 - 2025-10-01: Implemented soft divergence haircut band (accept/soft/hard thresholds, `DivergenceHaircut/DivergenceRejected` events, hysteresis state) gated by `enableSoftDivergence`, with tests/docs/tooling updates.
 - 2025-10-01: Expanded zero-default `FeatureFlags`, added configuration plumbing/tests (`FeatureFlagsTest`), and synced docs/config/scripts/shadow-bot to require explicit enables for F03–F12 rollout.

@@ -19,6 +19,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     uint256 private constant ONE = 1e18;
     uint256 private constant BPS = 10_000;
     uint256 private constant HC_AGE_UNKNOWN = type(uint256).max;
+    uint8 private constant AUTO_RECENTER_HEALTHY_REQUIRED = 3;
 
     enum ParamKind {
         Oracle,
@@ -145,6 +146,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     FeatureFlags public featureFlags;
     ConfidenceState private confidenceState;
     SoftDivergenceState private softDivergenceState;
+    uint8 private autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
 
     bytes32 private constant REASON_NONE = bytes32(0);
     bytes32 private constant REASON_FLOOR = bytes32("FLOOR");
@@ -494,6 +496,9 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             FeatureFlags memory oldFlags = featureFlags;
             FeatureFlags memory newFlags = abi.decode(data, (FeatureFlags));
             featureFlags = newFlags;
+            if (!oldFlags.enableAutoRecenter && newFlags.enableAutoRecenter) {
+                autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
+            }
             emit ParamsUpdated("FEATURE", abi.encode(oldFlags), data);
         } else {
             revert Errors.InvalidParamKind();
@@ -536,6 +541,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         if (previousPrice == 0) {
             lastRebalancePrice = currentPrice;
             lastRebalanceAt = uint64(block.timestamp);
+            autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
             return;
         }
 
@@ -546,6 +552,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
         bool updated = _performRebalance(currentPrice, thresholdBps);
         if (!updated) revert Errors.RecenterThreshold();
+
+        autoRecenterHealthyFrames = 0;
 
         emit ManualRebalanceExecuted(msg.sender, currentPrice, uint64(block.timestamp));
     }
@@ -665,7 +673,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             reason: reason != REASON_NONE ? reason : outcome.reason
         });
 
-        if (shouldSettleFee) {
+        if (shouldSettleFee && flags.enableAutoRecenter) {
             _checkAndRebalanceAuto(outcome.mid);
         }
     }
@@ -747,18 +755,32 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 previousPrice = lastRebalancePrice;
         if (previousPrice == 0) {
             lastRebalancePrice = currentPrice;
+            lastRebalanceAt = uint64(block.timestamp);
+            autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
+            return;
+        }
+
+        uint16 thresholdBps = inventoryConfig.recenterThresholdPct;
+        if (thresholdBps == 0) return;
+
+        uint256 priceChange = FixedPointMath.absDiff(currentPrice, previousPrice);
+        uint256 deviationBps = FixedPointMath.toBps(priceChange, previousPrice);
+
+        if (deviationBps < thresholdBps) {
+            if (autoRecenterHealthyFrames < AUTO_RECENTER_HEALTHY_REQUIRED) {
+                unchecked {
+                    autoRecenterHealthyFrames += 1;
+                }
+            }
             return;
         }
 
         if (!_cooldownElapsed()) return;
+        if (autoRecenterHealthyFrames < AUTO_RECENTER_HEALTHY_REQUIRED) return;
 
-        uint16 thresholdBps = inventoryConfig.recenterThresholdPct;
-        uint256 priceChange = FixedPointMath.absDiff(currentPrice, previousPrice);
-        if (FixedPointMath.toBps(priceChange, previousPrice) < thresholdBps) {
-            return;
+        if (_performRebalance(currentPrice, thresholdBps)) {
+            autoRecenterHealthyFrames = 0;
         }
-
-        _performRebalance(currentPrice, thresholdBps);
     }
 
     function _performRebalance(uint256 currentPrice, uint16 thresholdBps) internal returns (bool updated) {

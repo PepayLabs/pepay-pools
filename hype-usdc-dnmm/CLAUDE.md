@@ -35,6 +35,7 @@
 
 ## Change Log
 - 2025-10-01: Implemented the BBO-aware fee floor (F05) behind `enableBboFloor`, ensuring swap/preview fees respect `max(betaFloorBps, alphaBboBps * spread)` and updating docs/tests accordingly.
+- 2025-10-01: Delivered inventory tilt incentives (F06) with signed adjustments from instantaneous `x*`, spread/conf weighting, symmetric caps, and regression coverage in `InventoryTiltTest`.
 - 2025-10-01: Extended config schema with inventory tilt/BBO floor/AOMQ knobs, rebates allowlist, `ParamKind.Aomq`, and governance timelock plumbing; added `ConfigSchemaTest` coverage and refreshed deployment scripts/JSON defaults.
 - 2025-10-01: Hardened auto/manual rebalancing by wiring `enableAutoRecenter`, adding the `autoRecenterHealthyFrames` hysteresis counter, updating docs/tests, and keeping zero-default posture.
 - 2025-10-01: Added size-aware fee curve (linear/quadratic surcharge with cap, parity tests, config plumbing) gated by `enableSizeFee`.

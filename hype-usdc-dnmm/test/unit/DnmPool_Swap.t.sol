@@ -113,6 +113,7 @@ contract DnmPoolSwapTest is BaseTest {
             defaultFeeConfig(),
             defaultMakerConfig(),
             defaultAomqConfig(),
+            defaultPreviewConfig(),
             defaultFeatureFlags(),
             DnmPool.Guardians({governance: gov, pauser: pauser})
         );
@@ -169,6 +170,7 @@ contract DnmPoolSwapTest is BaseTest {
             defaultFeeConfig(),
             defaultMakerConfig(),
             defaultAomqConfig(),
+            defaultPreviewConfig(),
             defaultFeatureFlags(),
             DnmPool.Guardians({governance: gov, pauser: pauser})
         );

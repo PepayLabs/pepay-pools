@@ -100,6 +100,7 @@ abstract contract BaseTest is MathAsserts {
             feeCfg,
             makerCfg,
             aomqCfg,
+            defaultPreviewConfig(),
             defaultFeatureFlags(),
             guardians
         );
@@ -209,6 +210,15 @@ abstract contract BaseTest is MathAsserts {
 
     function defaultAomqConfig() internal pure returns (DnmPool.AomqConfig memory) {
         return DnmPool.AomqConfig({minQuoteNotional: 0, emergencySpreadBps: 0, floorEpsilonBps: 0});
+    }
+
+    function defaultPreviewConfig() internal pure returns (DnmPool.PreviewConfig memory) {
+        return DnmPool.PreviewConfig({
+            maxAgeSec: 0,
+            snapshotCooldownSec: 0,
+            revertOnStalePreview: false,
+            enablePreviewFresh: false
+        });
     }
 
     function defaultFeatureFlags() internal pure returns (DnmPool.FeatureFlags memory) {

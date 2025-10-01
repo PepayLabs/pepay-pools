@@ -27,6 +27,7 @@
 - Run `terragon-forge.sh test --match-test testSwapBaseForQuoteHappyPath`.
 - Submit manual swaps with small size via fork RPC.
 - Verify events through explorer or local indexer; confirm `feeBps` / `reason` values align with expectations.
+- Trigger `refreshPreviewSnapshot(IDnmPool.OracleMode.Spot, bytes(""))` once swaps are live. Call `previewFees([1 ether, 2 ether])` and `previewLadder(0)` to confirm routers observe the same fee ordering (AOMQ clamp flags should be `false` in healthy conditions).
 
 ## 5. RFQ Enablement (Optional)
 1. Deploy `QuoteRFQ` with maker key.
@@ -37,6 +38,7 @@
 - Connect indexer to `SwapExecuted`, `QuoteServed`, `ParamsUpdated`, `Paused`, `Unpaused`, `ManualRebalanceExecuted`, `RecenterCooldownSet`.
 - Publish Grafana dashboard using metrics defined in `docs/OBSERVABILITY.md`.
 - Persist test artifacts from `metrics/` (CSV/JSON) and `gas-snapshots.txt` into the monitoring pipeline for historical comparisons.
+- Add preview health panels: `dnmm_preview_snapshot_age_sec`, `dnmm_preview_stale_reverts_total`, ladder ask/bid series by bucket, and clamp gauges. Alert when snapshot age > `previewMaxAgeSec` or stale reverts increase.
 - Wire the parity freshness check after any long invariant run: execute `script/run_invariants.sh` (or `script/check_invariants_and_parity.sh`) and verify `reports/metrics/freshness_report.json` reports `status=pass` for all parity CSVs.
 - Deploy `OracleWatcher` alongside the pool, configure thresholds, and run `scripts/watch_oracles.ts` to stream `OracleAlert` / `AutoPauseRequested`. Route `critical=true` alerts to on-call and wire the optional pause handler contract if using auto-pause. Track `lastRebalancePrice`, `lastRebalanceAt`, and cooldown adherence (time since last rebalance vs `recenterCooldownSec`) in dashboards/alerts.
 
@@ -48,8 +50,8 @@
 ## 8. Performance & Metric Validation
 - Execute `forge test --match-path test/perf` to capture gas profiles (`metrics/gas_snapshots.csv`, `gas-snapshots.txt`) and burst reliability metrics (`metrics/load_burst_summary.csv`).
 - Run `script/run_slither_ci.sh` to emit `reports/security/slither_findings.json`; review and clear any Medium/High severity issues before promotion.
-- Ensure tuple/decimal sweep outputs (`metrics/tuple_decimal_sweep.csv`) and fee dynamics series (`metrics/fee_B*.csv`) are reviewed before deployment to detect scaling regressions.
-- After each perf sweep update `reports/gas/gas_report.json` and compare against budgets (quote ≤ 90k, swap ≤ 200k, rfq ≤ 400k) before committing.
+- Ensure tuple/decimal sweep outputs (`metrics/tuple_decimal_sweep.csv`), fee dynamics series (`metrics/fee_B*.csv`), and preview ladders (`metrics/preview_ladder_*.csv` if generated) are reviewed before deployment to detect scaling regressions.
+- After each perf sweep update `reports/gas/gas_report.json` and compare against budgets (quote ≤ 130k, swap ≤ 320k, previewFees ≤ 80k, previewLadder ≤ 250k, RFQ verify ≤ 470k) before committing.
 - Run invariant suites with `script/run_invariants.sh` (defaults to an adaptive 20k run with sampling + idle guards) after cleaning `cache/invariant`; fall back to `FOUNDRY_INVARIANT_RUNS=2000 forge test --profile ci --match-path test/invariants` for quick smoke checks.
 - When the long run executes, confirm `reports/invariants_run.json` shows planned vs executed parity and revert-rate ≤ 10%; escalate per `reports/ci/quality_gates_summary.json` if thresholds are breached.
 

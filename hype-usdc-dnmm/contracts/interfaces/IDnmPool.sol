@@ -34,6 +34,38 @@ interface IDnmPool {
         view
         returns (uint256 bidPx, uint256 askPx, uint256 ttlMs, bytes32 quoteId);
 
+    function refreshPreviewSnapshot(OracleMode mode, bytes calldata oracleData) external;
+
+    function previewFees(uint256[] calldata sizesBaseWad)
+        external
+        view
+        returns (uint256[] memory askFeeBps, uint256[] memory bidFeeBps);
+
+    function previewFeesFresh(OracleMode mode, bytes calldata oracleData, uint256[] calldata sizesBaseWad)
+        external
+        view
+        returns (uint256[] memory askFeeBps, uint256[] memory bidFeeBps);
+
+    function previewLadder(uint256 s0BaseWad)
+        external
+        view
+        returns (
+            uint256[] memory sizesBaseWad,
+            uint256[] memory askFeeBps,
+            uint256[] memory bidFeeBps,
+            bool[] memory askClamped,
+            bool[] memory bidClamped,
+            uint64 snapshotTimestamp,
+            uint96 snapshotMid
+        );
+
+    function previewSnapshotAge() external view returns (uint256 ageSec, uint64 snapshotTimestamp);
+
+    function previewConfig()
+        external
+        view
+        returns (uint32 maxAgeSec, uint32 snapshotCooldownSec, bool revertOnStalePreview, bool enablePreviewFresh);
+
     function rebalanceTarget() external;
 
     function setRecenterCooldownSec(uint32 newCooldownSec) external;

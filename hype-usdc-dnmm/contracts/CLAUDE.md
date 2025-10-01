@@ -35,6 +35,7 @@
 
 ## Change Log
 - 2025-10-01: Implemented AOMQ micro-quote pipeline (F07) in `DnmPool`: soft-divergence/floor/fallback triggers, clamp-to-min quote sizing, spread floors, and activation telemetry.
+- 2025-10-01: Snapshot-backed preview APIs (F08) – added `PreviewConfig`, `PreviewSnapshot`, `refreshPreviewSnapshot`, `previewFees`, `previewLadder`, and `_applyFeePipeline` so swap/quote/preview share identical fee ordering without mutating in view paths.
 - 2025-10-01: Added governance config scaffolding (`governanceConfig()` accessor, timelock delay slot) and executor discount ledger getters in `DnmPool` to stage F09/F11 without changing behaviour (defaults remain zero/off).
 - 2025-10-01: Added BBO-aware fee floor enforcement (F05) behind `enableBboFloor`, clamping swap/preview fees to `max(betaFloorBps, alphaBboBps * spread)` while respecting the global cap.
 - 2025-10-01: Added inventory tilt incentives (F06) behind `enableInvTilt`, computing signed adjustments from instantaneous `x*` deviation with spread/conf weighting and symmetric caps.

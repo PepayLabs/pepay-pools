@@ -35,7 +35,8 @@
 
 ## Change Log
 - 2025-10-01: Added `Scenario_AOMQ` integration coverage (soft divergence activation, oracle-hard fault guard, floor-adjacent micro quotes, BBO spread enforcement) validating the new F07 pipeline end-to-end.
-- 2025-10-01: Extended `ConfigSchemaTest` to assert feature-flag defaults (AOMQ/Rebates/AutoRecenter), governance timelock scaffolding, and executor discount accessors to gate upcoming F07–F12 work.
+- 2025-10-01: Added `PreviewFees_Parity` unit suite and `Scenario_Preview_AOMQ` integration flow to guarantee snapshot previews remain bit-exact with quotes (including AOMQ clamps) and to assert staleness handling.
+- 2025-10-01: Extended `ConfigSchemaTest` to assert feature-flag defaults (AOMQ/Rebates/AutoRecenter), governance timelock scaffolding, preview config defaults, and executor discount accessors to gate upcoming F07–F12 work.
 - 2025-10-01: Added `BboFloorTest` covering spread-tracking floor, fallback absolute floor, and cap interaction.
 - 2025-10-01: Added `InventoryTiltTest` ensuring restorative trades receive discounts/surcharges per F06 weighting and matching the analytical tilt formula.
 - 2025-10-01: Added `ConfigSchemaTest` validating inventory tilt, maker BBO floor, and AOMQ config defaults plus governance bounds on new parameters.

@@ -11,6 +11,10 @@
 - `fee_state_decay` – Monitor gap between `feeConfig.baseBps` and emitted `feeBps` across blocks for decay health.
 - Parity exports (`mid_event_vs_precompile_mid_bps.csv`, `canary_deltas.csv`, `divergence_rate.csv`, `divergence_histogram.csv`) – snapshot oracle parity, fallback reasons, and divergence guard hit-rates per Δ bucket.
 - Load test artefacts (`load_burst_summary.csv`, `load_fee_decay_series.csv`) – failure-rate, average fee, and recorded `fee_cap_bps` for the stress harness.
+- `preview_snapshot_age_sec` / `preview_snapshot_timestamp` – expose the age of the cached oracle outcome (0 when unset). Age > `previewMaxAgeSec` should trigger either a refresh or stale handling by routers.
+- `preview_stale_reverts_total` – counter incremented when clients hit `PreviewSnapshotStale`; useful to detect keeper outages.
+- `preview_ladder_ask_bps{bucket}` / `preview_ladder_bid_bps{bucket}` – gauges for the standard ladder sizes (`bucket ∈ {S0,2S0,5S0,10S0}`) to trend fee shape over time.
+- `preview_clamp_flags{bucket,side}` – boolean gauges (0/1) indicating when AOMQ clamps the ask/bid side for the given ladder bucket.
 
 ## Logs & Events
 - `SwapExecuted(user, isBaseIn, amountIn, amountOut, mid, feeBps, partial, reason)` – Primary execution telemetry.
@@ -31,12 +35,15 @@
 - **Canary Shadow** – Track `canary_deltas.csv` median vs ε and ensure divergence rejections line up with observer deltas.
 - **Fee Dynamics** – Graph fee_bps vs time; overlay α/β contributions derived from oracle + inventory inputs.
 - **Revenue** – Aggregate LP fees per period (amountIn × fee_bps/BPS).
+- **Preview & Ladder** – Track snapshot age vs. max-age, the current ask/bid ladder, and clamp flags to surface impending stale previews before routers hit them.
 
 ## Alerting Baselines
 - Divergence rejections > 3% of calls within 5 minutes.
 - Partial fills > 10% of swap notional in an hour.
 - `reason` = `"PYTH"` or `"EMA"` exceeding baseline (oracle degradation).
 - `SwapExecuted` absence for >1 minute when maker S0 expected (RFQ degradation signal).
+- `preview_snapshot_age_sec > 2 × previewMaxAgeSec` for more than two consecutive samples.
+- `preview_stale_reverts_total` derivative > 0.5 / min (indicates routers regularly hitting stale previews).
 
 ## Telemetry Integration
 - Ingest events via an indexer (e.g., Subsquid on HyperEVM) and push to Prometheus/Grafana.

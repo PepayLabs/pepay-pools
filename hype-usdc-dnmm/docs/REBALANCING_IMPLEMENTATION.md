@@ -78,6 +78,23 @@ Layer 2: Manual Rebalancing (Separate Function)
 - ✅ `contracts/interfaces/IDnmPool.sol`: exposes `rebalanceTarget()` (manual keeper hook) and the cooldown setter for integration tests.
 - ✅ `test/unit/DnmPool_Rebalance.t.sol`: regression coverage for automatic triggers, cooldown suppression, manual freshness & cooldown reverts, and stale-oracle handling.
 - ✅ Updated docs/runbooks (this file, `docs/ARCHITECTURE.md`, `RUNBOOK.md`) to describe the dual-layer system, oracle gating, and cooldown operations.
+- ✅ 2025-10-01 follow-up: snapshot-backed fee previews (`previewFees`, `previewLadder`, `refreshPreviewSnapshot`) now share the same oracle outcome + fee pipeline, making pre-trade ladders deterministic while keeping the rebalancing state machine untouched.
+
+## Preview Snapshot & Fee Ladder
+
+The Level-3 refresh introduced an operator-friendly preview surface without touching the rebalance workflow:
+
+- `PreviewSnapshot` is appended to `DnmPool` storage (1 slot) and records the last oracle mid/divergence/confidence tuple, divergence haircut, and whether AOMQ was active on either side. Snapshots are refreshed (a) automatically after every settled swap and (b) permissionlessly via `refreshPreviewSnapshot(mode, oracleData)` with a governance-controlled cooldown + max-age.
+- `previewFees(uint256[] sizesBaseWad)` replays the exact fee pipeline (base fee, size surcharge, tilt, divergence haircut, BBO floor, AOMQ clamp) in `view` context using the cached oracle outcome and current reserves. The helper `_applyFeePipeline` is shared between swap/quote/preview ensuring bit-exact parity.
+- `previewLadder(uint256 s0BaseWad)` returns the standard `[S0, 2S0, 5S0, 10S0]` buckets with ask/bid fee ladders, clamp flags, and snapshot metadata so routers can pre-slice large orders.
+- `previewFeesFresh` (guarded by `enablePreviewFresh`) runs the same pipeline off a live oracle read without mutating state—useful for off-chain analytics when snapshots are intentionally stale.
+- Config knobs live under `previewConfig` (max-age, cooldown, stale-behaviour, fresh toggle) and are covered in `ConfigSchemaTest`.
+
+Operational expectations:
+
+1. Keep snapshot age < `previewMaxAgeSec` in production. When the pool is idle, a keeper/monitor should call `refreshPreviewSnapshot` after ensuring oracles are fresh.
+2. Routers SHOULD read `previewSnapshotAge()` and fall back to fresh reads if snapshots are stale and the pool is configured to revert on stale preview.
+3. AOMQ clamp flags surface in previews so routers can detect edge cases (micro quotes) before routing size across venues; the actual rebalancing flow remains unchanged.
 
 ### 1. Add State Variable
 

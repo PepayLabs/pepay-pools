@@ -22,6 +22,8 @@ interface MetricsSnapshot {
   inventory_deviation_bps: number;
   fee_bps: number;
   decision_counts: Record<string, number>;
+  preview_age_sec: number;
+  preview_stale_reverts: number;
 }
 
 export class ShadowBotMonitor {
@@ -36,12 +38,14 @@ export class ShadowBotMonitor {
   private readonly ALERT_REJECT_DURATION_SEC = Number(process.env.ALERT_REJECT_DURATION_SEC || 60);
   private readonly ALERT_SPREAD_BPS = Number(process.env.ALERT_SPREAD_BPS || 100);
   private readonly ALERT_CONF_BPS = Number(process.env.ALERT_CONF_BPS || 90);
+  private readonly ALERT_PREVIEW_AGE = Number(process.env.ALERT_PREVIEW_AGE || 60);
 
   // Monitoring state
   private rejectStartTime?: number;
   private consecutiveRejects = 0;
   private lastAlertTime: Record<string, number> = {};
   private readonly ALERT_COOLDOWN = 300; // 5 minutes between same alerts
+  private lastPreviewStaleCount = 0;
 
   constructor() {
     this.provider = new JsonRpcProvider(process.env.RPC_URL);
@@ -84,6 +88,7 @@ export class ShadowBotMonitor {
       this.checkConfidenceAlert(metrics);
       this.checkInventoryAlert(metrics);
       this.checkDecisionPatterns(metrics);
+      this.checkPreviewHealth(metrics);
 
       // Store history
       this.metricsHistory.push(metrics);
@@ -105,7 +110,9 @@ export class ShadowBotMonitor {
       sigma_bps: 0,
       inventory_deviation_bps: 0,
       fee_bps: 0,
-      decision_counts: {}
+      decision_counts: {},
+      preview_age_sec: 0,
+      preview_stale_reverts: 0
     };
 
     for (const line of lines) {
@@ -121,6 +128,10 @@ export class ShadowBotMonitor {
         metrics.inventory_deviation_bps = parseFloat(line.split(' ')[1]);
       } else if (line.startsWith('dnmm_fee_bps ')) {
         metrics.fee_bps = parseFloat(line.split(' ')[1]);
+      } else if (line.startsWith('dnmm_preview_snapshot_age_sec ')) {
+        metrics.preview_age_sec = parseFloat(line.split(' ')[1]);
+      } else if (line.startsWith('dnmm_preview_stale_reverts_total ')) {
+        metrics.preview_stale_reverts = parseFloat(line.split(' ')[1]);
       } else if (line.includes('dnmm_decisions_total{decision=')) {
         const match = line.match(/decision="([^"]+)"\}\s+(\d+)/);
         if (match) {
@@ -216,6 +227,32 @@ export class ShadowBotMonitor {
         this.rejectStartTime = undefined;
       }
     }
+  }
+
+  private checkPreviewHealth(metrics: MetricsSnapshot) {
+    if (metrics.preview_age_sec > this.ALERT_PREVIEW_AGE) {
+      this.addAlert({
+        level: 'warning',
+        type: 'PREVIEW_STALE',
+        message: `Preview snapshot age ${metrics.preview_age_sec}s exceeds threshold`,
+        value: metrics.preview_age_sec,
+        threshold: this.ALERT_PREVIEW_AGE,
+        timestamp: Date.now()
+      });
+    }
+
+    if (metrics.preview_stale_reverts > this.lastPreviewStaleCount) {
+      this.addAlert({
+        level: 'warning',
+        type: 'PREVIEW_STALE_REVERTS',
+        message: `Preview calls reverting as stale`,
+        value: metrics.preview_stale_reverts,
+        threshold: this.lastPreviewStaleCount,
+        timestamp: Date.now()
+      });
+    }
+
+    this.lastPreviewStaleCount = metrics.preview_stale_reverts;
   }
 
   private addAlert(alert: Alert) {

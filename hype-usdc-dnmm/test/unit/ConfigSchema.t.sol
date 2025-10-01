@@ -66,6 +66,15 @@ contract ConfigSchemaTest is BaseTest {
         assertEq(cfg.timelockDelaySec, 0, "timelock default");
     }
 
+    function test_previewConfigDefaults() public view {
+        (uint32 maxAgeSec, uint32 cooldownSec, bool revertOnStale, bool enableFresh) = pool.previewConfig();
+
+        assertEq(maxAgeSec, 0, "preview max age disabled by default");
+        assertEq(cooldownSec, 0, "preview cooldown default");
+        assertFalse(revertOnStale, "preview revert default");
+        assertFalse(enableFresh, "preview fresh disabled");
+    }
+
     function test_rebateDefaultsAreZero() public view {
         assertEq(pool.aggregatorDiscount(alice), 0, "alice discount default");
         assertEq(pool.aggregatorDiscount(bob), 0, "bob discount default");

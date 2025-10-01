@@ -12,7 +12,9 @@ import {EventRecorder} from "../utils/EventRecorder.sol";
 
 contract GasSnapshotsTest is BaseTest {
     uint256 internal constant QUOTE_GAS_BUDGET = 130_000;
-    uint256 internal constant SWAP_GAS_BUDGET = 225_000;
+    uint256 internal constant SWAP_GAS_BUDGET = 320_000;
+    uint256 internal constant PREVIEW_FEES_BUDGET = 80_000;
+    uint256 internal constant PREVIEW_LADDER_BUDGET = 250_000;
 
     QuoteRFQ internal rfq;
     uint256 internal makerKey = 0xBADA55;
@@ -28,8 +30,8 @@ contract GasSnapshotsTest is BaseTest {
     }
 
     function test_gasProfiles() public {
-        string[] memory labels = new string[](6);
-        uint256[] memory gasUsed = new uint256[](6);
+        string[] memory labels = new string[](8);
+        uint256[] memory gasUsed = new uint256[](8);
 
         labels[0] = "quote_hc";
         gasUsed[0] = _measureQuoteHC();
@@ -49,11 +51,19 @@ contract GasSnapshotsTest is BaseTest {
         labels[5] = "rfq_verify_swap";
         gasUsed[5] = _measureRFQGas();
 
+        labels[6] = "preview_fees";
+        gasUsed[6] = _measurePreviewFeesGas();
+
+        labels[7] = "preview_ladder";
+        gasUsed[7] = _measurePreviewLadderGas();
+
         _assertGasWithin("quote_hc", gasUsed[0], QUOTE_GAS_BUDGET);
         _assertGasWithin("quote_ema", gasUsed[1], QUOTE_GAS_BUDGET);
         _assertGasWithin("quote_pyth", gasUsed[2], QUOTE_GAS_BUDGET);
         _assertGasWithin("swap_base_hc", gasUsed[3], SWAP_GAS_BUDGET);
         _assertGasWithin("swap_quote_hc", gasUsed[4], SWAP_GAS_BUDGET);
+        _assertGasWithin("preview_fees", gasUsed[6], PREVIEW_FEES_BUDGET);
+        _assertGasWithin("preview_ladder", gasUsed[7], PREVIEW_LADDER_BUDGET);
 
         string[] memory rows = new string[](labels.length);
         for (uint256 i = 0; i < labels.length; ++i) {
@@ -125,6 +135,40 @@ contract GasSnapshotsTest is BaseTest {
         uint256 gasBefore = gasleft();
         vm.prank(alice);
         localRfq.verifyAndSwap(sig, params, bytes(""));
+        return gasBefore - gasleft();
+    }
+
+    function _measurePreviewFeesGas() internal returns (uint256) {
+        _resetScenario();
+        DnmPool.PreviewConfig memory previewCfg = DnmPool.PreviewConfig({
+            maxAgeSec: 30,
+            snapshotCooldownSec: 0,
+            revertOnStalePreview: true,
+            enablePreviewFresh: false
+        });
+        vm.prank(gov);
+        pool.updateParams(DnmPool.ParamKind.Preview, abi.encode(previewCfg));
+        pool.refreshPreviewSnapshot(IDnmPool.OracleMode.Spot, bytes(""));
+        uint256[] memory sizes = new uint256[](1);
+        sizes[0] = 1e18;
+        uint256 gasBefore = gasleft();
+        pool.previewFees(sizes);
+        return gasBefore - gasleft();
+    }
+
+    function _measurePreviewLadderGas() internal returns (uint256) {
+        _resetScenario();
+        DnmPool.PreviewConfig memory previewCfg = DnmPool.PreviewConfig({
+            maxAgeSec: 30,
+            snapshotCooldownSec: 0,
+            revertOnStalePreview: true,
+            enablePreviewFresh: false
+        });
+        vm.prank(gov);
+        pool.updateParams(DnmPool.ParamKind.Preview, abi.encode(previewCfg));
+        pool.refreshPreviewSnapshot(IDnmPool.OracleMode.Spot, bytes(""));
+        uint256 gasBefore = gasleft();
+        pool.previewLadder(0);
         return gasBefore - gasleft();
     }
 

@@ -79,6 +79,12 @@ contract DivergencePolicyTest is Test {
         });
         DnmPool.AomqConfig memory aomqCfg =
             DnmPool.AomqConfig({minQuoteNotional: 0, emergencySpreadBps: 0, floorEpsilonBps: 0});
+        DnmPool.PreviewConfig memory previewCfg = DnmPool.PreviewConfig({
+            maxAgeSec: 30,
+            snapshotCooldownSec: 10,
+            revertOnStalePreview: true,
+            enablePreviewFresh: false
+        });
         DnmPool.FeatureFlags memory flags = DnmPool.FeatureFlags({
             blendOn: true,
             parityCiOn: true,
@@ -104,6 +110,7 @@ contract DivergencePolicyTest is Test {
             feeCfg,
             makerCfg,
             aomqCfg,
+            previewCfg,
             flags,
             DnmPool.Guardians({governance: GOV, pauser: PAUSER})
         );

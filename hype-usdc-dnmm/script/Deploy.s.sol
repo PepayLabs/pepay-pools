@@ -82,6 +82,13 @@ contract Deploy is Script {
             floorEpsilonBps: 0
         });
 
+        DnmPool.PreviewConfig memory previewCfg = DnmPool.PreviewConfig({
+            maxAgeSec: 30,
+            snapshotCooldownSec: 10,
+            revertOnStalePreview: true,
+            enablePreviewFresh: false
+        });
+
         DnmPool.Guardians memory guardians = DnmPool.Guardians({governance: msg.sender, pauser: msg.sender});
 
         address baseToken = vm.envAddress("DNMM_BASE_TOKEN");
@@ -101,6 +108,7 @@ contract Deploy is Script {
             feeCfg,
             makerCfg,
             aomqCfg,
+            previewCfg,
             DnmPool.FeatureFlags({
                 blendOn: false,
                 parityCiOn: false,

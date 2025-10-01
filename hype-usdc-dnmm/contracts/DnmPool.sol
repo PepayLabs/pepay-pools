@@ -26,7 +26,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         Fee,
         Inventory,
         Maker,
-        Feature
+        Feature,
+        Aomq
     }
 
     struct TokenConfig {
@@ -47,6 +48,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint128 targetBaseXstar;
         uint16 floorBps;
         uint16 recenterThresholdPct;
+        uint16 invTiltBpsPer1pct;
+        uint16 invTiltMaxBps;
+        uint16 tiltConfWeightBps;
+        uint16 tiltSpreadWeightBps;
     }
 
     struct OracleConfig {
@@ -70,6 +75,14 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     struct MakerConfig {
         uint128 s0Notional;
         uint32 ttlMs;
+        uint16 alphaBboBps;
+        uint16 betaFloorBps;
+    }
+
+    struct AomqConfig {
+        uint128 minQuoteNotional;
+        uint16 emergencySpreadBps;
+        uint16 floorEpsilonBps;
     }
 
     struct FeatureFlags {
@@ -125,6 +138,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     OracleConfig public oracleConfig;
     uint256 private feeConfigPacked;
     MakerConfig public makerConfig;
+    AomqConfig public aomqConfig;
     Guardians public guardians;
 
     IOracleAdapterHC internal immutable ORACLE_HC_;
@@ -217,14 +231,23 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         OracleConfig memory oracleConfig_,
         FeePolicy.FeeConfig memory feeConfig_,
         MakerConfig memory makerConfig_,
+        AomqConfig memory aomqConfig_,
         FeatureFlags memory featureFlags_,
         Guardians memory guardians_
     ) {
         if (baseToken_ == address(0) || quoteToken_ == address(0)) revert Errors.TokensZero();
         if (guardians_.governance == address(0)) revert Errors.GovernanceZero();
         if (inventoryConfig_.floorBps > 5000) revert Errors.InvalidConfig();
+        if (inventoryConfig_.invTiltBpsPer1pct > BPS) revert Errors.InvalidConfig();
+        if (inventoryConfig_.invTiltMaxBps > BPS) revert Errors.InvalidConfig();
+        if (inventoryConfig_.tiltConfWeightBps > BPS) revert Errors.InvalidConfig();
+        if (inventoryConfig_.tiltSpreadWeightBps > BPS) revert Errors.InvalidConfig();
         if (feeConfig_.capBps < feeConfig_.baseBps) revert Errors.InvalidConfig();
         if (oracleConfig_.confCapBpsStrict > oracleConfig_.confCapBpsSpot) revert Errors.InvalidConfig();
+        if (makerConfig_.alphaBboBps > BPS) revert Errors.InvalidConfig();
+        if (makerConfig_.betaFloorBps > BPS) revert Errors.InvalidConfig();
+        if (aomqConfig_.emergencySpreadBps > BPS) revert Errors.InvalidConfig();
+        if (aomqConfig_.floorEpsilonBps > BPS) revert Errors.InvalidConfig();
         if (oracleConfig_.sigmaEwmaLambdaBps > BPS) revert Errors.InvalidConfig();
         if (oracleConfig_.divergenceSoftBps != 0 && oracleConfig_.divergenceSoftBps < oracleConfig_.divergenceAcceptBps) {
             revert Errors.InvalidConfig();
@@ -264,6 +287,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         oracleConfig = oracleConfig_;
         feeConfigPacked = FeePolicy.pack(feeConfig_);
         makerConfig = makerConfig_;
+        aomqConfig = aomqConfig_;
         featureFlags = featureFlags_;
         guardians = guardians_;
     }
@@ -485,11 +509,17 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             InventoryConfig memory oldCfg = inventoryConfig;
             InventoryConfig memory newCfg = abi.decode(data, (InventoryConfig));
             if (newCfg.floorBps > 5000) revert Errors.InvalidConfig();
+            if (newCfg.invTiltBpsPer1pct > BPS) revert Errors.InvalidConfig();
+            if (newCfg.invTiltMaxBps > BPS) revert Errors.InvalidConfig();
+            if (newCfg.tiltConfWeightBps > BPS) revert Errors.InvalidConfig();
+            if (newCfg.tiltSpreadWeightBps > BPS) revert Errors.InvalidConfig();
             inventoryConfig = newCfg;
             emit ParamsUpdated("INVENTORY", abi.encode(oldCfg), data);
         } else if (kind == ParamKind.Maker) {
             MakerConfig memory oldCfg = makerConfig;
             MakerConfig memory newCfg = abi.decode(data, (MakerConfig));
+            if (newCfg.alphaBboBps > BPS) revert Errors.InvalidConfig();
+            if (newCfg.betaFloorBps > BPS) revert Errors.InvalidConfig();
             makerConfig = newCfg;
             emit ParamsUpdated("MAKER", abi.encode(oldCfg), data);
         } else if (kind == ParamKind.Feature) {
@@ -500,6 +530,13 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
                 autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
             }
             emit ParamsUpdated("FEATURE", abi.encode(oldFlags), data);
+        } else if (kind == ParamKind.Aomq) {
+            AomqConfig memory oldCfg = aomqConfig;
+            AomqConfig memory newCfg = abi.decode(data, (AomqConfig));
+            if (newCfg.emergencySpreadBps > BPS) revert Errors.InvalidConfig();
+            if (newCfg.floorEpsilonBps > BPS) revert Errors.InvalidConfig();
+            aomqConfig = newCfg;
+            emit ParamsUpdated("AOMQ", abi.encode(oldCfg), data);
         } else {
             revert Errors.InvalidParamKind();
         }
@@ -755,7 +792,6 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 previousPrice = lastRebalancePrice;
         if (previousPrice == 0) {
             lastRebalancePrice = currentPrice;
-            lastRebalanceAt = uint64(block.timestamp);
             autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
             return;
         }

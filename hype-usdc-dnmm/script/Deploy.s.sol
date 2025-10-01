@@ -28,8 +28,15 @@ contract Deploy is Script {
         bytes32 priceIdUsdcUsd = vm.envBytes32("DNMM_PYTH_PRICE_ID_USDC_USD");
         OracleAdapterPyth pyth = new OracleAdapterPyth(pythContract, priceIdHypeUsd, priceIdUsdcUsd);
 
-        DnmPool.InventoryConfig memory inventoryCfg =
-            DnmPool.InventoryConfig({targetBaseXstar: 0, floorBps: 300, recenterThresholdPct: 750});
+        DnmPool.InventoryConfig memory inventoryCfg = DnmPool.InventoryConfig({
+            targetBaseXstar: 0,
+            floorBps: 300,
+            recenterThresholdPct: 750,
+            invTiltBpsPer1pct: 0,
+            invTiltMaxBps: 0,
+            tiltConfWeightBps: 0,
+            tiltSpreadWeightBps: 0
+        });
 
         DnmPool.OracleConfig memory oracleCfg = DnmPool.OracleConfig({
             maxAgeSec: 48,
@@ -62,7 +69,18 @@ contract Deploy is Script {
             sizeFeeCapBps: 0
         });
 
-        DnmPool.MakerConfig memory makerCfg = DnmPool.MakerConfig({s0Notional: 5_000 ether, ttlMs: 200});
+        DnmPool.MakerConfig memory makerCfg = DnmPool.MakerConfig({
+            s0Notional: 5_000 ether,
+            ttlMs: 200,
+            alphaBboBps: 0,
+            betaFloorBps: 0
+        });
+
+        DnmPool.AomqConfig memory aomqCfg = DnmPool.AomqConfig({
+            minQuoteNotional: 0,
+            emergencySpreadBps: 0,
+            floorEpsilonBps: 0
+        });
 
         DnmPool.Guardians memory guardians = DnmPool.Guardians({governance: msg.sender, pauser: msg.sender});
 
@@ -82,6 +100,7 @@ contract Deploy is Script {
             oracleCfg,
             feeCfg,
             makerCfg,
+            aomqCfg,
             DnmPool.FeatureFlags({
                 blendOn: false,
                 parityCiOn: false,

@@ -29,11 +29,23 @@ Derived from Lifinity's SOL/USDC configuration (see `lifinity-contract/CONFIGURA
 | `fee.sizeFeeCapBps` | Maximum BPS contributed by the size surcharge. | `0` |
 | `inventory.floorBps` | Minimum side inventory retained. | `300` bps |
 | `inventory.recenterThresholdPct` | Price move threshold for `x*` updates. | `750` (7.5%) |
-| `maker.*` | On-chain S0 + TTL for RFQ quotes. | S0=`5000`, ttl=`200ms` |
-| `features.*` | Deployment-time feature toggles (zero-default). | All `false` |
+| `inventory.invTiltBpsPer1pct` | Tilt slope applied per 1% inventory deviation (bps). | `0` |
+| `inventory.invTiltMaxBps` | Max tilt adjustment applied to spreads (bps). | `0` |
+| `inventory.tiltConfWeightBps` | Weight applied to oracle confidence when scaling tilt (1.0 = 10000). | `0` |
+| `inventory.tiltSpreadWeightBps` | Weight applied to HyperCore spread when scaling tilt (1.0 = 10000). | `0` |
+| `maker.S0Notional` | On-chain S0 anchor (expressed in quote units) used for sizing ladders. | `5000` |
+| `maker.ttlMs` | RFQ TTL in milliseconds. | `200` |
+| `maker.alphaBboBps` | Multiplier (bps) applied to HC spread when computing the BBO-aware floor. | `0` |
+| `maker.betaFloorBps` | Absolute floor fallback (bps) enforced when book spread is narrow. | `0` |
+| `aomq.minQuoteNotional` | Minimum emergency quote notional emitted under AOMQ. | `0` |
+| `aomq.emergencySpreadBps` | Spread (bps) applied to AOMQ micro quotes. | `0` |
+| `aomq.floorEpsilonBps` | Additional epsilon above the configured floor when AOMQ is active. | `0` |
+| `rebates.allowlist` | List of `{executor, discountBps}` entries granted maker rebates. | `[]` |
+| `governance.timelockDelaySec` | Global timelock (seconds) for sensitive param commits. | `0` |
+| `featureFlags.*` | Deployment-time feature toggles (zero-default). | All `false` |
 
 ### Feature Flags
-`FeatureFlags` are configured at deployment (see the `features` block in `parameters_default.json`) and may be toggled via `updateParams(ParamKind.Feature, ...)`. All flags default to `false`; governance enables them once safeguards and playbooks are in place.
+`FeatureFlags` are configured at deployment (see the `featureFlags` block in `parameters_default.json`) and may be toggled via `updateParams(ParamKind.Feature, ...)`. All flags default to `false`; governance enables them once safeguards and playbooks are in place.
 
 | Flag | Description | Default |
 |------|-------------|---------|

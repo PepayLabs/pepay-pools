@@ -134,7 +134,7 @@ contract GasSnapshotsTest is BaseTest {
         FeePolicy.FeeConfig memory feeCfg = defaultFeeConfig();
         DnmPool.MakerConfig memory makerCfg = defaultMakerConfig();
 
-        redeployPool(invCfg, oracleCfg, feeCfg, makerCfg);
+        redeployPool(invCfg, oracleCfg, feeCfg, makerCfg, defaultAomqConfig());
         pool.sync();
         seedPOL(
             DeployConfig({

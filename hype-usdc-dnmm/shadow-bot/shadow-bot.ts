@@ -766,7 +766,7 @@ http.createServer(async (_req, res) => {
           recenterThresholdPct: state.inventoryConfig.recenterThresholdPct
         },
         fee: state.feeConfig,
-        features: featureFlags
+        featureFlags
       }
     };
     res.setHeader('Content-Type', 'application/json');

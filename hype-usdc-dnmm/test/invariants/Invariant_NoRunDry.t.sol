@@ -33,7 +33,7 @@ contract InvariantNoRunDry is StdInvariant, BaseTest {
 
     function invariant_never_runs_dry() public view {
         (uint128 baseRes, uint128 quoteRes) = pool.reserves();
-        (, uint16 floorBps,) = pool.inventoryConfig();
+        (, uint16 floorBps,,,,,) = pool.inventoryConfig();
         uint256 baseFloor = Inventory.floorAmount(uint256(baseRes), floorBps);
         uint256 quoteFloor = Inventory.floorAmount(uint256(quoteRes), floorBps);
         assertGe(uint256(baseRes), baseFloor, "base below floor");

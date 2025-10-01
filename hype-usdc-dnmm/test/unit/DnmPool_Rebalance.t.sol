@@ -35,7 +35,7 @@ contract DnmPoolRebalanceTest is BaseTest {
 
         assertEq(pool.lastRebalancePrice(), newMid, "lastRebalancePrice updated");
 
-        (uint128 targetAfter,,) = pool.inventoryConfig();
+        (uint128 targetAfter,,,,,,) = pool.inventoryConfig();
         uint128 expectedTarget = _computeTarget(baseBefore, quoteBefore, newMid);
         assertEq(targetAfter, expectedTarget, "target recentered to oracle mid");
     }
@@ -45,7 +45,7 @@ contract DnmPoolRebalanceTest is BaseTest {
 
         vm.prank(alice);
         pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
-        (uint128 targetBefore,,) = pool.inventoryConfig();
+        (uint128 targetBefore,,,,,,) = pool.inventoryConfig();
         uint256 baselinePrice = pool.lastRebalancePrice();
 
         uint256 nearMid = 1_040_000_000_000_000_000; // 4% drift < 7.5% threshold
@@ -54,7 +54,7 @@ contract DnmPoolRebalanceTest is BaseTest {
         vm.prank(alice);
         pool.swapExactIn(500 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
 
-        (uint128 targetAfter,,) = pool.inventoryConfig();
+        (uint128 targetAfter,,,,,,) = pool.inventoryConfig();
         assertEq(targetAfter, targetBefore, "target unchanged when drift < threshold");
         assertEq(pool.lastRebalancePrice(), baselinePrice, "baseline unchanged without rebalance");
     }
@@ -75,7 +75,7 @@ contract DnmPoolRebalanceTest is BaseTest {
         vm.prank(bob);
         pool.rebalanceTarget();
 
-        (uint128 targetAfter,,) = pool.inventoryConfig();
+        (uint128 targetAfter,,,,,,) = pool.inventoryConfig();
         uint128 expectedTarget = _computeTarget(baseBefore, quoteBefore, shockedMid);
         assertEq(targetAfter, expectedTarget, "manual rebalance matches auto calculations");
         assertEq(pool.lastRebalancePrice(), shockedMid, "lastRebalancePrice updated");
@@ -84,6 +84,9 @@ contract DnmPoolRebalanceTest is BaseTest {
     function test_manualRebalanceRevertsWhenBelowThreshold() public {
         vm.prank(alice);
         pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+
+        vm.prank(bob);
+        pool.rebalanceTarget(); // seed baseline at current mid (no drift)
 
         uint256 nearMid = 1_030_000_000_000_000_000; // 3% drift
         _setOraclePrice(nearMid);
@@ -171,7 +174,7 @@ contract DnmPoolRebalanceTest is BaseTest {
         vm.prank(alice);
         pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
 
-        (uint128 targetBefore,,) = pool.inventoryConfig();
+        (uint128 targetBefore,,,,,,) = pool.inventoryConfig();
         uint256 baselinePrice = pool.lastRebalancePrice();
 
         _setOraclePrice(1_160_000_000_000_000_000); // 16% drift > threshold
@@ -179,7 +182,7 @@ contract DnmPoolRebalanceTest is BaseTest {
         vm.prank(alice);
         pool.swapExactIn(500 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
 
-        (uint128 targetAfter,,) = pool.inventoryConfig();
+        (uint128 targetAfter,,,,,,) = pool.inventoryConfig();
         assertEq(targetAfter, targetBefore, "auto recenter disabled keeps target static");
         assertEq(pool.lastRebalancePrice(), baselinePrice, "baseline price unchanged");
     }

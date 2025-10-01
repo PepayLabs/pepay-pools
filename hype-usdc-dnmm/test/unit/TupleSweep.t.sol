@@ -71,7 +71,11 @@ contract TupleSweepTest is Test {
         DnmPool.InventoryConfig memory invCfg = DnmPool.InventoryConfig({
             targetBaseXstar: uint128(50_000 * baseScale),
             floorBps: 300,
-            recenterThresholdPct: 750
+            recenterThresholdPct: 750,
+            invTiltBpsPer1pct: 0,
+            invTiltMaxBps: 0,
+            tiltConfWeightBps: 0,
+            tiltSpreadWeightBps: 0
         });
         DnmPool.OracleConfig memory oracleCfg = DnmPool.OracleConfig({
             maxAgeSec: 60,
@@ -102,7 +106,14 @@ contract TupleSweepTest is Test {
             gammaSizeQuadBps: 0,
             sizeFeeCapBps: 0
         });
-        DnmPool.MakerConfig memory makerCfg = DnmPool.MakerConfig({s0Notional: uint128(1_000 * baseScale), ttlMs: 200});
+        DnmPool.MakerConfig memory makerCfg = DnmPool.MakerConfig({
+            s0Notional: uint128(1_000 * baseScale),
+            ttlMs: 200,
+            alphaBboBps: 0,
+            betaFloorBps: 0
+        });
+        DnmPool.AomqConfig memory aomqCfg =
+            DnmPool.AomqConfig({minQuoteNotional: 0, emergencySpreadBps: 0, floorEpsilonBps: 0});
         DnmPool.Guardians memory guardians = DnmPool.Guardians({governance: address(this), pauser: address(this)});
 
         DnmPool pool = new DnmPool(
@@ -116,6 +127,7 @@ contract TupleSweepTest is Test {
             oracleCfg,
             feeCfg,
             makerCfg,
+            aomqCfg,
             DnmPool.FeatureFlags({
                 blendOn: true,
                 parityCiOn: true,
@@ -175,7 +187,7 @@ contract TupleSweepTest is Test {
         assertEq(returnedBaseScale, baseScale, "base scale mismatch");
         assertEq(returnedQuoteScale, quoteScale, "quote scale mismatch");
 
-        (uint128 targetBase,,) = pool.inventoryConfig();
+        (uint128 targetBase,,,,,,) = pool.inventoryConfig();
         uint256 floorAmount = Inventory.floorAmount(uint256(targetBase), invCfg.floorBps);
         assertLt(floorAmount, uint256(type(uint128).max), "floor overflow");
 

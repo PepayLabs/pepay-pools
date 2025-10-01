@@ -55,7 +55,7 @@ contract PreviewParityTest is BaseTest {
         updateEma(newMid - 2e16, 4, true);
         updatePyth(newMid, 1e18, 2, 2, 25, 25);
 
-        (uint128 s0Notional,) = pool.makerConfig();
+        (uint128 s0Notional,,,) = pool.makerConfig();
         (uint256 bidPx, uint256 askPx,,) = pool.getTopOfBookQuote(uint256(s0Notional));
 
         uint256 snapshot = vm.snapshotState();

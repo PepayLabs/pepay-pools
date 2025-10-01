@@ -145,7 +145,7 @@ contract FeeDynamicsTest is BaseTest {
 
         string[] memory rows = new string[](6);
         uint64 spikeBlock = uint64(block.number);
-        (uint128 targetBase,,) = pool.inventoryConfig();
+        (uint128 targetBase,,,,,,) = pool.inventoryConfig();
         (,,,, uint256 baseScale, uint256 quoteScale) = pool.tokenConfig();
         Inventory.Tokens memory tokens = Inventory.Tokens({baseScale: baseScale, quoteScale: quoteScale});
         FeePolicy.FeeState memory state =
@@ -230,7 +230,7 @@ contract FeeDynamicsTest is BaseTest {
         FeePolicy.FeeConfig memory feeCfg = defaultFeeConfig();
         feeCfg.capBps = 150;
 
-        redeployPool(invCfg, oracleCfg, feeCfg, defaultMakerConfig());
+        redeployPool(invCfg, oracleCfg, feeCfg, defaultMakerConfig(), defaultAomqConfig());
         seedPOL(
             DeployConfig({
                 baseLiquidity: 100_000 ether,
@@ -407,7 +407,7 @@ contract FeeDynamicsTest is BaseTest {
 
     function _currentInventoryDeviationBps(uint256 mid) internal view returns (uint256) {
         (uint128 baseRes, uint128 quoteRes) = pool.reserves();
-        (uint128 targetBase,,) = pool.inventoryConfig();
+        (uint128 targetBase,,,,,,) = pool.inventoryConfig();
         (,,,, uint256 baseScale, uint256 quoteScale) = pool.tokenConfig();
         Inventory.Tokens memory tokens = Inventory.Tokens({baseScale: baseScale, quoteScale: quoteScale});
         return Inventory.deviationBps(baseRes, quoteRes, targetBase, mid, tokens);
@@ -469,7 +469,7 @@ contract FeeDynamicsTest is BaseTest {
         FeePolicy.FeeConfig memory feeCfg = defaultFeeConfig();
         DnmPool.MakerConfig memory makerCfg = defaultMakerConfig();
 
-        redeployPool(invCfg, oracleCfg, feeCfg, makerCfg);
+        redeployPool(invCfg, oracleCfg, feeCfg, makerCfg, defaultAomqConfig());
         seedPOL(
             DeployConfig({
                 baseLiquidity: 100_000 ether,

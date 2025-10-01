@@ -146,7 +146,7 @@ contract LoadBurstPerfTest is BaseTest {
         FeePolicy.FeeConfig memory feeCfg = defaultFeeConfig();
         DnmPool.MakerConfig memory makerCfg = defaultMakerConfig();
 
-        redeployPool(invCfg, oracleCfg, feeCfg, makerCfg);
+        redeployPool(invCfg, oracleCfg, feeCfg, makerCfg, defaultAomqConfig());
         seedPOL(
             DeployConfig({
                 baseLiquidity: 120_000 ether,

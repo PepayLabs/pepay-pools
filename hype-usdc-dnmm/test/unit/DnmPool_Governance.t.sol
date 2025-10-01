@@ -68,7 +68,7 @@ contract DnmPoolGovernanceTest is BaseTest {
         vm.prank(alice);
         pool.swapExactIn(100 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
 
-        (uint128 targetBase,, uint16 thresholdBps) = pool.inventoryConfig();
+        (uint128 targetBase,, uint16 thresholdBps,,,,) = pool.inventoryConfig();
 
         vm.prank(alice);
         vm.expectRevert(Errors.NotGovernance.selector);
@@ -97,7 +97,7 @@ contract DnmPoolGovernanceTest is BaseTest {
         updateSpot(1e18, 61, true);
         updateBidAsk(9995e14, 10005e14, 20, true);
 
-        (uint128 targetBase,, uint16 thresholdBps) = pool.inventoryConfig();
+        (uint128 targetBase,, uint16 thresholdBps,,,,) = pool.inventoryConfig();
         uint128 farDelta = uint128((uint256(targetBase) * (thresholdBps + 100)) / 10_000);
         uint128 farTarget = targetBase > farDelta ? targetBase - farDelta : targetBase / 2;
 

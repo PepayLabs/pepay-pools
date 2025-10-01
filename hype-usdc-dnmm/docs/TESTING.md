@@ -10,6 +10,7 @@
 | `test/unit/FeePolicy.t.sol` | Fee surface math, caps, decay behaviour. |
 | `test/unit/Inventory.t.sol` | Partial fill solver, deviation calculations. |
 | `test/unit/DnmPool_Rebalance.t.sol` | Auto/manual recenter gating, cooldown, hysteresis streak, stale oracle guards. |
+| `test/unit/ConfigSchema.t.sol` | Config schema coverage for tilt/BBO/AOMQ knobs and governance bounds. |
 | `test/unit/DnmPool.t.sol` | Swap happy path, fallback usage, divergence revert. |
 | `test/integration/DnmPoolIntegration.t.sol` | Recenter gating, oracle fallback scenarios. |
 | `test/integration/FeeDynamics.t.sol` | Fee surface sweeps with CSV emission for base/volatility/inventory components. |

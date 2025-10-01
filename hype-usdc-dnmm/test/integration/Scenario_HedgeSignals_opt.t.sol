@@ -16,7 +16,7 @@ contract ScenarioHedgeSignalsOptTest is BaseTest {
         vm.prank(alice);
         pool.swapExactIn(100 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
 
-        (uint128 target,, uint16 recenterPct) = pool.inventoryConfig();
+        (uint128 target,, uint16 recenterPct,,,,) = pool.inventoryConfig();
         uint128 newTarget = target + (target * (recenterPct + 500)) / 10_000;
 
         vm.recordLogs();

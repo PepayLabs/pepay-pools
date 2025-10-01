@@ -49,7 +49,7 @@ contract DnmPoolSwapTest is BaseTest {
     function test_swap_partial_fill_floor_protection() public {
         uint256 largeAmount = 400_000 ether;
         (, uint128 quoteBefore) = pool.reserves();
-        (, uint16 floorBps,) = pool.inventoryConfig();
+        (, uint16 floorBps,,,,,) = pool.inventoryConfig();
         uint256 expectedFloor = Inventory.floorAmount(uint256(quoteBefore), floorBps);
 
         DnmPool.QuoteResult memory preview = quote(largeAmount, true, IDnmPool.OracleMode.Spot);
@@ -112,6 +112,7 @@ contract DnmPoolSwapTest is BaseTest {
             defaultOracleConfig(),
             defaultFeeConfig(),
             defaultMakerConfig(),
+            defaultAomqConfig(),
             defaultFeatureFlags(),
             DnmPool.Guardians({governance: gov, pauser: pauser})
         );
@@ -167,6 +168,7 @@ contract DnmPoolSwapTest is BaseTest {
             defaultOracleConfig(),
             defaultFeeConfig(),
             defaultMakerConfig(),
+            defaultAomqConfig(),
             defaultFeatureFlags(),
             DnmPool.Guardians({governance: gov, pauser: pauser})
         );
@@ -182,7 +184,11 @@ contract DnmPoolSwapTest is BaseTest {
                 DnmPool.InventoryConfig({
                     targetBaseXstar: 100_000 ether,
                     floorBps: defaultInventoryConfig().floorBps,
-                    recenterThresholdPct: defaultInventoryConfig().recenterThresholdPct
+                    recenterThresholdPct: defaultInventoryConfig().recenterThresholdPct,
+                    invTiltBpsPer1pct: 0,
+                    invTiltMaxBps: 0,
+                    tiltConfWeightBps: 0,
+                    tiltSpreadWeightBps: 0
                 })
             )
         );

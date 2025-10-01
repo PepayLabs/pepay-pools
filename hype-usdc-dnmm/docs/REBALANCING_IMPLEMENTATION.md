@@ -74,7 +74,7 @@ Layer 2: Manual Rebalancing (Separate Function)
 
 ### Implementation Summary (2025-10-01)
 
-- ✅ `contracts/DnmPool.sol`: tracks `lastRebalancePrice` and `lastRebalanceAt`, enforces a governance-set `recenterCooldownSec`, adds `_cooldownElapsed()` alongside `_checkAndRebalanceAuto`, shares `_performRebalance()` across auto/manual paths, validates spot freshness via `_getFreshSpotPrice()`, and emits both `ManualRebalanceExecuted` + `RecenterCooldownSet` events.
+- ✅ `contracts/DnmPool.sol`: tracks `lastRebalancePrice`/`lastRebalanceAt`, enforces a governance-set `recenterCooldownSec`, wires the `enableAutoRecenter` flag, introduces the `autoRecenterHealthyFrames` hysteresis counter, shares `_performRebalance()` across auto/manual paths, validates spot freshness via `_getFreshSpotPrice()`, and emits both `ManualRebalanceExecuted` + `RecenterCooldownSet` events.
 - ✅ `contracts/interfaces/IDnmPool.sol`: exposes `rebalanceTarget()` (manual keeper hook) and the cooldown setter for integration tests.
 - ✅ `test/unit/DnmPool_Rebalance.t.sol`: regression coverage for automatic triggers, cooldown suppression, manual freshness & cooldown reverts, and stale-oracle handling.
 - ✅ Updated docs/runbooks (this file, `docs/ARCHITECTURE.md`, `RUNBOOK.md`) to describe the dual-layer system, oracle gating, and cooldown operations.
@@ -107,14 +107,14 @@ uint256 public lastRebalancePrice;  // Price at last rebalance (18 decimals)
             reason: reason != REASON_NONE ? reason : outcome.reason
         });
 
-        if (shouldSettleFee) {
+        if (shouldSettleFee && flags.enableAutoRecenter) {
             _checkAndRebalanceAuto(outcome.mid);
         }
     }
 ```
 
 **Notes**
-- Guarded by `shouldSettleFee` so preview/quote calls stay read-only.
+- Guarded by `shouldSettleFee` and `enableAutoRecenter` (default `false`) so preview/quote calls stay read-only and backwards compatible until explicitly enabled.
 - Swap executes against the previous target; rebalance (if any) lands before the next swap.
 - Keeps ordering parity with Lifinity while preventing dry-run calls from mutating state.
 
@@ -131,16 +131,32 @@ function _checkAndRebalanceAuto(uint256 currentPrice) internal {
     uint256 previousPrice = lastRebalancePrice;
     if (previousPrice == 0) {
         lastRebalancePrice = currentPrice;
+        lastRebalanceAt = uint64(block.timestamp);
+        autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
         return;
     }
 
     uint16 thresholdBps = inventoryConfig.recenterThresholdPct;
+    if (thresholdBps == 0) return;
+
     uint256 priceChange = FixedPointMath.absDiff(currentPrice, previousPrice);
-    if (FixedPointMath.toBps(priceChange, previousPrice) < thresholdBps) {
+    uint256 deviationBps = FixedPointMath.toBps(priceChange, previousPrice);
+
+    if (deviationBps < thresholdBps) {
+        if (autoRecenterHealthyFrames < AUTO_RECENTER_HEALTHY_REQUIRED) {
+            unchecked {
+                autoRecenterHealthyFrames += 1;
+            }
+        }
         return;
     }
 
-    _performRebalance(currentPrice, thresholdBps);
+    if (!_cooldownElapsed()) return;
+    if (autoRecenterHealthyFrames < AUTO_RECENTER_HEALTHY_REQUIRED) return;
+
+    if (_performRebalance(currentPrice, thresholdBps)) {
+        autoRecenterHealthyFrames = 0;
+    }
 }
 
 function _performRebalance(uint256 currentPrice, uint16 thresholdBps) internal returns (bool updated) {
@@ -175,6 +191,7 @@ function _performRebalance(uint256 currentPrice, uint16 thresholdBps) internal r
     uint128 oldTarget = invCfg.targetBaseXstar;
     invCfg.targetBaseXstar = newTarget;
     lastRebalancePrice = currentPrice;
+    lastRebalanceAt = uint64(block.timestamp);
 
     emit TargetBaseXstarUpdated(oldTarget, newTarget, currentPrice, uint64(block.timestamp));
     return true;
@@ -188,6 +205,7 @@ function _performRebalance(uint256 currentPrice, uint16 thresholdBps) internal r
 2. **Shared logic**: `_performRebalance` used by both automatic and manual rebalancing
 3. **Double-check validation**: Even after threshold check, validates deviation before writing
 4. **Gas optimization**: Early returns avoid expensive calculations when not needed
+5. **Hysteresis guard**: `autoRecenterHealthyFrames` enforces three consecutive healthy frames (< threshold) before the next auto commit, preventing thrash when price hovers around the boundary.
 
 ---
 
@@ -204,6 +222,7 @@ function rebalanceTarget() external {
     if (previousPrice == 0) {
         lastRebalancePrice = currentPrice;
         lastRebalanceAt = uint64(block.timestamp);
+        autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
         return;
     }
 
@@ -215,6 +234,7 @@ function rebalanceTarget() external {
     bool updated = _performRebalance(currentPrice, thresholdBps);
     if (!updated) revert Errors.RecenterThreshold();
 
+    autoRecenterHealthyFrames = 0;
     emit ManualRebalanceExecuted(msg.sender, currentPrice, uint64(block.timestamp));
 }
 ```

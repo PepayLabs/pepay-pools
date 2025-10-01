@@ -34,8 +34,10 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-01: Refreshed `REBALANCING_IMPLEMENTATION.md` for auto-recenter flag gating + hysteresis, and `TESTING.md` for the new `DnmPool_Rebalance` suite + CI guidance.
 - 2025-10-01: Documented size-aware fee curve (gamma lin/quad coefficients, S0 normalisation, cap) in `ARCHITECTURE.md`.
 - 2025-10-01: Documented soft divergence haircut bands (accept/soft/hard), new events, and hysteresis behaviour across `ARCHITECTURE.md` and `DIVERGENCE_POLICY.md`.
-- 2025-10-01: Updated `CONFIG.md` to cover zero-default feature flags and the new `features` JSON block aligning with DNMM L3 gating plan.
+- 2025-10-01: Documented BBO-aware floor uplift (F05) in `ARCHITECTURE.md`, including the alpha/beta parameters and enforcement ordering.
+- 2025-10-01: Updated `CONFIG.md` to capture zero-default `featureFlags`, inventory tilt/BBO floor/AOMQ knobs, rebates allowlist, and governance timelock scaffolding in `parameters_default.json`.
 - 2025-09-28: Added divergence guard reference (`docs/DIVERGENCE_POLICY.md`) and floor-invariant explainer (`docs/INVENTORY_FLOOR.md`).
 - 2024-07-12: Documented confidence blending weights, EWMA sigma, and the `ConfidenceDebug` telemetry stream.

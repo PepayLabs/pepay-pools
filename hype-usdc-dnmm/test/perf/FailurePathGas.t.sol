@@ -119,7 +119,7 @@ contract FailurePathGasTest is BaseTest {
         DnmPool.InventoryConfig memory invCfg = defaultInventoryConfig();
         DnmPool.OracleConfig memory oracleCfg = defaultOracleConfig();
         DnmPool.MakerConfig memory makerCfg = defaultMakerConfig();
-        redeployPool(invCfg, oracleCfg, defaultFeeConfig(), makerCfg);
+        redeployPool(invCfg, oracleCfg, defaultFeeConfig(), makerCfg, defaultAomqConfig());
         seedPOL(
             DeployConfig({
                 baseLiquidity: 100_000 ether,

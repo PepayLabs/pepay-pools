@@ -19,13 +19,15 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     uint256 private constant ONE = 1e18;
     uint256 private constant BPS = 10_000;
     uint256 private constant HC_AGE_UNKNOWN = type(uint256).max;
+    uint8 private constant AUTO_RECENTER_HEALTHY_REQUIRED = 3;
 
     enum ParamKind {
         Oracle,
         Fee,
         Inventory,
         Maker,
-        Feature
+        Feature,
+        Aomq
     }
 
     struct TokenConfig {
@@ -46,6 +48,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint128 targetBaseXstar;
         uint16 floorBps;
         uint16 recenterThresholdPct;
+        uint16 invTiltBpsPer1pct;
+        uint16 invTiltMaxBps;
+        uint16 tiltConfWeightBps;
+        uint16 tiltSpreadWeightBps;
     }
 
     struct OracleConfig {
@@ -69,6 +75,14 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     struct MakerConfig {
         uint128 s0Notional;
         uint32 ttlMs;
+        uint16 alphaBboBps;
+        uint16 betaFloorBps;
+    }
+
+    struct AomqConfig {
+        uint128 minQuoteNotional;
+        uint16 emergencySpreadBps;
+        uint16 floorEpsilonBps;
     }
 
     struct FeatureFlags {
@@ -124,6 +138,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     OracleConfig public oracleConfig;
     uint256 private feeConfigPacked;
     MakerConfig public makerConfig;
+    AomqConfig public aomqConfig;
     Guardians public guardians;
 
     IOracleAdapterHC internal immutable ORACLE_HC_;
@@ -145,6 +160,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     FeatureFlags public featureFlags;
     ConfidenceState private confidenceState;
     SoftDivergenceState private softDivergenceState;
+    uint8 private autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
 
     bytes32 private constant REASON_NONE = bytes32(0);
     bytes32 private constant REASON_FLOOR = bytes32("FLOOR");
@@ -215,14 +231,23 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         OracleConfig memory oracleConfig_,
         FeePolicy.FeeConfig memory feeConfig_,
         MakerConfig memory makerConfig_,
+        AomqConfig memory aomqConfig_,
         FeatureFlags memory featureFlags_,
         Guardians memory guardians_
     ) {
         if (baseToken_ == address(0) || quoteToken_ == address(0)) revert Errors.TokensZero();
         if (guardians_.governance == address(0)) revert Errors.GovernanceZero();
         if (inventoryConfig_.floorBps > 5000) revert Errors.InvalidConfig();
+        if (inventoryConfig_.invTiltBpsPer1pct > BPS) revert Errors.InvalidConfig();
+        if (inventoryConfig_.invTiltMaxBps > BPS) revert Errors.InvalidConfig();
+        if (inventoryConfig_.tiltConfWeightBps > BPS) revert Errors.InvalidConfig();
+        if (inventoryConfig_.tiltSpreadWeightBps > BPS) revert Errors.InvalidConfig();
         if (feeConfig_.capBps < feeConfig_.baseBps) revert Errors.InvalidConfig();
         if (oracleConfig_.confCapBpsStrict > oracleConfig_.confCapBpsSpot) revert Errors.InvalidConfig();
+        if (makerConfig_.alphaBboBps > BPS) revert Errors.InvalidConfig();
+        if (makerConfig_.betaFloorBps > BPS) revert Errors.InvalidConfig();
+        if (aomqConfig_.emergencySpreadBps > BPS) revert Errors.InvalidConfig();
+        if (aomqConfig_.floorEpsilonBps > BPS) revert Errors.InvalidConfig();
         if (oracleConfig_.sigmaEwmaLambdaBps > BPS) revert Errors.InvalidConfig();
         if (oracleConfig_.divergenceSoftBps != 0 && oracleConfig_.divergenceSoftBps < oracleConfig_.divergenceAcceptBps) {
             revert Errors.InvalidConfig();
@@ -262,6 +287,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         oracleConfig = oracleConfig_;
         feeConfigPacked = FeePolicy.pack(feeConfig_);
         makerConfig = makerConfig_;
+        aomqConfig = aomqConfig_;
         featureFlags = featureFlags_;
         guardians = guardians_;
     }
@@ -483,18 +509,34 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             InventoryConfig memory oldCfg = inventoryConfig;
             InventoryConfig memory newCfg = abi.decode(data, (InventoryConfig));
             if (newCfg.floorBps > 5000) revert Errors.InvalidConfig();
+            if (newCfg.invTiltBpsPer1pct > BPS) revert Errors.InvalidConfig();
+            if (newCfg.invTiltMaxBps > BPS) revert Errors.InvalidConfig();
+            if (newCfg.tiltConfWeightBps > BPS) revert Errors.InvalidConfig();
+            if (newCfg.tiltSpreadWeightBps > BPS) revert Errors.InvalidConfig();
             inventoryConfig = newCfg;
             emit ParamsUpdated("INVENTORY", abi.encode(oldCfg), data);
         } else if (kind == ParamKind.Maker) {
             MakerConfig memory oldCfg = makerConfig;
             MakerConfig memory newCfg = abi.decode(data, (MakerConfig));
+            if (newCfg.alphaBboBps > BPS) revert Errors.InvalidConfig();
+            if (newCfg.betaFloorBps > BPS) revert Errors.InvalidConfig();
             makerConfig = newCfg;
             emit ParamsUpdated("MAKER", abi.encode(oldCfg), data);
         } else if (kind == ParamKind.Feature) {
             FeatureFlags memory oldFlags = featureFlags;
             FeatureFlags memory newFlags = abi.decode(data, (FeatureFlags));
             featureFlags = newFlags;
+            if (!oldFlags.enableAutoRecenter && newFlags.enableAutoRecenter) {
+                autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
+            }
             emit ParamsUpdated("FEATURE", abi.encode(oldFlags), data);
+        } else if (kind == ParamKind.Aomq) {
+            AomqConfig memory oldCfg = aomqConfig;
+            AomqConfig memory newCfg = abi.decode(data, (AomqConfig));
+            if (newCfg.emergencySpreadBps > BPS) revert Errors.InvalidConfig();
+            if (newCfg.floorEpsilonBps > BPS) revert Errors.InvalidConfig();
+            aomqConfig = newCfg;
+            emit ParamsUpdated("AOMQ", abi.encode(oldCfg), data);
         } else {
             revert Errors.InvalidParamKind();
         }
@@ -536,6 +578,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         if (previousPrice == 0) {
             lastRebalancePrice = currentPrice;
             lastRebalanceAt = uint64(block.timestamp);
+            autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
             return;
         }
 
@@ -546,6 +589,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
         bool updated = _performRebalance(currentPrice, thresholdBps);
         if (!updated) revert Errors.RecenterThreshold();
+
+        autoRecenterHealthyFrames = 0;
 
         emit ManualRebalanceExecuted(msg.sender, currentPrice, uint64(block.timestamp));
     }
@@ -627,6 +672,16 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             }
         }
 
+        if (flags.enableBboFloor) {
+            uint16 floorBps = _computeBboFloor(outcome.spreadBps, makerCfg);
+            if (floorBps > feeCfg.capBps) {
+                floorBps = feeCfg.capBps;
+            }
+            if (feeBps < floorBps) {
+                feeBps = floorBps;
+            }
+        }
+
         if (flags.debugEmit) {
             uint256 feeBaseComponent = feeCfg.baseBps;
             uint256 feeVolComponent = feeCfg.alphaConfDenominator == 0
@@ -665,7 +720,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             reason: reason != REASON_NONE ? reason : outcome.reason
         });
 
-        if (shouldSettleFee) {
+        if (shouldSettleFee && flags.enableAutoRecenter) {
             _checkAndRebalanceAuto(outcome.mid);
         }
     }
@@ -741,24 +796,53 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         return uint16(sizeFee);
     }
 
+    function _computeBboFloor(uint256 spreadBps, MakerConfig memory makerCfg) internal pure returns (uint16) {
+        uint16 betaFloor = makerCfg.betaFloorBps;
+        uint16 alphaFloor = 0;
+
+        if (makerCfg.alphaBboBps > 0 && spreadBps > 0) {
+            uint256 scaled = FixedPointMath.mulDivDown(spreadBps, makerCfg.alphaBboBps, BPS);
+            if (scaled > type(uint16).max) {
+                alphaFloor = type(uint16).max;
+            } else {
+                alphaFloor = uint16(scaled);
+            }
+        }
+
+        return alphaFloor > betaFloor ? alphaFloor : betaFloor;
+    }
+
     function _checkAndRebalanceAuto(uint256 currentPrice) internal {
         if (currentPrice == 0) return;
 
         uint256 previousPrice = lastRebalancePrice;
         if (previousPrice == 0) {
             lastRebalancePrice = currentPrice;
+            autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
+            return;
+        }
+
+        uint16 thresholdBps = inventoryConfig.recenterThresholdPct;
+        if (thresholdBps == 0) return;
+
+        uint256 priceChange = FixedPointMath.absDiff(currentPrice, previousPrice);
+        uint256 deviationBps = FixedPointMath.toBps(priceChange, previousPrice);
+
+        if (deviationBps < thresholdBps) {
+            if (autoRecenterHealthyFrames < AUTO_RECENTER_HEALTHY_REQUIRED) {
+                unchecked {
+                    autoRecenterHealthyFrames += 1;
+                }
+            }
             return;
         }
 
         if (!_cooldownElapsed()) return;
+        if (autoRecenterHealthyFrames < AUTO_RECENTER_HEALTHY_REQUIRED) return;
 
-        uint16 thresholdBps = inventoryConfig.recenterThresholdPct;
-        uint256 priceChange = FixedPointMath.absDiff(currentPrice, previousPrice);
-        if (FixedPointMath.toBps(priceChange, previousPrice) < thresholdBps) {
-            return;
+        if (_performRebalance(currentPrice, thresholdBps)) {
+            autoRecenterHealthyFrames = 0;
         }
-
-        _performRebalance(currentPrice, thresholdBps);
     }
 
     function _performRebalance(uint256 currentPrice, uint16 thresholdBps) internal returns (bool updated) {

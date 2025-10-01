@@ -50,7 +50,13 @@ abstract contract BaseTest is MathAsserts {
 
         _setOracleDefaults();
 
-        pool = _deployPool(defaultInventoryConfig(), defaultOracleConfig(), defaultFeeConfig(), defaultMakerConfig());
+        pool = _deployPool(
+            defaultInventoryConfig(),
+            defaultOracleConfig(),
+            defaultFeeConfig(),
+            defaultMakerConfig(),
+            defaultAomqConfig()
+        );
         vm.prank(gov);
         pool.setRecenterCooldownSec(0);
         seedPOL(
@@ -78,7 +84,8 @@ abstract contract BaseTest is MathAsserts {
         DnmPool.InventoryConfig memory inventoryCfg,
         DnmPool.OracleConfig memory oracleCfg,
         FeePolicy.FeeConfig memory feeCfg,
-        DnmPool.MakerConfig memory makerCfg
+        DnmPool.MakerConfig memory makerCfg,
+        DnmPool.AomqConfig memory aomqCfg
     ) internal returns (DnmPool) {
         DnmPool.Guardians memory guardians = DnmPool.Guardians({governance: gov, pauser: pauser});
         DnmPool newPool = new DnmPool(
@@ -92,6 +99,7 @@ abstract contract BaseTest is MathAsserts {
             oracleCfg,
             feeCfg,
             makerCfg,
+            aomqCfg,
             defaultFeatureFlags(),
             guardians
         );
@@ -102,13 +110,22 @@ abstract contract BaseTest is MathAsserts {
         DnmPool.InventoryConfig memory inventoryCfg,
         DnmPool.OracleConfig memory oracleCfg,
         FeePolicy.FeeConfig memory feeCfg,
-        DnmPool.MakerConfig memory makerCfg
+        DnmPool.MakerConfig memory makerCfg,
+        DnmPool.AomqConfig memory aomqCfg
     ) internal {
-        pool = _deployPool(inventoryCfg, oracleCfg, feeCfg, makerCfg);
+        pool = _deployPool(inventoryCfg, oracleCfg, feeCfg, makerCfg, aomqCfg);
     }
 
     function defaultInventoryConfig() internal pure returns (DnmPool.InventoryConfig memory) {
-        return DnmPool.InventoryConfig({targetBaseXstar: 50_000 ether, floorBps: 300, recenterThresholdPct: 750});
+        return DnmPool.InventoryConfig({
+            targetBaseXstar: 50_000 ether,
+            floorBps: 300,
+            recenterThresholdPct: 750,
+            invTiltBpsPer1pct: 0,
+            invTiltMaxBps: 0,
+            tiltConfWeightBps: 0,
+            tiltSpreadWeightBps: 0
+        });
     }
 
     function defaultOracleConfig() internal pure returns (DnmPool.OracleConfig memory) {
@@ -182,7 +199,16 @@ abstract contract BaseTest is MathAsserts {
     }
 
     function defaultMakerConfig() internal pure returns (DnmPool.MakerConfig memory) {
-        return DnmPool.MakerConfig({s0Notional: 5_000 ether, ttlMs: 300});
+        return DnmPool.MakerConfig({
+            s0Notional: 5_000 ether,
+            ttlMs: 300,
+            alphaBboBps: 0,
+            betaFloorBps: 0
+        });
+    }
+
+    function defaultAomqConfig() internal pure returns (DnmPool.AomqConfig memory) {
+        return DnmPool.AomqConfig({minQuoteNotional: 0, emergencySpreadBps: 0, floorEpsilonBps: 0});
     }
 
     function defaultFeatureFlags() internal pure returns (DnmPool.FeatureFlags memory) {
@@ -251,7 +277,11 @@ abstract contract BaseTest is MathAsserts {
                 DnmPool.InventoryConfig({
                     targetBaseXstar: uint128(cfg.baseLiquidity),
                     floorBps: cfg.floorBps,
-                    recenterThresholdPct: cfg.recenterPct
+                    recenterThresholdPct: cfg.recenterPct,
+                    invTiltBpsPer1pct: 0,
+                    invTiltMaxBps: 0,
+                    tiltConfWeightBps: 0,
+                    tiltSpreadWeightBps: 0
                 })
             )
         );

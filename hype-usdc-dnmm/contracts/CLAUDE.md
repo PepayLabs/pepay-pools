@@ -34,6 +34,9 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-01: Added BBO-aware fee floor enforcement (F05) behind `enableBboFloor`, clamping swap/preview fees to `max(betaFloorBps, alphaBboBps * spread)` while respecting the global cap.
+- 2025-10-01: Extended configuration structs (inventory tilt weights, maker BBO floor coefficients, `AomqConfig`), introduced `ParamKind.Aomq` with bounds checks, and surfaced `aomqConfig` getter to unblock F05–F07 plumbing.
+- 2025-10-01: Gated auto recentering behind `enableAutoRecenter`, introduced the `autoRecenterHealthyFrames` hysteresis counter (3 healthy frames) with cooldown integration, and reset streaks on governance/manual commits.
 - 2025-10-01: Added size-aware fee surcharge gated by `enableSizeFee` (gamma linear/quadratic coefficients, cap, notional normalization) with preview/swap parity handling and tests.
 - 2025-10-01: Added soft divergence haircut state machine (`divergenceAccept/Soft/Hard`, `haircutMin/slope`, events, hysteresis) gated behind `enableSoftDivergence`; updated fee plumbing and tests.
 - 2025-10-01: Expanded `FeatureFlags` to include zero-default toggles for upcoming F03–F09/F12 upgrades, defaulting all flags to `false` and adding governance tests for explicit enablement.

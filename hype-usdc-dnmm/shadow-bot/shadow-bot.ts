@@ -46,6 +46,10 @@ interface InventoryConfig {
   floorBps: number;
   targetBaseXstar: bigint;
   recenterThresholdPct: number;
+  invTiltBpsPer1pct: number;
+  invTiltMaxBps: number;
+  tiltConfWeightBps: number;
+  tiltSpreadWeightBps: number;
 }
 
 interface FeeConfig {
@@ -183,7 +187,7 @@ const PYTH_ABI = [
 
 const DNMM_ABI = [
   'function oracleConfig() external view returns (uint32 maxAgeSec, uint32 stallWindowSec, uint16 confCapBpsSpot, uint16 confCapBpsStrict, uint16 divergenceBps, bool allowEmaFallback, uint16 confWeightSpreadBps, uint16 confWeightSigmaBps, uint16 confWeightPythBps, uint16 sigmaEwmaLambdaBps, uint16 divergenceAcceptBps, uint16 divergenceSoftBps, uint16 divergenceHardBps, uint16 haircutMinBps, uint16 haircutSlopeBps)',
-  'function inventoryConfig() external view returns (uint16 floorBps, uint128 targetBaseXstar, uint16 recenterThresholdPct)',
+  'function inventoryConfig() external view returns (uint128 targetBaseXstar, uint16 floorBps, uint16 recenterThresholdPct, uint16 invTiltBpsPer1pct, uint16 invTiltMaxBps, uint16 tiltConfWeightBps, uint16 tiltSpreadWeightBps)',
   'function feeConfig() external view returns (uint16 baseBps, uint16 alphaNumerator, uint16 alphaDenominator, uint16 betaInvDevNumerator, uint16 betaInvDevDenominator, uint16 capBps, uint16 decayRate, uint16 gammaSizeLinBps, uint16 gammaSizeQuadBps, uint16 sizeFeeCapBps)',
   'function reserves() external view returns (uint256 baseReserves, uint256 quoteReserves)',
   'function lastMid() external view returns (uint256)',
@@ -236,7 +240,11 @@ const state = {
   inventoryConfig: {
     floorBps: INVENTORY_FLOOR_BPS,
     targetBaseXstar: INVENTORY_TARGET_BASE,
-    recenterThresholdPct: INVENTORY_RECENTER_PCT
+    recenterThresholdPct: INVENTORY_RECENTER_PCT,
+    invTiltBpsPer1pct: 0,
+    invTiltMaxBps: 0,
+    tiltConfWeightBps: 0,
+    tiltSpreadWeightBps: 0
   } as InventoryConfig,
 
   feeConfig: {
@@ -763,10 +771,14 @@ http.createServer(async (_req, res) => {
         inventory: {
           floorBps: state.inventoryConfig.floorBps,
           targetBaseXstar: formatUnits(state.inventoryConfig.targetBaseXstar, 18),
-          recenterThresholdPct: state.inventoryConfig.recenterThresholdPct
+          recenterThresholdPct: state.inventoryConfig.recenterThresholdPct,
+          invTiltBpsPer1pct: state.inventoryConfig.invTiltBpsPer1pct,
+          invTiltMaxBps: state.inventoryConfig.invTiltMaxBps,
+          tiltConfWeightBps: state.inventoryConfig.tiltConfWeightBps,
+          tiltSpreadWeightBps: state.inventoryConfig.tiltSpreadWeightBps
         },
         fee: state.feeConfig,
-        features: featureFlags
+        featureFlags
       }
     };
     res.setHeader('Content-Type', 'application/json');
@@ -876,9 +888,13 @@ async function loadDNMMConfig() {
     // Load inventory config
     const invCfg = await dnmm.inventoryConfig();
     state.inventoryConfig = {
-      floorBps: Number(invCfg[0]),
-      targetBaseXstar: getBigInt(invCfg[1]),
-      recenterThresholdPct: Number(invCfg[2])
+      targetBaseXstar: getBigInt(invCfg[0]),
+      floorBps: Number(invCfg[1]),
+      recenterThresholdPct: Number(invCfg[2]),
+      invTiltBpsPer1pct: Number(invCfg[3]),
+      invTiltMaxBps: Number(invCfg[4]),
+      tiltConfWeightBps: Number(invCfg[5]),
+      tiltSpreadWeightBps: Number(invCfg[6])
     };
 
     // Load fee config

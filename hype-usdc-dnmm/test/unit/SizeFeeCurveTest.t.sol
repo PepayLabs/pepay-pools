@@ -33,7 +33,7 @@ contract SizeFeeCurveTest is BaseTest {
     }
 
     function test_sizeFeeMonotonicInTradeSize() public {
-        (uint128 s0Notional,) = pool.makerConfig();
+        (uint128 s0Notional,,,) = pool.makerConfig();
         uint256 s0 = uint256(s0Notional);
 
         uint256[] memory tradeSizes = new uint256[](3);
@@ -65,7 +65,7 @@ contract SizeFeeCurveTest is BaseTest {
         vm.prank(gov);
         pool.updateParams(DnmPool.ParamKind.Fee, abi.encode(feeCfg));
 
-        (uint128 s0Notional,) = pool.makerConfig();
+        (uint128 s0Notional,,,) = pool.makerConfig();
         uint256 snap = vm.snapshotState();
         uint16 feeBps = _quoteFee(uint256(s0Notional) * 5);
         vm.revertToState(snap);
@@ -75,7 +75,7 @@ contract SizeFeeCurveTest is BaseTest {
     }
 
     function test_previewMatchesSwapAfterSizeFee() public {
-        (uint128 s0Notional,) = pool.makerConfig();
+        (uint128 s0Notional,,,) = pool.makerConfig();
         uint256 amount = (uint256(s0Notional) * 3) / 2; // 1.5x S0
 
         uint256 snap = vm.snapshotState();

@@ -19,7 +19,7 @@ contract ScenarioFloorPartialFillTest is BaseTest {
         FeePolicy.FeeConfig memory feeCfg = defaultFeeConfig();
         DnmPool.MakerConfig memory makerCfg = defaultMakerConfig();
 
-        redeployPool(invCfg, oracleCfg, feeCfg, makerCfg);
+        redeployPool(invCfg, oracleCfg, feeCfg, makerCfg, defaultAomqConfig());
         seedPOL(
             DeployConfig({
                 baseLiquidity: 1_000 ether,
@@ -40,7 +40,7 @@ contract ScenarioFloorPartialFillTest is BaseTest {
         deal(address(hype), alice, 200_000 ether);
         approveAll(alice);
 
-        (, uint16 floorBps,) = pool.inventoryConfig();
+        (, uint16 floorBps,,,,,) = pool.inventoryConfig();
         (, uint128 quoteBefore) = pool.reserves();
         uint256 expectedQuoteFloor = Inventory.floorAmount(uint256(quoteBefore), floorBps);
 
@@ -61,7 +61,7 @@ contract ScenarioFloorPartialFillTest is BaseTest {
         approveAll(bob);
 
         (uint128 baseBefore,) = pool.reserves();
-        (, uint16 floorBps,) = pool.inventoryConfig();
+        (, uint16 floorBps,,,,,) = pool.inventoryConfig();
         uint256 expectedBaseFloor = Inventory.floorAmount(uint256(baseBefore), floorBps);
 
         recordLogs();

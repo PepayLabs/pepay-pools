@@ -29,7 +29,7 @@ contract ScenarioRepriceUpDownTest is BaseTest {
 
     function _rebalanceInventory(address quoteActor, address baseActor) internal {
         (uint128 baseRes,) = pool.reserves();
-        (uint128 targetBase,,) = pool.inventoryConfig();
+        (uint128 targetBase,,,,,,) = pool.inventoryConfig();
         (,,,, uint256 baseScale, uint256 quoteScale) = pool.tokenConfig();
         uint256 minBaseTrade = baseScale;
         uint256 minQuoteTrade = quoteScale;

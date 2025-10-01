@@ -24,7 +24,7 @@ contract ScenarioRecenterThresholdTest is BaseTest {
         vm.prank(alice);
         pool.swapExactIn(100 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
 
-        (uint128 targetBase,, uint16 recenterPct) = pool.inventoryConfig();
+        (uint128 targetBase,, uint16 recenterPct,,,,) = pool.inventoryConfig();
         uint128 delta = (targetBase * (recenterPct + 500)) / 10_000; // push beyond threshold
         uint128 newTarget = targetBase + delta;
 

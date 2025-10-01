@@ -33,8 +33,15 @@ contract DivergencePolicyTest is Test {
         oracleHc = new MockOracleHC();
         oraclePyth = new MockOraclePyth();
 
-        inventoryCfg =
-            DnmPool.InventoryConfig({targetBaseXstar: 50_000 ether, floorBps: 300, recenterThresholdPct: 750});
+        inventoryCfg = DnmPool.InventoryConfig({
+            targetBaseXstar: 50_000 ether,
+            floorBps: 300,
+            recenterThresholdPct: 750,
+            invTiltBpsPer1pct: 0,
+            invTiltMaxBps: 0,
+            tiltConfWeightBps: 0,
+            tiltSpreadWeightBps: 0
+        });
         oracleCfg = DnmPool.OracleConfig({
             maxAgeSec: 60,
             stallWindowSec: 15,
@@ -64,7 +71,14 @@ contract DivergencePolicyTest is Test {
             gammaSizeQuadBps: 0,
             sizeFeeCapBps: 0
         });
-        DnmPool.MakerConfig memory makerCfg = DnmPool.MakerConfig({s0Notional: 5_000 ether, ttlMs: 300});
+        DnmPool.MakerConfig memory makerCfg = DnmPool.MakerConfig({
+            s0Notional: 5_000 ether,
+            ttlMs: 300,
+            alphaBboBps: 0,
+            betaFloorBps: 0
+        });
+        DnmPool.AomqConfig memory aomqCfg =
+            DnmPool.AomqConfig({minQuoteNotional: 0, emergencySpreadBps: 0, floorEpsilonBps: 0});
         DnmPool.FeatureFlags memory flags = DnmPool.FeatureFlags({
             blendOn: true,
             parityCiOn: true,
@@ -89,6 +103,7 @@ contract DivergencePolicyTest is Test {
             oracleCfg,
             feeCfg,
             makerCfg,
+            aomqCfg,
             flags,
             DnmPool.Guardians({governance: GOV, pauser: PAUSER})
         );

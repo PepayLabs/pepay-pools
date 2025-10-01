@@ -1,6 +1,6 @@
 # Automated Inventory Target Rebalancing - Implementation Spec
 
-**Status**: Implemented (2025-09-30)
+**Status**: Implemented (2025-10-01)
 **Lifinity Parity**: 100% (Matches Lifinity V2 dual rebalancing system)
 **Gas Impact**: +2k average (+0.9% per swap)
 
@@ -72,9 +72,9 @@ Layer 2: Manual Rebalancing (Separate Function)
 
 ## Code Changes Required
 
-### Implementation Summary (2025-09-30)
+### Implementation Summary (2025-10-01)
 
-- ✅ `contracts/DnmPool.sol`: introduced `lastRebalancePrice`, automatic `_checkAndRebalanceAuto`, shared `_performRebalance`, permissionless `rebalanceTarget`, and `ManualRebalanceExecuted` telemetry.
+- ✅ `contracts/DnmPool.sol`: introduced `lastRebalancePrice`, automatic `_checkAndRebalanceAuto`, shared `_performRebalance`, permissionless `rebalanceTarget`, governance-side `_getFreshSpotPrice`, and `ManualRebalanceExecuted` telemetry.
 - ✅ `contracts/interfaces/IDnmPool.sol`: surfaced the new `rebalanceTarget()` entrypoint for keepers and tests.
 - ✅ `test/unit/DnmPool_Rebalance.t.sol`: added regression coverage for automatic triggers, manual fallback, threshold guards, and revert paths.
 - ✅ Updated docs/runbooks (this file, `docs/ARCHITECTURE.md`, `RUNBOOK.md`) to describe the dual-layer system post implementation.
@@ -197,15 +197,7 @@ function _performRebalance(uint256 currentPrice, uint16 thresholdBps) internal r
 
 ```solidity
 function rebalanceTarget() external {
-    IOracleAdapterHC.MidResult memory midRes = ORACLE_HC_.readMidAndAge();
-    OracleConfig memory oracleCfg = oracleConfig;
-
-    bool ageKnown = midRes.ageSec != HC_AGE_UNKNOWN;
-    if (!(midRes.success && ageKnown && midRes.ageSec <= oracleCfg.maxAgeSec && midRes.mid > 0)) {
-        revert Errors.OracleStale();
-    }
-
-    uint256 currentPrice = midRes.mid;
+    uint256 currentPrice = _getFreshSpotPrice();
     uint256 previousPrice = lastRebalancePrice;
     if (previousPrice == 0) {
         lastRebalancePrice = currentPrice;
@@ -229,11 +221,34 @@ function rebalanceTarget() external {
 - Threshold validation prevents spam
 - Caller pays gas (no protocol cost)
 - Lifinity uses this model successfully
-- Reads the HyperCore spot oracle directly, so keepers do not need a priming swap/quote during quiet periods
+- Always reads a fresh HyperCore spot mid via `_getFreshSpotPrice`, so keepers do not need a priming swap/quote during quiet periods
 
 ---
 
-### 5. Add Event
+### 5. Introduce `_getFreshSpotPrice`
+
+**Location**: `contracts/DnmPool.sol` helper section
+
+```solidity
+function _getFreshSpotPrice() internal view returns (uint256 mid) {
+    IOracleAdapterHC.MidResult memory midRes = ORACLE_HC_.readMidAndAge();
+    OracleConfig memory oracleCfg = oracleConfig;
+
+    bool ageKnown = midRes.ageSec != HC_AGE_UNKNOWN;
+    if (!(midRes.success && ageKnown && midRes.ageSec <= oracleCfg.maxAgeSec && midRes.mid > 0)) {
+        revert Errors.OracleStale();
+    }
+
+    return midRes.mid;
+}
+```
+
+**Purpose**
+- Centralises oracle freshness checks for auto/ manual/ governance entrypoints.
+- Provides a single revert surface (`Errors.OracleStale`) for stale data, simplifying audits.
+- Lets governance overrides share the same validation path as keeper-triggered updates.
+
+### 6. Add Event
 
 **Location**: After line 144 (after `TargetBaseXstarUpdated` event)
 
@@ -243,7 +258,7 @@ event ManualRebalanceExecuted(address indexed caller, uint256 price, uint64 time
 
 ---
 
-### 6. Update Error Library
+### 7. Update Error Library
 
 **Location**: `contracts/lib/Errors.sol` (if needed)
 
@@ -334,6 +349,8 @@ Scenario B: Price moves, low trading
 ---
 
 ## Implementation Steps
+
+*Status:* All checklist items below were executed and verified on 2025-10-01. They are retained for operational traceability.
 
 ### Phase 1: Contract Changes (Week 5)
 

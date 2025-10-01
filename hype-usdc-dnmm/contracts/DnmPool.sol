@@ -421,16 +421,21 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     }
 
     function setTargetBaseXstar(uint128 newTarget) external onlyGovernance {
-        if (lastMid == 0) revert Errors.MidUnset();
+        uint256 freshMid = _getFreshSpotPrice();
+
+        InventoryConfig storage invCfg = inventoryConfig;
+        uint128 oldTarget = invCfg.targetBaseXstar;
+        uint256 baseline = oldTarget == 0 ? 1 : oldTarget;
         uint256 deviationBps = FixedPointMath.toBps(
-            FixedPointMath.absDiff(uint256(newTarget), uint256(inventoryConfig.targetBaseXstar)),
-            inventoryConfig.targetBaseXstar == 0 ? 1 : inventoryConfig.targetBaseXstar
+            FixedPointMath.absDiff(uint256(newTarget), uint256(oldTarget)),
+            baseline
         );
-        if (deviationBps < inventoryConfig.recenterThresholdPct) revert Errors.RecenterThreshold();
-        uint128 oldTarget = inventoryConfig.targetBaseXstar;
-        inventoryConfig.targetBaseXstar = newTarget;
-        lastRebalancePrice = lastMid;
-        emit TargetBaseXstarUpdated(oldTarget, newTarget, lastMid, uint64(block.timestamp));
+        if (deviationBps < invCfg.recenterThresholdPct) revert Errors.RecenterThreshold();
+
+        invCfg.targetBaseXstar = newTarget;
+        lastRebalancePrice = freshMid;
+
+        emit TargetBaseXstarUpdated(oldTarget, newTarget, freshMid, uint64(block.timestamp));
     }
 
     /**
@@ -438,15 +443,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
      * Reverts when price drift since the last rebalance does not exceed `recenterThresholdPct`.
      */
     function rebalanceTarget() external {
-        IOracleAdapterHC.MidResult memory midRes = ORACLE_HC_.readMidAndAge();
-        OracleConfig memory oracleCfg = oracleConfig;
-
-        bool ageKnown = midRes.ageSec != HC_AGE_UNKNOWN;
-        if (!(midRes.success && ageKnown && midRes.ageSec <= oracleCfg.maxAgeSec && midRes.mid > 0)) {
-            revert Errors.OracleStale();
-        }
-
-        uint256 currentPrice = midRes.mid;
+        uint256 currentPrice = _getFreshSpotPrice();
         uint256 previousPrice = lastRebalancePrice;
         if (previousPrice == 0) {
             lastRebalancePrice = currentPrice;
@@ -646,6 +643,18 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     function _inventoryTokens() internal view returns (Inventory.Tokens memory invTokens) {
         invTokens.baseScale = BASE_SCALE_;
         invTokens.quoteScale = QUOTE_SCALE_;
+    }
+
+    function _getFreshSpotPrice() internal view returns (uint256 mid) {
+        IOracleAdapterHC.MidResult memory midRes = ORACLE_HC_.readMidAndAge();
+        OracleConfig memory oracleCfg = oracleConfig;
+
+        bool ageKnown = midRes.ageSec != HC_AGE_UNKNOWN;
+        if (!(midRes.success && ageKnown && midRes.ageSec <= oracleCfg.maxAgeSec && midRes.mid > 0)) {
+            revert Errors.OracleStale();
+        }
+
+        return midRes.mid;
     }
 
     function _readOracle(OracleMode mode, bytes calldata oracleData, FeatureFlags memory flags, OracleConfig memory cfg)

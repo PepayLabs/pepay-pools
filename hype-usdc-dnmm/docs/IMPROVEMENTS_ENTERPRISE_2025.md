@@ -5,7 +5,7 @@
 *Current Implementation: Lifinity v2 Port with HyperCore/Pyth Oracles*
 *Target: Institutional-Grade Market Making with Protocol-Owned Liquidity*
 
-> **Implementation Update (2025-09-30):** Automated and manual target rebalancing have shipped; see `docs/REBALANCING_IMPLEMENTATION.md` for the final Solidity snapshots.
+> **Implementation Update (2025-10-01):** Automated and manual target rebalancing have shipped; see `docs/REBALANCING_IMPLEMENTATION.md` for the final Solidity snapshots.
 
 ---
 

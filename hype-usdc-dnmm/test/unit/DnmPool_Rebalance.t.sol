@@ -86,6 +86,19 @@ contract DnmPoolRebalanceTest is BaseTest {
         pool.rebalanceTarget();
     }
 
+    function test_manualRebalanceRevertsWhenOracleStale() public {
+        vm.prank(alice);
+        pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+
+        updateSpot(1e18, 61, true); // exceeds default maxAgeSec (60)
+        updateBidAsk(9995e14, 10005e14, 20, true);
+        updateEma(1e18, 0, true);
+
+        vm.prank(bob);
+        vm.expectRevert(Errors.OracleStale.selector);
+        pool.rebalanceTarget();
+    }
+
     function _computeTarget(uint128 baseReserves, uint128 quoteReserves, uint256 mid)
         internal
         view

@@ -34,6 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-01: Extended `ConfigSchemaTest` to assert feature-flag defaults (AOMQ/Rebates/AutoRecenter), governance timelock scaffolding, and executor discount accessors to gate upcoming F07–F12 work.
 - 2025-10-01: Added `BboFloorTest` covering spread-tracking floor, fallback absolute floor, and cap interaction.
 - 2025-10-01: Added `InventoryTiltTest` ensuring restorative trades receive discounts/surcharges per F06 weighting and matching the analytical tilt formula.
 - 2025-10-01: Added `ConfigSchemaTest` validating inventory tilt, maker BBO floor, and AOMQ config defaults plus governance bounds on new parameters.

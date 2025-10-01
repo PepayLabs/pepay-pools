@@ -85,6 +85,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint16 floorEpsilonBps;
     }
 
+    struct GovernanceConfig {
+        uint32 timelockDelaySec; // seconds; 0 == immediate
+    }
+
     struct FeatureFlags {
         bool blendOn;
         bool parityCiOn;
@@ -140,6 +144,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     MakerConfig public makerConfig;
     AomqConfig public aomqConfig;
     Guardians public guardians;
+    GovernanceConfig private _governanceConfig;
 
     IOracleAdapterHC internal immutable ORACLE_HC_;
     IOracleAdapterPyth internal immutable ORACLE_PYTH_;
@@ -161,6 +166,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     ConfidenceState private confidenceState;
     SoftDivergenceState private softDivergenceState;
     uint8 private autoRecenterHealthyFrames = AUTO_RECENTER_HEALTHY_REQUIRED;
+
+    mapping(address => uint16) private _aggregatorDiscountBps;
 
     bytes32 private constant REASON_NONE = bytes32(0);
     bytes32 private constant REASON_FLOOR = bytes32("FLOOR");
@@ -290,6 +297,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         aomqConfig = aomqConfig_;
         featureFlags = featureFlags_;
         guardians = guardians_;
+        _governanceConfig = GovernanceConfig({timelockDelaySec: 0});
     }
 
     function oracleAdapterHC() public view returns (IOracleAdapterHC) {
@@ -427,6 +435,14 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     {
         TokenConfig memory cfg = tokenConfig;
         return (cfg.baseToken, cfg.quoteToken, cfg.baseDecimals, cfg.quoteDecimals, cfg.baseScale, cfg.quoteScale);
+    }
+
+    function governanceConfig() external view returns (GovernanceConfig memory) {
+        return _governanceConfig;
+    }
+
+    function aggregatorDiscount(address executor) external view returns (uint16) {
+        return _aggregatorDiscountBps[executor];
     }
 
     function getSoftDivergenceState()

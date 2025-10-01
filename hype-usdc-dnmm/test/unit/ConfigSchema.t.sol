@@ -11,7 +11,7 @@ contract ConfigSchemaTest is BaseTest {
     }
 
     function test_featureFlagsExposeAomqAndRebates() public view {
-        DnmPool.FeatureFlags memory flags = pool.featureFlags();
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
 
         assertEq(flags.enableAOMQ, false, "AOMQ default");
         assertEq(flags.enableRebates, false, "Rebates default");

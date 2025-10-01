@@ -45,7 +45,7 @@
   },
   "maker": {
     "S0Notional": 5000,
-    "ttlMs": 200,
+    "ttlMs": 300,
     "alphaBboBps": 0,
     "betaFloorBps": 0
   },

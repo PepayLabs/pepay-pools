@@ -49,6 +49,12 @@
     "alphaBboBps": 0,
     "betaFloorBps": 0
   },
+  "preview": {
+    "maxAgeSec": 30,
+    "snapshotCooldownSec": 10,
+    "revertOnStalePreview": true,
+    "enablePreviewFresh": false
+  },
   "featureFlags": {
     "blendOn": false,
     "parityCiOn": false,

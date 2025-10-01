@@ -24,3 +24,15 @@
 - Takers must approve `QuoteRFQ` for either HYPE or USDC prior to calling `verifyAndSwap`.
 - `oracleData` should include the same payload used in on-chain swaps (e.g., Pyth price update bundle).
 - For multi-sig key rotation, stage a new key via governance tooling before switching the signer live.
+
+## Pre-trade Previews
+
+Routers can now interrogate the pool's snapshot-backed preview surface before dispatching RFQs:
+
+- `previewFees(uint256[] sizesBaseWad)` returns ask/bid fee ladders (bps) for arbitrary base sizes using the latest snapshot. The call is `view` and gas-light (~1k with a single size) because it replays the same fee pipeline that `swapExactIn` uses.
+- `previewLadder(uint256 s0BaseWad)` is a convenience helper that outputs `[S0, 2S0, 5S0, 10S0]` sizes, clamp flags (AOMQ micro quotes), snapshot timestamp, and the mid used for the computation. If `s0BaseWad == 0` the pool derives S0 from `makerConfig.s0Notional`.
+- Snapshots are updated automatically after every filled swap and may optionally be refreshed off-cycle via `refreshPreviewSnapshot`. Integrators SHOULD monitor `previewSnapshotAge()` and refresh when age > `previewMaxAgeSec`.
+- If `previewConfig.revertOnStalePreview == true` the preview calls revert with `PreviewSnapshotStale(age, maxAge)`. Routers should either trigger a refresh (if allowed) or fall back to `previewFeesFresh` when `enablePreviewFresh` is toggled on.
+- Clamp flags signal that AOMQ is active and the reported fee already includes the micro-quote spread floor. Respecting the clamp avoids takers requesting depth beyond the configured min-notional.
+
+> Tip: for RFQ slicing, run `previewFees` on the intended clip sizes, honour the clamp flags, then bundle the resulting fee ladders into the quote request that makers need to satisfy.

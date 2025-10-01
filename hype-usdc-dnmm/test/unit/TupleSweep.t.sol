@@ -114,6 +114,12 @@ contract TupleSweepTest is Test {
         });
         DnmPool.AomqConfig memory aomqCfg =
             DnmPool.AomqConfig({minQuoteNotional: 0, emergencySpreadBps: 0, floorEpsilonBps: 0});
+        DnmPool.PreviewConfig memory previewCfg = DnmPool.PreviewConfig({
+            maxAgeSec: 30,
+            snapshotCooldownSec: 10,
+            revertOnStalePreview: true,
+            enablePreviewFresh: false
+        });
         DnmPool.Guardians memory guardians = DnmPool.Guardians({governance: address(this), pauser: address(this)});
 
         DnmPool pool = new DnmPool(
@@ -128,6 +134,7 @@ contract TupleSweepTest is Test {
             feeCfg,
             makerCfg,
             aomqCfg,
+            previewCfg,
             DnmPool.FeatureFlags({
                 blendOn: true,
                 parityCiOn: true,

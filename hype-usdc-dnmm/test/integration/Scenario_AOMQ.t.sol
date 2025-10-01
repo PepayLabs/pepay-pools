@@ -36,12 +36,22 @@ contract ScenarioAomqTest is BaseTest {
     }
 
     function test_aomqActivatesOnSoftDivergence() public {
+        DnmPool.OracleConfig memory oracleCfg = defaultOracleConfig();
+        oracleCfg.allowEmaFallback = false;
+        oracleCfg.divergenceBps = 2_000;
+        oracleCfg.divergenceAcceptBps = 30;
+        oracleCfg.divergenceSoftBps = 60;
+        oracleCfg.divergenceHardBps = 2_000;
+        vm.prank(gov);
+        pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(oracleCfg));
+
         _configureAomq(50_000000, 120, 100);
+        (uint128 minQuote,,) = pool.aomqConfig();
+        assertEq(minQuote, 50_000000, "min quote configured");
 
         updateSpot(1e18, 10, true);
-        updateBidAsk(995e15, 1_005e15, 100, true);
-        updatePyth(1_060e18, 1e18, 0, 0, 0, 0);
-
+        updateBidAsk(995e15, 1_005e15, 40, true);
+        updatePyth(1005e15, 1e18, 0, 0, 0, 0);
         recordLogs();
         DnmPool.QuoteResult memory quoteResult = quote(10_000 ether, true, IDnmPool.OracleMode.Spot);
         EventRecorder.AomqEvent[] memory events = EventRecorder.decodeAomqEvents(vm.getRecordedLogs());
@@ -99,9 +109,6 @@ contract ScenarioAomqTest is BaseTest {
         uint256 slackBps = s0Notional > 0
             ? FixedPointMath.toBps(availableQuote, uint256(s0Notional))
             : 0;
-        emit log_named_uint("quoteReserveBefore", uint256(quoteReserveBefore));
-        emit log_named_uint("availableQuote", availableQuote);
-        emit log_named_uint("slackBps_vsS0", slackBps);
         assertLe(slackBps, 600, "inventory near floor");
 
         hype.transfer(bob, 50_000 ether);
@@ -123,8 +130,15 @@ contract ScenarioAomqTest is BaseTest {
     function test_aomqDoesNotBypassHardFaults() public {
         _configureAomq(30_000000, 80, 100);
 
+        DnmPool.OracleConfig memory oracleCfg = defaultOracleConfig();
+        oracleCfg.allowEmaFallback = false;
+        vm.prank(gov);
+        pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(oracleCfg));
+
         updateSpot(0, 0, false);
         updateBidAsk(0, 0, 0, false);
+        updateEma(0, 0, false);
+        updatePyth(0, 0, 0, 0, 0, 0);
 
         vm.expectRevert(Errors.OracleStale.selector);
         quote(5_000 ether, true, IDnmPool.OracleMode.Spot);

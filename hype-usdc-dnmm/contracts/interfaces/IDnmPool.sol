@@ -34,6 +34,8 @@ interface IDnmPool {
         view
         returns (uint256 bidPx, uint256 askPx, uint256 ttlMs, bytes32 quoteId);
 
+    function rebalanceTarget() external;
+
     function tokens()
         external
         view

@@ -1,0 +1,125 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
+import {DnmPool} from "../../contracts/DnmPool.sol";
+import {FixedPointMath} from "../../contracts/lib/FixedPointMath.sol";
+import {Errors} from "../../contracts/lib/Errors.sol";
+import {BaseTest} from "../utils/BaseTest.sol";
+
+contract DnmPoolRebalanceTest is BaseTest {
+    uint256 internal constant ONE = 1e18;
+
+    function setUp() public {
+        setUpBase();
+        approveAll(alice);
+        approveAll(bob);
+    }
+
+    function test_autoRebalanceUpdatesTarget() public {
+        // establish baseline so lastRebalancePrice is populated
+        vm.prank(alice);
+        pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        assertEq(pool.lastRebalancePrice(), pool.lastMid(), "baseline price recorded");
+
+        uint256 newMid = 1_100_000_000_000_000_000; // 1.10
+        _setOraclePrice(newMid);
+
+        (uint128 baseBefore, uint128 quoteBefore) = pool.reserves();
+
+        vm.prank(alice);
+        pool.swapExactIn(500 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+
+        assertEq(pool.lastRebalancePrice(), newMid, "lastRebalancePrice updated");
+
+        (uint128 targetAfter,,) = pool.inventoryConfig();
+        uint128 expectedTarget = _computeTarget(baseBefore, quoteBefore, newMid);
+        assertEq(targetAfter, expectedTarget, "target recentered to oracle mid");
+    }
+
+    function test_autoRebalanceSkipsBelowThreshold() public {
+        vm.prank(alice);
+        pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        (uint128 targetBefore,,) = pool.inventoryConfig();
+        uint256 baselinePrice = pool.lastRebalancePrice();
+
+        uint256 nearMid = 1_040_000_000_000_000_000; // 4% drift < 7.5% threshold
+        _setOraclePrice(nearMid);
+
+        vm.prank(alice);
+        pool.swapExactIn(500 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+
+        (uint128 targetAfter,,) = pool.inventoryConfig();
+        assertEq(targetAfter, targetBefore, "target unchanged when drift < threshold");
+        assertEq(pool.lastRebalancePrice(), baselinePrice, "baseline unchanged without rebalance");
+    }
+
+    function test_manualRebalancePermissionless() public {
+        vm.prank(alice);
+        pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+
+        uint256 shockedMid = 1_150_000_000_000_000_000; // 15% drift
+        _setOraclePrice(shockedMid);
+
+        (uint128 baseBefore, uint128 quoteBefore) = pool.reserves();
+
+        vm.expectEmit(true, false, false, true, address(pool));
+        emit DnmPool.ManualRebalanceExecuted(bob, shockedMid, uint64(block.timestamp));
+        vm.prank(bob);
+        pool.rebalanceTarget();
+
+        (uint128 targetAfter,,) = pool.inventoryConfig();
+        uint128 expectedTarget = _computeTarget(baseBefore, quoteBefore, shockedMid);
+        assertEq(targetAfter, expectedTarget, "manual rebalance matches auto calculations");
+        assertEq(pool.lastRebalancePrice(), shockedMid, "lastRebalancePrice updated");
+    }
+
+    function test_manualRebalanceRevertsWhenBelowThreshold() public {
+        vm.prank(alice);
+        pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+
+        uint256 nearMid = 1_030_000_000_000_000_000; // 3% drift
+        _setOraclePrice(nearMid);
+
+        vm.prank(bob);
+        vm.expectRevert(Errors.RecenterThreshold.selector);
+        pool.rebalanceTarget();
+    }
+
+    function test_manualRebalanceRevertsWhenOracleStale() public {
+        vm.prank(alice);
+        pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+
+        updateSpot(1e18, 61, true); // exceeds default maxAgeSec (60)
+        updateBidAsk(9995e14, 10005e14, 20, true);
+        updateEma(1e18, 0, true);
+
+        vm.prank(bob);
+        vm.expectRevert(Errors.OracleStale.selector);
+        pool.rebalanceTarget();
+    }
+
+    function _computeTarget(uint128 baseReserves, uint128 quoteReserves, uint256 mid)
+        internal
+        view
+        returns (uint128)
+    {
+        (, , , , uint256 baseScale, uint256 quoteScale) = pool.tokens();
+        uint256 baseWad = FixedPointMath.mulDivDown(uint256(baseReserves), ONE, baseScale);
+        uint256 quoteWad = FixedPointMath.mulDivDown(uint256(quoteReserves), ONE, quoteScale);
+        uint256 baseNotional = FixedPointMath.mulDivDown(baseWad, mid, ONE);
+        uint256 totalNotional = quoteWad + baseNotional;
+        uint256 targetValueWad = totalNotional / 2;
+        uint256 newTargetWad = FixedPointMath.mulDivDown(targetValueWad, ONE, mid);
+        return uint128(FixedPointMath.mulDivDown(newTargetWad, baseScale, ONE));
+    }
+
+    function _setOraclePrice(uint256 mid) internal {
+        uint256 spreadBps = 40;
+        uint256 spread = mid * spreadBps / 10_000;
+        updateSpot(mid, 0, true);
+        updateBidAsk(mid - spread, mid + spread, spreadBps, true);
+        updateEma(mid, 0, true);
+        updatePyth(mid, ONE, 0, 0, 20, 20);
+    }
+}

@@ -20,7 +20,7 @@
 ## 3. Seeding Liquidity
 1. Transfer HYPE and USDC into the pool contract proportionally to desired inventory.
 2. Execute `sync()` to align internal reserves.
-3. Call `setTargetBaseXstar` to align with initial deposit split (ensure price drift ≥ threshold when recentering).
+3. Trigger an initial price sample (small `swapExactIn` or `rebalanceTarget()` call) to seed `lastRebalancePrice`; use `setTargetBaseXstar` only if governance wants a custom override.
 
 ## 4. Smoke Tests
 - Run `terragon-forge.sh test --match-test testSwapBaseForQuoteHappyPath`.

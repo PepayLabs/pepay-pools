@@ -33,15 +33,23 @@ Supporting libraries provide fixed-point math, inventory deviation helpers, and 
 - The additional surcharge is `gammaSizeLinBps × u + gammaSizeQuadBps × u²`, capped by `sizeFeeCapBps` and then by the global fee cap.
 - Works symmetrically for base-in and quote-in trades (quote notional derived from the mid price). Previews, swaps, and RFQ settlement all reuse the same helper ensuring parity.
 
+### BBO-Aware Floor (F05)
+
+- Configuration lives in `MakerConfig` (`alphaBboBps`, `betaFloorBps`) and is gated by `featureFlags.enableBboFloor`.
+- On every quote/swap the pool computes `floorDynamic = max(betaFloorBps, alphaBboBps * spreadBps / 10_000)`, where `spreadBps` comes from the HyperCore order book precompile.
+- The final fee is clamped to `max(feeBps, floorDynamic)` after the size curve and soft-divergence haircuts run, but before downstream discounts. The result still honours `FeeConfig.capBps`.
+- When the order book spread is unavailable (e.g., EMA/Pyth fallback), the absolute floor (`betaFloorBps`) is used so quotes never collapse to zero.
+- Both swap execution and preview paths share the same helper, ensuring routers cannot undercut the configured minimum even when rebates are introduced in later upgrades.
+
 ## Storage Layout
 
 | Slot | Component | Notes |
 |------|-----------|-------|
 | 0    | Tokens/reserve state | Uses 128-bit packing for base/quote balances |
-| 1    | Inventory config     | Floor + recenter thresholds |
+| 1    | Inventory config     | Floor, recenter thresholds, tilt coefficients |
 | 2    | Oracle config        | Freshness windows, confidence caps, divergence tolerance |
 | 3    | Fee config           | Base/alpha/beta/cap/decay parameters |
-| 4    | Maker config         | On-chain S0 settings for RFQ path |
+| 4    | Maker config         | On-chain S0 settings + BBO-aware floor coefficients |
 | 5    | Guardians            | Governance + pauser |
 | 6    | Fee state            | Last fee in bps + last update block |
 | 7    | Cached mid           | Last mid used & timestamp for recentering |

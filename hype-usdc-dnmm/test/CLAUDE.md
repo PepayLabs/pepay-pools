@@ -34,6 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-01: Added `BboFloorTest` covering spread-tracking floor, fallback absolute floor, and cap interaction.
 - 2025-10-01: Added `ConfigSchemaTest` validating inventory tilt, maker BBO floor, and AOMQ config defaults plus governance bounds on new parameters.
 - 2025-10-01: Extended `DnmPool_Rebalance` coverage for auto recenter flag gating, cooldown suppression, hysteresis streak recovery, and stale-oracle regressions.
 - 2025-10-01: Added `SizeFeeCurveTest` validating linear/quadratic surcharge monotonicity, cap enforcement, and preview↔swap parity.

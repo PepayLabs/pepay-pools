@@ -672,6 +672,16 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             }
         }
 
+        if (flags.enableBboFloor) {
+            uint16 floorBps = _computeBboFloor(outcome.spreadBps, makerCfg);
+            if (floorBps > feeCfg.capBps) {
+                floorBps = feeCfg.capBps;
+            }
+            if (feeBps < floorBps) {
+                feeBps = floorBps;
+            }
+        }
+
         if (flags.debugEmit) {
             uint256 feeBaseComponent = feeCfg.baseBps;
             uint256 feeVolComponent = feeCfg.alphaConfDenominator == 0
@@ -784,6 +794,22 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             sizeFee = type(uint16).max;
         }
         return uint16(sizeFee);
+    }
+
+    function _computeBboFloor(uint256 spreadBps, MakerConfig memory makerCfg) internal pure returns (uint16) {
+        uint16 betaFloor = makerCfg.betaFloorBps;
+        uint16 alphaFloor = 0;
+
+        if (makerCfg.alphaBboBps > 0 && spreadBps > 0) {
+            uint256 scaled = FixedPointMath.mulDivDown(spreadBps, makerCfg.alphaBboBps, BPS);
+            if (scaled > type(uint16).max) {
+                alphaFloor = type(uint16).max;
+            } else {
+                alphaFloor = uint16(scaled);
+            }
+        }
+
+        return alphaFloor > betaFloor ? alphaFloor : betaFloor;
     }
 
     function _checkAndRebalanceAuto(uint256 currentPrice) internal {

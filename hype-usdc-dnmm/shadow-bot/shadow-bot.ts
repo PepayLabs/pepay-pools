@@ -65,6 +65,47 @@ interface FeeConfig {
   sizeFeeCapBps: number;
 }
 
+interface MakerConfig {
+  s0Notional: bigint;
+  ttlMs: number;
+  alphaBboBps: number;
+  betaFloorBps: number;
+}
+
+interface FeatureFlags {
+  blendOn: boolean;
+  parityCiOn: boolean;
+  debugEmit: boolean;
+  enableSoftDivergence: boolean;
+  enableSizeFee: boolean;
+  enableBboFloor: boolean;
+  enableInvTilt: boolean;
+  enableAOMQ: boolean;
+  enableRebates: boolean;
+  enableAutoRecenter: boolean;
+}
+
+interface MetricsState {
+  samples: number;
+  twoSidedSamples: number;
+  lastLogBlock?: number;
+  recenterCommits: number;
+  previewStaleReverts: number;
+}
+
+interface FeeConfig {
+  baseBps: number;
+  alphaNumerator: number;
+  alphaDenominator: number;
+  betaInvDevNumerator: number;
+  betaInvDevDenominator: number;
+  capBps: number;
+  decayRate: number;
+  gammaSizeLinBps: number;
+  gammaSizeQuadBps: number;
+  sizeFeeCapBps: number;
+}
+
 interface InventoryState {
   baseReserves: bigint;
   quoteReserves: bigint;
@@ -121,9 +162,10 @@ const PYTH_QUOTE_FEED_ID = env('PYTH_QUOTE_FEED_ID') || '';
 const INTERVAL_MS = int('INTERVAL_MS', 5000);
 const OUT_CSV = env('OUT_CSV') || 'shadow_enterprise.csv';
 const PROM_PORT = int('PROM_PORT', 9464);
+const REBATE_EXECUTOR = env('REBATE_EXECUTOR') || undefined;
 
 // Feature flags
-const featureFlags = {
+let featureFlags: FeatureFlags = {
   blendOn: env('BLEND_ON') === 'true',
   parityCiOn: env('PARITY_CI_ON') === 'true',
   debugEmit: env('DEBUG_EMIT') === 'true',
@@ -186,16 +228,24 @@ const PYTH_ABI = [
 ];
 
 const DNMM_ABI = [
+  'event TargetBaseXstarUpdated(uint128 oldTarget, uint128 newTarget, uint256 mid, uint64 timestamp)',
   'function oracleConfig() external view returns (uint32 maxAgeSec, uint32 stallWindowSec, uint16 confCapBpsSpot, uint16 confCapBpsStrict, uint16 divergenceBps, bool allowEmaFallback, uint16 confWeightSpreadBps, uint16 confWeightSigmaBps, uint16 confWeightPythBps, uint16 sigmaEwmaLambdaBps, uint16 divergenceAcceptBps, uint16 divergenceSoftBps, uint16 divergenceHardBps, uint16 haircutMinBps, uint16 haircutSlopeBps)',
   'function inventoryConfig() external view returns (uint128 targetBaseXstar, uint16 floorBps, uint16 recenterThresholdPct, uint16 invTiltBpsPer1pct, uint16 invTiltMaxBps, uint16 tiltConfWeightBps, uint16 tiltSpreadWeightBps)',
   'function feeConfig() external view returns (uint16 baseBps, uint16 alphaNumerator, uint16 alphaDenominator, uint16 betaInvDevNumerator, uint16 betaInvDevDenominator, uint16 capBps, uint16 decayRate, uint16 gammaSizeLinBps, uint16 gammaSizeQuadBps, uint16 sizeFeeCapBps)',
+  'function makerConfig() external view returns (uint128 s0Notional, uint32 ttlMs, uint16 alphaBboBps, uint16 betaFloorBps)',
+  'function featureFlags() external view returns (bool blendOn, bool parityCiOn, bool debugEmit, bool enableSoftDivergence, bool enableSizeFee, bool enableBboFloor, bool enableInvTilt, bool enableAOMQ, bool enableRebates, bool enableAutoRecenter)',
   'function reserves() external view returns (uint256 baseReserves, uint256 quoteReserves)',
   'function lastMid() external view returns (uint256)',
+  'function previewSnapshotAge() external view returns (uint256 ageSec, uint64 snapshotTimestamp)',
+  'function previewFees(uint256[] sizesBaseWad) external view returns (uint256[] askFeeBps, uint256[] bidFeeBps)',
+  'function previewFeesFresh(uint8 mode, bytes oracleData, uint256[] sizesBaseWad) external view returns (uint256[] askFeeBps, uint256[] bidFeeBps)',
+  'function aggregatorDiscount(address executor) external view returns (uint16)',
   'function sigmaEwma() external view returns (uint256)'
 ];
 
 const coder = AbiCoder.defaultAbiCoder();
 const provider = new JsonRpcProvider(RPC_URL);
+const dnmmContract = DNMM_POOL_ADDRESS ? new Contract(DNMM_POOL_ADDRESS, DNMM_ABI, provider) : undefined;
 const ONE = 10n ** 18n;
 const BPS = 10_000n;
 
@@ -258,7 +308,23 @@ const state = {
     gammaSizeLinBps: 0,
     gammaSizeQuadBps: 0,
     sizeFeeCapBps: 0
-  } as FeeConfig
+  } as FeeConfig,
+
+  makerConfig: {
+    s0Notional: parseUnits('5000', 6),
+    ttlMs: 300,
+    alphaBboBps: 0,
+    betaFloorBps: 0
+  } as MakerConfig,
+
+  featureFlags: featureFlags
+};
+
+const metricsState: MetricsState = {
+  samples: 0,
+  twoSidedSamples: 0,
+  recenterCommits: 0,
+  previewStaleReverts: 0
 };
 
 // ---------- Helper Functions ----------
@@ -708,17 +774,36 @@ function simulateTrade(isBuy: boolean, amountIn: bigint) {
 collectDefaultMetrics();
 
 const gDelta = new Gauge({ name: 'dnmm_delta_bps', help: 'HC vs Pyth delta bps' });
-const gConf = new Gauge({ name: 'dnmm_conf_bps', help: 'Total confidence bps' });
+const gPythConf = new Gauge({ name: 'dnmm_pyth_conf_bps', help: 'Pyth confidence basis points' });
+const gConf = new Gauge({ name: 'dnmm_conf_bps', help: 'Total confidence bps (post weighting)' });
 const gSpread = new Gauge({ name: 'dnmm_spread_bps', help: 'HC orderbook spread bps' });
 const gSigma = new Gauge({ name: 'dnmm_sigma_bps', help: 'Volatility EWMA bps' });
 const gInventory = new Gauge({ name: 'dnmm_inventory_deviation_bps', help: 'Inventory deviation from target' });
-const gFee = new Gauge({ name: 'dnmm_fee_bps', help: 'Calculated fee bps' });
+const gFee = new Gauge({ name: 'dnmm_fee_bps', help: 'Calculated fee bps (midpoint)' });
+const gFeeAsk = new Gauge({ name: 'dnmm_fee_ask_bps', help: 'Preview ask fee (S0 bucket)' });
+const gFeeBid = new Gauge({ name: 'dnmm_fee_bid_bps', help: 'Preview bid fee (S0 bucket)' });
+const gTwoSidedUptime = new Gauge({ name: 'dnmm_two_sided_uptime_pct', help: 'Two-sided uptime percentage since start' });
+const gPreviewAge = new Gauge({ name: 'dnmm_preview_snapshot_age_sec', help: 'Preview snapshot age (seconds)' });
+const gAggDiscount = new Gauge({ name: 'dnmm_agg_discount_bps', help: 'Aggregator discount bps for configured executor' });
+const gLadderPoints = new Gauge({
+  name: 'dnmm_ladder_points_bps',
+  help: 'Preview fees for standard ladder buckets',
+  labelNames: ['bucket', 'side'] as const
+});
 
 const cDecision = new Counter({
   name: 'dnmm_decisions_total',
   help: 'Count of decisions by type',
   labelNames: ['decision'] as const
 });
+const cSizeBucket = new Counter({
+  name: 'dnmm_size_bucket_total',
+  help: 'Trade count segmented by size bucket',
+  labelNames: ['bucket'] as const
+});
+const cPreviewStale = new Counter({ name: 'dnmm_preview_stale_reverts_total', help: 'Preview stale reverts observed' });
+const cRecenterCommits = new Counter({ name: 'dnmm_recenter_commits_total', help: 'TargetBaseXstarUpdated events observed' });
+const cRebatesApplied = new Counter({ name: 'dnmm_rebates_applied_total', help: 'Preview ladder calls where rebate applied' });
 
 const hDelta = new Histogram({
   name: 'dnmm_delta_bps_hist',
@@ -778,7 +863,13 @@ http.createServer(async (_req, res) => {
           tiltSpreadWeightBps: state.inventoryConfig.tiltSpreadWeightBps
         },
         fee: state.feeConfig,
-        featureFlags
+        maker: {
+          s0Notional: formatUnits(state.makerConfig.s0Notional, 18),
+          ttlMs: state.makerConfig.ttlMs,
+          alphaBboBps: state.makerConfig.alphaBboBps,
+          betaFloorBps: state.makerConfig.betaFloorBps
+        },
+        featureFlags: state.featureFlags
       }
     };
     res.setHeader('Content-Type', 'application/json');
@@ -855,6 +946,104 @@ function appendCsvRow(path: string, data: Record<string, any>) {
   fs.appendFileSync(path, row.join(',') + '\n', { encoding: 'utf-8' });
 }
 
+
+function computeLadderBaseSizes(mid: bigint): bigint[] {
+  const s0Notional = state.makerConfig.s0Notional;
+  if (!s0Notional || s0Notional === 0n || mid === 0n) return [];
+  const multipliers = [1n, 2n, 5n, 10n];
+  const sizes: bigint[] = [];
+  for (const mult of multipliers) {
+    const quoteNotional = s0Notional * mult;
+    const baseSize = mulDivDown(quoteNotional, ONE, mid);
+    sizes.push(baseSize > 0n ? baseSize : 0n);
+  }
+  return sizes;
+}
+
+async function updateRecenterCommitsMetric() {
+  const dnmm = dnmmContract;
+  if (!dnmm) return;
+  const latest = await provider.getBlockNumber();
+  if (metricsState.lastLogBlock === undefined) {
+    metricsState.lastLogBlock = latest;
+    return;
+  }
+  if (latest <= metricsState.lastLogBlock) return;
+  const fromBlock = metricsState.lastLogBlock + 1;
+  try {
+    const logs = await dnmm.queryFilter(dnmm.filters.TargetBaseXstarUpdated(), fromBlock, latest);
+    if (logs.length > 0) {
+      cRecenterCommits.inc(logs.length);
+      metricsState.recenterCommits += logs.length;
+    }
+  } catch (err) {
+    console.error('[metrics] Failed to query TargetBaseXstarUpdated logs', err);
+  } finally {
+    metricsState.lastLogBlock = latest;
+  }
+}
+
+const LADDER_LABELS = ['S0', '2S0', '5S0', '10S0'];
+
+async function updatePreviewObservability(mid: bigint) {
+  const dnmm = dnmmContract;
+  if (!dnmm || mid === 0n) return;
+
+  try {
+    const age = await dnmm.previewSnapshotAge();
+    const ageSec = Number(age[0]);
+    gPreviewAge.set(Number.isFinite(ageSec) ? ageSec : 0);
+  } catch (err) {
+    gPreviewAge.set(0);
+  }
+
+  const sizes = computeLadderBaseSizes(mid);
+  if (sizes.length === 0) {
+    gAggDiscount.set(0);
+    return;
+  }
+  const sizeArgs = sizes.map((s) => s.toString());
+  const overrides = REBATE_EXECUTOR ? { from: REBATE_EXECUTOR } : undefined;
+  try {
+    const [askFees, bidFees] = overrides
+      ? await dnmm.previewFeesFresh(0, '0x', sizeArgs, overrides)
+      : await dnmm.previewFeesFresh(0, '0x', sizeArgs);
+    if (askFees.length > 0) {
+      gFeeAsk.set(Number(askFees[0]));
+    } else {
+      gFeeAsk.set(0);
+    }
+    if (bidFees.length > 0) {
+      gFeeBid.set(Number(bidFees[0]));
+    } else {
+      gFeeBid.set(0);
+    }
+    LADDER_LABELS.forEach((label, idx) => {
+      const ask = askFees[idx] !== undefined ? Number(askFees[idx]) : 0;
+      const bid = bidFees[idx] !== undefined ? Number(bidFees[idx]) : 0;
+      gLadderPoints.labels(label, 'ask').set(ask);
+      gLadderPoints.labels(label, 'bid').set(bid);
+    });
+    if (REBATE_EXECUTOR) {
+      const discount = await dnmm.aggregatorDiscount(REBATE_EXECUTOR);
+      const discountNum = Number(discount);
+      gAggDiscount.set(discountNum);
+      if (discountNum > 0) {
+        cRebatesApplied.inc();
+      }
+    } else {
+      gAggDiscount.set(0);
+    }
+  } catch (err) {
+    metricsState.previewStaleReverts += 1;
+    cPreviewStale.inc();
+    gAggDiscount.set(0);
+    gFeeAsk.set(0);
+    gFeeBid.set(0);
+    console.warn('[metrics] previewFeesFresh revert', err);
+  }
+}
+
 // ---------- Load DNMM Config (if available) ----------
 async function loadDNMMConfig() {
   if (!DNMM_POOL_ADDRESS) {
@@ -862,10 +1051,13 @@ async function loadDNMMConfig() {
     return;
   }
 
-  try {
-    const dnmm = new Contract(DNMM_POOL_ADDRESS, DNMM_ABI, provider);
+  const dnmm = dnmmContract;
+  if (!dnmm) {
+    console.log('[config] No DNMM contract instance, using defaults');
+    return;
+  }
 
-    // Load oracle config
+  try {
     const oracleCfg = await dnmm.oracleConfig();
     state.oracleConfig = {
       maxAgeSec: Number(oracleCfg[0]),
@@ -885,7 +1077,6 @@ async function loadDNMMConfig() {
       haircutSlopeBps: Number(oracleCfg[14])
     };
 
-    // Load inventory config
     const invCfg = await dnmm.inventoryConfig();
     state.inventoryConfig = {
       targetBaseXstar: getBigInt(invCfg[0]),
@@ -897,7 +1088,6 @@ async function loadDNMMConfig() {
       tiltSpreadWeightBps: Number(invCfg[6])
     };
 
-    // Load fee config
     const feeCfg = await dnmm.feeConfig();
     state.feeConfig = {
       baseBps: Number(feeCfg[0]),
@@ -912,12 +1102,33 @@ async function loadDNMMConfig() {
       sizeFeeCapBps: Number(feeCfg[9])
     };
 
-    // Load reserves
+    const makerCfg = await dnmm.makerConfig();
+    state.makerConfig = {
+      s0Notional: getBigInt(makerCfg[0]),
+      ttlMs: Number(makerCfg[1]),
+      alphaBboBps: Number(makerCfg[2]),
+      betaFloorBps: Number(makerCfg[3])
+    };
+
+    const onchainFlags = await dnmm.featureFlags();
+    featureFlags = {
+      blendOn: onchainFlags[0],
+      parityCiOn: onchainFlags[1],
+      debugEmit: onchainFlags[2],
+      enableSoftDivergence: onchainFlags[3],
+      enableSizeFee: onchainFlags[4],
+      enableBboFloor: onchainFlags[5],
+      enableInvTilt: onchainFlags[6],
+      enableAOMQ: onchainFlags[7],
+      enableRebates: onchainFlags[8],
+      enableAutoRecenter: onchainFlags[9]
+    };
+    state.featureFlags = featureFlags;
+
     const reserves = await dnmm.reserves();
     state.inventory.baseReserves = getBigInt(reserves[0]);
     state.inventory.quoteReserves = getBigInt(reserves[1]);
 
-    // Load last mid
     const lastMid = await dnmm.lastMid();
     state.inventory.lastMid = getBigInt(lastMid);
 
@@ -934,6 +1145,7 @@ async function sampleOnce() {
   const currentBlock = Math.floor(now / 2); // Assume 2-second blocks
 
   try {
+    await updateRecenterCommitsMetric();
     // Read HyperCore oracles
     const hc = await readHyperCore();
 
@@ -946,6 +1158,7 @@ async function sampleOnce() {
 
     // Check Pyth freshness
     const pythFresh = pyth.ts !== undefined && (now - pyth.ts) <= state.oracleConfig.maxAgeSec;
+    gPythConf.set(pyth.confBps ?? 0);
 
     // Determine which price to use (following contract fallback logic)
     let usedMid = hc.midHC;
@@ -999,6 +1212,20 @@ async function sampleOnce() {
     // Calculate inventory deviation
     const inventoryDeviationBps = calculateInventoryDeviation();
 
+    // Two-sided uptime tracking (availability above inventory floors)
+    metricsState.samples += 1;
+    const baseFloor = mulDivDown(state.inventory.baseReserves, BigInt(state.inventoryConfig.floorBps), BPS);
+    const quoteFloor = mulDivDown(state.inventory.quoteReserves, BigInt(state.inventoryConfig.floorBps), BPS);
+    const baseAvailable = state.inventory.baseReserves > baseFloor ? state.inventory.baseReserves - baseFloor : 0n;
+    const quoteAvailable = state.inventory.quoteReserves > quoteFloor ? state.inventory.quoteReserves - quoteFloor : 0n;
+    if (baseAvailable > 0n && quoteAvailable > 0n) {
+      metricsState.twoSidedSamples += 1;
+    }
+    const uptimePct = metricsState.samples > 0
+      ? (metricsState.twoSidedSamples * 100) / metricsState.samples
+      : 100;
+    gTwoSidedUptime.set(uptimePct);
+
     // Calculate fee with decay
     const feeBps = calculateFee(confTotalBps, inventoryDeviationBps, currentBlock);
 
@@ -1025,7 +1252,10 @@ async function sampleOnce() {
     hConf.observe(confTotalBps);
     hFee.observe(feeBps);
     hSpread.observe(hc.spreadBps);
-    cDecision.inc({ decision: validity.reason });
+    const decisionLabel = validity.valid ? 'accept' : 'reject';
+    cDecision.inc({ decision: decisionLabel });
+
+    await updatePreviewObservability(usedMid);
 
     // Log to CSV
     appendCsvRow(OUT_CSV, {
@@ -1059,9 +1289,22 @@ async function sampleOnce() {
     if (validity.valid && Math.random() < 0.1) {
       const isBuy = Math.random() < 0.5;
       const amount = parseUnits(String(Math.floor(Math.random() * 1000)), isBuy ? 6 : 18);
+      const quoteNotionalWad = isBuy
+        ? amount * 10n ** 12n
+        : mulDivDown(amount, usedMid === 0n ? ONE : usedMid, ONE);
       const result = simulateTrade(isBuy, amount);
 
       if (result.executed) {
+        const s0 = state.makerConfig.s0Notional;
+        let bucket = '>2S0';
+        if (s0 > 0n) {
+          if (quoteNotionalWad <= s0) {
+            bucket = '<=S0';
+          } else if (quoteNotionalWad <= s0 * 2n) {
+            bucket = 'S0..2S0';
+          }
+        }
+        cSizeBucket.inc({ bucket });
         console.log(
           `[trade] ${isBuy ? 'BUY' : 'SELL'} ${formatUnits(amount, isBuy ? 6 : 18)} ` +
           `${isBuy ? 'USDC' : 'HYPE'} - ${result.partial ? 'PARTIAL' : 'FULL'}`
@@ -1092,6 +1335,7 @@ appendCsvHeader(OUT_CSV);
   console.log('[config] Loading DNMM configuration...');
 
   await loadDNMMConfig();
+  metricsState.lastLogBlock = await provider.getBlockNumber();
 
   console.log('[config] Oracle Config:', state.oracleConfig);
   console.log('[config] Inventory Config:', {

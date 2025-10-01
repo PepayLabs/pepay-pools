@@ -10,6 +10,7 @@
   - `fee_ask_bps`, `fee_bid_bps` – Applied fees per side after discounts/floors.
   - `size_bucket{bucket}` – Counter for trade notional buckets (`<=S0`, `S0..2S0`, `>2S0`).
   - `ladder_points{bucket,side}` – Gauge exposing `previewFees` for `[S0,2S0,5S0,10S0]` buckets.
+  - `agg_discount_bps` – Instantaneous aggregator discount for the configured executor address.
   - `rebates_applied_total` – Counter bump when an allow-listed executor receives a rebate.
 - **Inventory & reliability**
   - `inventory_dev_bps` – Absolute deviation vs `targetBaseXstar`.

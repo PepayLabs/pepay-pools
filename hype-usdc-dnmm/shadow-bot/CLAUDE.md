@@ -90,6 +90,7 @@ PYTH_QUOTE_FEED_ID=0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e
 INTERVAL_MS=5000
 OUT_CSV=hype_usdc_shadow_enterprise.csv
 PROM_PORT=9464
+REBATE_EXECUTOR=0xfeed...  # Optional: executor address to sample aggregator discounts
 ```
 
 ### Optional: Load from Deployed Pool
@@ -608,6 +609,8 @@ ws.on('trade', (data) => updateMetrics(data));
 - **Alerts**: See `OPERATIONS.md`
 
 ## Change Log
+
+- **2025-10-02**: Expanded L3 observability: added Prometheus series (pyth_conf, fee_ask/bid, size buckets, ladder_points, two_sided uptime, preview freshness, rebates) and Grafana dashboard JSON (`dashboards/dnmm_shadow_metrics.json`); shadow bot now queries timelocked config, preview ladder, and recenter events.
 
 - **2025-10-01**: Parsed expanded `oracleConfig()` (accept/soft/hard, haircut) and `feeConfig()` (size-fee gammas + cap) return values; synced feature flag environment toggles to the zero-default set (blend/soft divergence/size fee/BBO floor/inventory tilt/AOMQ/rebates/auto recenter).
 - **2025-10-01**: Added preview health monitoring (snapshot age + stale reverts) and exposed new Prometheus gauges for the preview ladder/clamp flags per F08.

@@ -19,7 +19,7 @@ contract ScenarioDivergenceHistogramTest is BaseTest {
         cfg.divergenceBps = 50;
         cfg.maxAgeSec = 60;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(cfg));
+        pool.updateParams(IDnmPool.ParamKind.Oracle, abi.encode(cfg));
         divergenceThreshold = cfg.divergenceBps;
 
         // ensure EMA fallback disabled in this scenario so divergence comes from spot/hc path

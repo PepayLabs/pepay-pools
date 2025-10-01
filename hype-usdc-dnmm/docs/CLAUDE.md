@@ -34,6 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-02: Updated `FEES_AND_INVENTORY.md` for rebate ordering, `CONFIG.md` for timelock + preview knobs, `OBSERVABILITY.md` for new metrics/alerts, `RUNBOOK.md` for timelock/autopause playbooks, and `CHANGELOG.md` to capture F09/F11/F12 close-out.
 - 2025-10-01: Refreshed `REBALANCING_IMPLEMENTATION.md` for auto-recenter flag gating + hysteresis, and `TESTING.md` for the new `DnmPool_Rebalance` suite + CI guidance.
 - 2025-10-01: Documented size-aware fee curve (gamma lin/quad coefficients, S0 normalisation, cap) in `ARCHITECTURE.md`.
 - 2025-10-01: Documented soft divergence haircut bands (accept/soft/hard), new events, and hysteresis behaviour across `ARCHITECTURE.md` and `DIVERGENCE_POLICY.md`.

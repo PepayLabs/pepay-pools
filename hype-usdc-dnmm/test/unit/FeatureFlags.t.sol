@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 
@@ -50,7 +51,7 @@ contract FeatureFlagsTest is BaseTest {
         });
 
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Feature, abi.encode(flags));
+        pool.updateParams(IDnmPool.ParamKind.Feature, abi.encode(flags));
 
         (
             bool blendOn,

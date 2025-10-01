@@ -17,7 +17,7 @@ contract DnmPoolGovernanceTest is BaseTest {
     function test_onlyGovernance_updates() public {
         vm.prank(alice);
         vm.expectRevert(Errors.NotGovernance.selector);
-        pool.updateParams(DnmPool.ParamKind.Fee, abi.encode(defaultFeeConfig()));
+        pool.updateParams(IDnmPool.ParamKind.Fee, abi.encode(defaultFeeConfig()));
     }
 
     function test_pause_and_unpause() public {
@@ -49,7 +49,7 @@ contract DnmPoolGovernanceTest is BaseTest {
         strictCfg.allowEmaFallback = false;
 
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(strictCfg));
+        pool.updateParams(IDnmPool.ParamKind.Oracle, abi.encode(strictCfg));
 
         vm.expectRevert(Errors.OracleSpread.selector);
         quote(1_000 ether, true, IDnmPool.OracleMode.Spot);
@@ -57,7 +57,7 @@ contract DnmPoolGovernanceTest is BaseTest {
         DnmPool.OracleConfig memory relaxed = strictCfg;
         relaxed.allowEmaFallback = true;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(relaxed));
+        pool.updateParams(IDnmPool.ParamKind.Oracle, abi.encode(relaxed));
 
         DnmPool.QuoteResult memory res = quote(1_000 ether, true, IDnmPool.OracleMode.Spot);
         assertTrue(res.usedFallback, "fallback used");
@@ -112,7 +112,7 @@ contract DnmPoolGovernanceTest is BaseTest {
 
         vm.prank(gov);
         vm.expectRevert(Errors.InvalidConfig.selector);
-        pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(cfg));
+        pool.updateParams(IDnmPool.ParamKind.Oracle, abi.encode(cfg));
     }
 
     function test_inventory_config_guard_enforced() public {
@@ -121,7 +121,7 @@ contract DnmPoolGovernanceTest is BaseTest {
 
         vm.prank(gov);
         vm.expectRevert(Errors.InvalidConfig.selector);
-        pool.updateParams(DnmPool.ParamKind.Inventory, abi.encode(cfg));
+        pool.updateParams(IDnmPool.ParamKind.Inventory, abi.encode(cfg));
     }
 
     function test_fee_config_guard_enforced() public {
@@ -130,7 +130,7 @@ contract DnmPoolGovernanceTest is BaseTest {
 
         vm.prank(gov);
         vm.expectRevert(abi.encodeWithSelector(FeePolicy.FeeBaseAboveCap.selector, cfg.baseBps, cfg.capBps));
-        pool.updateParams(DnmPool.ParamKind.Fee, abi.encode(cfg));
+        pool.updateParams(IDnmPool.ParamKind.Fee, abi.encode(cfg));
     }
 
     function test_sequential_updates_leave_pool_operational() public {
@@ -138,12 +138,12 @@ contract DnmPoolGovernanceTest is BaseTest {
         oracleCfg.maxAgeSec = 30;
 
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(oracleCfg));
+        pool.updateParams(IDnmPool.ParamKind.Oracle, abi.encode(oracleCfg));
 
         DnmPool.FeatureFlags memory flags = getFeatureFlags();
         flags.debugEmit = false;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Feature, abi.encode(flags));
+        pool.updateParams(IDnmPool.ParamKind.Feature, abi.encode(flags));
 
         updateSpot(1e18, 10, true);
         updateBidAsk(999e15, 1_001e18, 30, true);
@@ -155,6 +155,6 @@ contract DnmPoolGovernanceTest is BaseTest {
         // restore debug flag to avoid surprising later tests
         flags.debugEmit = true;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Feature, abi.encode(flags));
+        pool.updateParams(IDnmPool.ParamKind.Feature, abi.encode(flags));
     }
 }

@@ -26,7 +26,7 @@ contract ScenarioAomqTest is BaseTest {
             floorEpsilonBps: floorEpsilonBps
         });
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Aomq, abi.encode(cfg));
+        pool.updateParams(IDnmPool.ParamKind.Aomq, abi.encode(cfg));
 
         DnmPool.FeatureFlags memory flags = getFeatureFlags();
         flags.enableAOMQ = true;
@@ -43,7 +43,7 @@ contract ScenarioAomqTest is BaseTest {
         oracleCfg.divergenceSoftBps = 60;
         oracleCfg.divergenceHardBps = 2_000;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(oracleCfg));
+        pool.updateParams(IDnmPool.ParamKind.Oracle, abi.encode(oracleCfg));
 
         _configureAomq(50_000000, 120, 100);
         (uint128 minQuote,,) = pool.aomqConfig();
@@ -133,7 +133,7 @@ contract ScenarioAomqTest is BaseTest {
         DnmPool.OracleConfig memory oracleCfg = defaultOracleConfig();
         oracleCfg.allowEmaFallback = false;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(oracleCfg));
+        pool.updateParams(IDnmPool.ParamKind.Oracle, abi.encode(oracleCfg));
 
         updateSpot(0, 0, false);
         updateBidAsk(0, 0, 0, false);
@@ -151,7 +151,7 @@ contract ScenarioAomqTest is BaseTest {
         makerCfg.alphaBboBps = 2000; // 20% of spread
         makerCfg.betaFloorBps = 25;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Maker, abi.encode(makerCfg));
+        pool.updateParams(IDnmPool.ParamKind.Maker, abi.encode(makerCfg));
 
         updateSpot(1e18, 5, true);
         updateBidAsk(998e15, 1_002e15, 400, true);

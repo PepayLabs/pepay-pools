@@ -23,7 +23,7 @@ contract SizeFeeCurveTest is BaseTest {
         feeCfg.sizeFeeCapBps = 60;
 
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Fee, abi.encode(feeCfg));
+        pool.updateParams(IDnmPool.ParamKind.Fee, abi.encode(feeCfg));
 
         DnmPool.FeatureFlags memory flags = getFeatureFlags();
         flags.enableSizeFee = true;
@@ -63,7 +63,7 @@ contract SizeFeeCurveTest is BaseTest {
         feeCfg.sizeFeeCapBps = 50;
 
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Fee, abi.encode(feeCfg));
+        pool.updateParams(IDnmPool.ParamKind.Fee, abi.encode(feeCfg));
 
         (uint128 s0Notional,,,) = pool.makerConfig();
         uint256 snap = vm.snapshotState();

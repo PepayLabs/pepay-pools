@@ -21,7 +21,7 @@ contract BboFloorTest is BaseTest {
         makerCfg.alphaBboBps = 5_000; // 50% of spread
         makerCfg.betaFloorBps = 10; // fallback absolute floor
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Maker, abi.encode(makerCfg));
+        pool.updateParams(IDnmPool.ParamKind.Maker, abi.encode(makerCfg));
 
         updateSpot(1e18, 1, true);
         updateBidAsk(995e15, 1_005e15, 200, true); // 200 bps spread
@@ -51,7 +51,7 @@ contract BboFloorTest is BaseTest {
         makerCfg.alphaBboBps = 8_000; // 80%
         makerCfg.betaFloorBps = 25; // safety absolute floor
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Maker, abi.encode(makerCfg));
+        pool.updateParams(IDnmPool.ParamKind.Maker, abi.encode(makerCfg));
 
         updateSpot(1e18, 1, true);
         updateBidAsk(0, 0, 0, false); // spread unavailable
@@ -71,7 +71,7 @@ contract BboFloorTest is BaseTest {
         makerCfg.alphaBboBps = 10_000; // 100%
         makerCfg.betaFloorBps = 10;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Maker, abi.encode(makerCfg));
+        pool.updateParams(IDnmPool.ParamKind.Maker, abi.encode(makerCfg));
 
         updateSpot(1e18, 1, true);
         updateBidAsk(900e15, 1_100e15, 2_000, true); // 2000 bps spread would push above cap

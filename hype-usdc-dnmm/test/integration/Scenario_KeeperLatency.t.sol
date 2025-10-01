@@ -16,7 +16,7 @@ contract ScenarioKeeperLatencyTest is BaseTest {
         cfg.stallWindowSec = 15;
         feeCapBps = defaultFeeConfig().capBps;
         vm.prank(gov);
-        pool.updateParams(DnmPool.ParamKind.Oracle, abi.encode(cfg));
+        pool.updateParams(IDnmPool.ParamKind.Oracle, abi.encode(cfg));
 
         // initial clean state
         updateSpot(1e18, 2, true);

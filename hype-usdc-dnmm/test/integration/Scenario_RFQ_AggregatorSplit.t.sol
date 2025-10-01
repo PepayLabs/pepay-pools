@@ -8,6 +8,7 @@ import {IQuoteRFQ} from "../../contracts/interfaces/IQuoteRFQ.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 import {EventRecorder} from "../utils/EventRecorder.sol";
 import {MockCurveDEX} from "../utils/Mocks.sol";
+import {Inventory} from "../../contracts/lib/Inventory.sol";
 
 contract ScenarioRFQAggregatorSplitTest is BaseTest {
     QuoteRFQ internal rfq;
@@ -27,6 +28,11 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
         hype.approve(address(dex), type(uint256).max);
         usdc.approve(address(dex), type(uint256).max);
         dex.seed(100_000 ether, 100_000_000000);
+
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        flags.blendOn = true;
+        flags.debugEmit = true;
+        setFeatureFlags(flags);
 
         vm.prank(alice);
         hype.approve(address(dex), type(uint256).max);
@@ -69,6 +75,14 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
                 delta = uint256(targetBase) - baseRes;
             }
         }
+
+        (baseRes,) = pool.reserves();
+        emit log_named_uint("post_rebalance_base", baseRes);
+        emit log_named_uint("target_base", targetBase);
+        (uint128 baseFinal, uint128 quoteFinal) = pool.reserves();
+        Inventory.Tokens memory tokens = Inventory.Tokens({baseScale: baseScale, quoteScale: quoteScale});
+        uint256 invDev = Inventory.deviationBps(baseFinal, quoteFinal, targetBase, pool.lastMid(), tokens);
+        emit log_named_uint("post_rebalance_inv_dev", invDev);
     }
 
     function test_aggregator_prefers_dnmm_post_reprice() public {
@@ -80,7 +94,7 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
         uint256 orderSize = 8_000 ether;
         DnmPool.QuoteResult memory poolQuote = quote(orderSize, true, IDnmPool.OracleMode.Spot);
         uint256 dexQuote = dex.quoteBaseIn(orderSize);
-        (uint16 baseFee,,,,,,) = pool.feeConfig();
+        uint16 baseFee = defaultFeeConfig().baseBps;
         assertGt(poolQuote.feeBpsUsed, baseFee, "fee spike");
         assertGt(poolQuote.amountOut, dexQuote, "dnmm better than cpamm");
 
@@ -118,6 +132,7 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
         uint256 cpammFull = dex.quoteBaseIn(orderSize);
         uint256 cpammVwap = _priceBaseIn(orderSize, cpammFull, baseDecimals, quoteDecimals);
         require(aggVwap >= cpammVwap, "aggregator vwap must beat pure cpamm");
+        emit log_named_uint("poolQuote_fee", poolQuote.feeBpsUsed);
 
         string[] memory rows = new string[](1);
         rows[0] = _formatRow(
@@ -166,7 +181,16 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
         updateBidAsk(10998e14, 11002e14, 4, true);
         rollBlocks(1);
         vm.warp(block.timestamp + 1);
+        vm.recordLogs();
         DnmPool.QuoteResult memory calmQuote = quote(orderSize, true, IDnmPool.OracleMode.Spot);
+        emit log_named_uint("calmQuote_fee", calmQuote.feeBpsUsed);
+        EventRecorder.ConfidenceDebugEvent[] memory calmDebug = EventRecorder.decodeConfidenceDebug(vm.getRecordedLogs());
+        if (calmDebug.length > 0) {
+            emit log_named_uint("calm_conf", calmDebug[0].confBlendedBps);
+            emit log_named_uint("calm_feeBase", calmDebug[0].feeBaseBps);
+            emit log_named_uint("calm_feeVol", calmDebug[0].feeVolBps);
+            emit log_named_uint("calm_feeInv", calmDebug[0].feeInvBps);
+        }
         assertLt(calmQuote.feeBpsUsed, poolQuote.feeBpsUsed, "fee decays");
         assertLe(calmQuote.feeBpsUsed, poolQuote.feeBpsUsed, "fee remained controlled");
     }

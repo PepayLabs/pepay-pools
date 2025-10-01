@@ -35,6 +35,11 @@ interface OracleConfig {
   confWeightSigmaBps: number;
   confWeightPythBps: number;
   sigmaEwmaLambdaBps: number;
+  divergenceAcceptBps: number;
+  divergenceSoftBps: number;
+  divergenceHardBps: number;
+  haircutMinBps: number;
+  haircutSlopeBps: number;
 }
 
 interface InventoryConfig {
@@ -51,6 +56,9 @@ interface FeeConfig {
   betaInvDevDenominator: number;
   capBps: number;
   decayRate: number;
+  gammaSizeLinBps: number;
+  gammaSizeQuadBps: number;
+  sizeFeeCapBps: number;
 }
 
 interface InventoryState {
@@ -112,9 +120,16 @@ const PROM_PORT = int('PROM_PORT', 9464);
 
 // Feature flags
 const featureFlags = {
-  blendOn: env('BLEND_ON') !== 'false', // Default true
+  blendOn: env('BLEND_ON') === 'true',
   parityCiOn: env('PARITY_CI_ON') === 'true',
-  debugEmit: env('DEBUG_EMIT') === 'true'
+  debugEmit: env('DEBUG_EMIT') === 'true',
+  enableSoftDivergence: env('ENABLE_SOFT_DIVERGENCE') === 'true',
+  enableSizeFee: env('ENABLE_SIZE_FEE') === 'true',
+  enableBboFloor: env('ENABLE_BBO_FLOOR') === 'true',
+  enableInvTilt: env('ENABLE_INV_TILT') === 'true',
+  enableAOMQ: env('ENABLE_AOMQ') === 'true',
+  enableRebates: env('ENABLE_REBATES') === 'true',
+  enableAutoRecenter: env('ENABLE_AUTO_RECENTER') === 'true'
 };
 
 // Decision thresholds
@@ -122,6 +137,8 @@ const ACCEPT_BPS = int('ACCEPT_BPS', 30);
 const SOFT_BPS = int('SOFT_BPS', 50);
 const HARD_BPS = int('HARD_BPS', 75);
 const HYSTERESIS_FRAMES = int('HYSTERESIS_FRAMES', 3);
+const HAIRCUT_MIN_BPS = int('HAIRCUT_MIN_BPS', 3);
+const HAIRCUT_SLOPE_BPS = int('HAIRCUT_SLOPE_BPS', 1);
 
 // Oracle config defaults (can be overridden from DNMM pool)
 const MAX_AGE_SEC = int('MAX_AGE_SEC', 60);
@@ -165,9 +182,9 @@ const PYTH_ABI = [
 ];
 
 const DNMM_ABI = [
-  'function oracleConfig() external view returns (uint32 maxAgeSec, uint32 stallWindowSec, uint16 confCapBpsSpot, uint16 confCapBpsStrict, uint16 divergenceBps, bool allowEmaFallback, uint16 confWeightSpreadBps, uint16 confWeightSigmaBps, uint16 confWeightPythBps, uint16 sigmaEwmaLambdaBps)',
+  'function oracleConfig() external view returns (uint32 maxAgeSec, uint32 stallWindowSec, uint16 confCapBpsSpot, uint16 confCapBpsStrict, uint16 divergenceBps, bool allowEmaFallback, uint16 confWeightSpreadBps, uint16 confWeightSigmaBps, uint16 confWeightPythBps, uint16 sigmaEwmaLambdaBps, uint16 divergenceAcceptBps, uint16 divergenceSoftBps, uint16 divergenceHardBps, uint16 haircutMinBps, uint16 haircutSlopeBps)',
   'function inventoryConfig() external view returns (uint16 floorBps, uint128 targetBaseXstar, uint16 recenterThresholdPct)',
-  'function feeConfig() external view returns (uint16 baseBps, uint16 alphaNumerator, uint16 alphaDenominator, uint16 betaInvDevNumerator, uint16 betaInvDevDenominator, uint16 capBps, uint16 decayRate)',
+  'function feeConfig() external view returns (uint16 baseBps, uint16 alphaNumerator, uint16 alphaDenominator, uint16 betaInvDevNumerator, uint16 betaInvDevDenominator, uint16 capBps, uint16 decayRate, uint16 gammaSizeLinBps, uint16 gammaSizeQuadBps, uint16 sizeFeeCapBps)',
   'function reserves() external view returns (uint256 baseReserves, uint256 quoteReserves)',
   'function lastMid() external view returns (uint256)',
   'function sigmaEwma() external view returns (uint256)'
@@ -208,7 +225,12 @@ const state = {
     confWeightSpreadBps: CONF_WEIGHT_SPREAD_BPS,
     confWeightSigmaBps: CONF_WEIGHT_SIGMA_BPS,
     confWeightPythBps: CONF_WEIGHT_PYTH_BPS,
-    sigmaEwmaLambdaBps: SIGMA_EWMA_LAMBDA_BPS
+    sigmaEwmaLambdaBps: SIGMA_EWMA_LAMBDA_BPS,
+    divergenceAcceptBps: ACCEPT_BPS,
+    divergenceSoftBps: SOFT_BPS,
+    divergenceHardBps: HARD_BPS,
+    haircutMinBps: HAIRCUT_MIN_BPS,
+    haircutSlopeBps: HAIRCUT_SLOPE_BPS
   } as OracleConfig,
 
   inventoryConfig: {
@@ -224,7 +246,10 @@ const state = {
     betaInvDevNumerator: FEE_BETA_NUM,
     betaInvDevDenominator: FEE_BETA_DENOM,
     capBps: FEE_CAP_BPS,
-    decayRate: FEE_DECAY_RATE
+    decayRate: FEE_DECAY_RATE,
+    gammaSizeLinBps: 0,
+    gammaSizeQuadBps: 0,
+    sizeFeeCapBps: 0
   } as FeeConfig
 };
 
@@ -840,7 +865,12 @@ async function loadDNMMConfig() {
       confWeightSpreadBps: Number(oracleCfg[6]),
       confWeightSigmaBps: Number(oracleCfg[7]),
       confWeightPythBps: Number(oracleCfg[8]),
-      sigmaEwmaLambdaBps: Number(oracleCfg[9])
+      sigmaEwmaLambdaBps: Number(oracleCfg[9]),
+      divergenceAcceptBps: Number(oracleCfg[10]),
+      divergenceSoftBps: Number(oracleCfg[11]),
+      divergenceHardBps: Number(oracleCfg[12]),
+      haircutMinBps: Number(oracleCfg[13]),
+      haircutSlopeBps: Number(oracleCfg[14])
     };
 
     // Load inventory config
@@ -860,7 +890,10 @@ async function loadDNMMConfig() {
       betaInvDevNumerator: Number(feeCfg[3]),
       betaInvDevDenominator: Number(feeCfg[4]),
       capBps: Number(feeCfg[5]),
-      decayRate: Number(feeCfg[6])
+      decayRate: Number(feeCfg[6]),
+      gammaSizeLinBps: Number(feeCfg[7]),
+      gammaSizeQuadBps: Number(feeCfg[8]),
+      sizeFeeCapBps: Number(feeCfg[9])
     };
 
     // Load reserves

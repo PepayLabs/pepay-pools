@@ -13,6 +13,9 @@ contract ScenarioPythHygieneTest is BaseTest {
         setUpBase();
         approveAll(alice);
         enableBlend();
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        flags.debugEmit = true;
+        setFeatureFlags(flags);
     }
 
     function test_confidence_components_zero_pyth_on_hc() public {
@@ -28,17 +31,16 @@ contract ScenarioPythHygieneTest is BaseTest {
         EventRecorder.ConfidenceDebugEvent[] memory debugs = EventRecorder.decodeConfidenceDebug(vm.getRecordedLogs());
         require(debugs.length == 1, "debug count");
         EventRecorder.ConfidenceDebugEvent memory dbg = debugs[0];
-        uint16 capSpot;
-        (,, capSpot,,,,,,,) = pool.oracleConfig();
+        uint16 capSpot = defaultOracleConfig().confCapBpsSpot;
         require(dbg.confPythBps == 0, "pyth component should be zero");
         require(dbg.confBlendedBps <= capSpot, "spot cap respected");
     }
 
     function test_pyth_fallback_uses_strict_cap() public {
-        uint32 maxAgeSec;
-        uint32 stallWindowSec;
-        uint16 capStrict;
-        (maxAgeSec, stallWindowSec,, capStrict,,,,,,) = pool.oracleConfig();
+        DnmPool.OracleConfig memory cfg = defaultOracleConfig();
+        uint32 maxAgeSec = cfg.maxAgeSec;
+        uint32 stallWindowSec = cfg.stallWindowSec;
+        uint16 capStrict = cfg.confCapBpsStrict;
         updateSpot(1_025e15, maxAgeSec + 10, true);
         updateBidAsk(1_020e15, 1_030e15, 45, true);
         updateEma(1_022e15, stallWindowSec + 15, true);
@@ -60,8 +62,7 @@ contract ScenarioPythHygieneTest is BaseTest {
     }
 
     function test_divergence_flap_blocks_until_epsilon_resolved() public {
-        uint16 divergenceBps;
-        (,,,, divergenceBps,,,,,) = pool.oracleConfig();
+        uint16 divergenceBps = defaultOracleConfig().divergenceBps;
         updateSpot(1e18, 2, true);
         updateBidAsk(995e15, 1_005e15, 25, true);
         updateEma(1e18, 3, true);

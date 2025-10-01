@@ -20,6 +20,10 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         hype.approve(address(dex), type(uint256).max);
         usdc.approve(address(dex), type(uint256).max);
         dex.seed(100_000 ether, 100_000_000000);
+
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        flags.blendOn = true;
+        setFeatureFlags(flags);
     }
 
     function _rebalanceInventory(address quoteActor, address baseActor) internal {
@@ -68,7 +72,7 @@ contract ScenarioRepriceUpDownTest is BaseTest {
         updatePyth(11e17, 1e18, 0, 0, 20, 20);
 
         DnmPool.QuoteResult memory dnmmQuote = quote(tradeSize, true, IDnmPool.OracleMode.Spot);
-        (uint16 baseFee,,,,,,) = pool.feeConfig();
+        uint16 baseFee = defaultFeeConfig().baseBps;
         assertGt(dnmmQuote.feeBpsUsed, baseFee, "fee spikes");
 
         recordLogs();

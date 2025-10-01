@@ -28,7 +28,7 @@ contract ScenarioCanaryShadowTest is BaseTest {
     }
 
     function test_canary_observer_tracks_pool_paths() public {
-        (,,,, uint16 divergenceBps,,,,,) = pool.oracleConfig();
+        uint16 divergenceBps = defaultOracleConfig().divergenceBps;
 
         bytes32[4] memory labels = [LABEL_HC, LABEL_EMA, LABEL_PYTH, LABEL_DIV];
         uint256[] memory deltas = new uint256[](labels.length - 1); // exclude divergence rejection from median

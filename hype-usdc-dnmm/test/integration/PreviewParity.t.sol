@@ -20,6 +20,9 @@ contract PreviewParityTest is BaseTest {
         setUpBase();
         approveAll(alice);
         enableBlend();
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        flags.debugEmit = true;
+        setFeatureFlags(flags);
 
         makerKey = 0xA11CE;
         address makerAddr = vm.addr(makerKey);
@@ -193,7 +196,7 @@ contract PreviewParityTest is BaseTest {
     }
 
     function test_rfq_blocks_and_resumes_through_divergence_gate() public {
-        (,,,, uint16 divergenceCap,,,,,) = pool.oracleConfig();
+        uint16 divergenceCap = defaultOracleConfig().divergenceBps;
 
         updateSpot(1_000_000_000_000_000_000, 2, true);
         updateBidAsk(998_000_000_000_000_000, 1_002_000_000_000_000_000, 40, true);

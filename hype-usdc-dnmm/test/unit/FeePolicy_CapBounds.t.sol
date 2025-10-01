@@ -26,7 +26,10 @@ contract FeePolicyCapBoundsTest is Test {
             betaInvDevNumerator: 12,
             betaInvDevDenominator: 100,
             capBps: capBps,
-            decayPctPerBlock: 10
+            decayPctPerBlock: 10,
+            gammaSizeLinBps: 0,
+            gammaSizeQuadBps: 0,
+            sizeFeeCapBps: 0
         });
     }
 

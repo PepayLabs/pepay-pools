@@ -14,23 +14,39 @@ Derived from Lifinity's SOL/USDC configuration (see `lifinity-contract/CONFIGURA
 | `oracle.hypercore.stallWindowSec` | EMA fallback stall window. | `10` sec |
 | `oracle.hypercore.allowEmaFallback` | Enables EMA fallback when spot fails. | `true` |
 | `oracle.hypercore.divergenceBps` | Max deviation vs. Pyth before rejection. | `50` bps |
+| `oracle.hypercore.divergenceAcceptBps` | Divergence level where soft haircut begins. | `30` bps |
+| `oracle.hypercore.divergenceSoftBps` | Divergence level where haircut saturates before hard reject. | `50` bps |
+| `oracle.hypercore.divergenceHardBps` | Divergence level triggering hard reject / AOMQ. | `75` bps |
+| `oracle.hypercore.haircutMinBps` | Base fee add-on when soft divergence triggers. | `3` bps |
+| `oracle.hypercore.haircutSlopeBps` | Additional bps added per 1 bps above accept band. | `1` |
 | `oracle.hypercore.confWeightSpreadBps` | Weight applied to HyperCore spread when blending confidence (1.0 = 10000). | `10000` |
 | `oracle.hypercore.confWeightSigmaBps` | Weight applied to EWMA sigma when blending confidence. | `10000` |
 | `oracle.hypercore.confWeightPythBps` | Weight applied to Pyth confidence when blending confidence. | `10000` |
 | `oracle.hypercore.sigmaEwmaLambdaBps` | EWMA smoothing factor λ (1.0 = 10000) for sigma updates. | `9000` |
 | `fee.*` | Lifinity α/β/cap/decay coefficients. | See file |
+| `fee.gammaSizeLinBps` | Linear size-fee coefficient applied per S0 multiple. | `0` |
+| `fee.gammaSizeQuadBps` | Quadratic size-fee coefficient applied per S0 multiple. | `0` |
+| `fee.sizeFeeCapBps` | Maximum BPS contributed by the size surcharge. | `0` |
 | `inventory.floorBps` | Minimum side inventory retained. | `300` bps |
 | `inventory.recenterThresholdPct` | Price move threshold for `x*` updates. | `750` (7.5%) |
 | `maker.*` | On-chain S0 + TTL for RFQ quotes. | S0=`5000`, ttl=`200ms` |
+| `features.*` | Deployment-time feature toggles (zero-default). | All `false` |
 
 ### Feature Flags
-`FeatureFlags` are configured at deployment and may be toggled via `updateParams(ParamKind.Feature, ...)`.
+`FeatureFlags` are configured at deployment (see the `features` block in `parameters_default.json`) and may be toggled via `updateParams(ParamKind.Feature, ...)`. All flags default to `false`; governance enables them once safeguards and playbooks are in place.
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `blendOn` | Enables the confidence blend (spread ⊕ σ ⊕ Pyth). | `true` |
-| `parityCiOn` | Enables CI blocking on parity mismatches/metrics. | `true` |
-| `debugEmit` | Emits `ConfidenceDebug`/telemetry events for observability. | `true` (tests only; disable in prod if noisy) |
+| `blendOn` | Enables the confidence blend (spread ⊕ σ ⊕ Pyth); falls back to pure spread when `false`. | `false` |
+| `parityCiOn` | Enables CI checks that fail tests when parity metrics drift. | `false` |
+| `debugEmit` | Emits `ConfidenceDebug` telemetry events for observability. | `false` |
+| `enableSoftDivergence` | Activates the soft divergence haircut band (F03). | `false` |
+| `enableSizeFee` | Activates size-aware fee curve (F04). | `false` |
+| `enableBboFloor` | Enables BBO-aware floor uplift (F05). | `false` |
+| `enableInvTilt` | Turns on instantaneous inventory tilt adjustments (F06). | `false` |
+| `enableAOMQ` | Enables adaptive micro quotes in degraded states (F07). | `false` |
+| `enableRebates` | Allows maker rebates / RFQ discounts (F09). | `false` |
+| `enableAutoRecenter` | Allows autonomous recenter commits under governance-approved policy. | `false` |
 
 ### `tokens.hyper.json`
 Holds production token metadata for HYPE and USDC. Replace placeholder addresses with HyperEVM deployments.

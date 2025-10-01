@@ -41,7 +41,12 @@ contract Deploy is Script {
             confWeightSpreadBps: 10_000,
             confWeightSigmaBps: 10_000,
             confWeightPythBps: 10_000,
-            sigmaEwmaLambdaBps: 9000
+            sigmaEwmaLambdaBps: 9000,
+            divergenceAcceptBps: 30,
+            divergenceSoftBps: 50,
+            divergenceHardBps: 50,
+            haircutMinBps: 3,
+            haircutSlopeBps: 1
         });
 
         FeePolicy.FeeConfig memory feeCfg = FeePolicy.FeeConfig({
@@ -51,7 +56,10 @@ contract Deploy is Script {
             betaInvDevNumerator: 10,
             betaInvDevDenominator: 100,
             capBps: 150,
-            decayPctPerBlock: 20
+            decayPctPerBlock: 20,
+            gammaSizeLinBps: 0,
+            gammaSizeQuadBps: 0,
+            sizeFeeCapBps: 0
         });
 
         DnmPool.MakerConfig memory makerCfg = DnmPool.MakerConfig({s0Notional: 5_000 ether, ttlMs: 200});
@@ -74,7 +82,18 @@ contract Deploy is Script {
             oracleCfg,
             feeCfg,
             makerCfg,
-            DnmPool.FeatureFlags({blendOn: true, parityCiOn: true, debugEmit: true}),
+            DnmPool.FeatureFlags({
+                blendOn: false,
+                parityCiOn: false,
+                debugEmit: false,
+                enableSoftDivergence: false,
+                enableSizeFee: false,
+                enableBboFloor: false,
+                enableInvTilt: false,
+                enableAOMQ: false,
+                enableRebates: false,
+                enableAutoRecenter: false
+            }),
             guardians
         );
 

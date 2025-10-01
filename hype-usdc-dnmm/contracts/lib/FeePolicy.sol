@@ -21,6 +21,9 @@ library FeePolicy {
     uint256 private constant OFFSET_CAP_BPS = 80;
     uint256 private constant OFFSET_DECAY_PCT = 96;
     uint256 private constant OFFSET_DECAY_FACTOR = 112;
+    uint256 private constant OFFSET_GAMMA_SIZE_LIN = 144;
+    uint256 private constant OFFSET_GAMMA_SIZE_QUAD = 160;
+    uint256 private constant OFFSET_SIZE_FEE_CAP = 176;
 
     struct FeeConfig {
         uint16 baseBps;
@@ -30,6 +33,9 @@ library FeePolicy {
         uint16 betaInvDevDenominator;
         uint16 capBps;
         uint16 decayPctPerBlock; // expressed as 0-100
+        uint16 gammaSizeLinBps;
+        uint16 gammaSizeQuadBps;
+        uint16 sizeFeeCapBps;
     }
 
     struct FeeState {
@@ -40,6 +46,10 @@ library FeePolicy {
     function pack(FeeConfig memory cfg) internal pure returns (uint256 packed) {
         if (cfg.capBps >= 10_000) revert FeeCapTooHigh(cfg.capBps);
         if (cfg.baseBps > cfg.capBps) revert FeeBaseAboveCap(cfg.baseBps, cfg.capBps);
+        if (cfg.sizeFeeCapBps >= 10_000) revert FeeCapTooHigh(cfg.sizeFeeCapBps);
+        if (cfg.sizeFeeCapBps > cfg.capBps) {
+            cfg.sizeFeeCapBps = cfg.capBps;
+        }
 
         packed = uint256(cfg.baseBps);
         packed |= uint256(cfg.alphaConfNumerator) << OFFSET_ALPHA_CONF_NUM;
@@ -51,6 +61,9 @@ library FeePolicy {
 
         uint256 decayFactor = (DECAY_SCALE * (HUNDRED - cfg.decayPctPerBlock)) / HUNDRED;
         packed |= decayFactor << OFFSET_DECAY_FACTOR;
+        packed |= uint256(cfg.gammaSizeLinBps) << OFFSET_GAMMA_SIZE_LIN;
+        packed |= uint256(cfg.gammaSizeQuadBps) << OFFSET_GAMMA_SIZE_QUAD;
+        packed |= uint256(cfg.sizeFeeCapBps) << OFFSET_SIZE_FEE_CAP;
     }
 
     function unpack(uint256 packed) internal pure returns (FeeConfig memory cfg) {
@@ -63,6 +76,11 @@ library FeePolicy {
             uint16 capBps,
             uint16 decayPctPerBlock
         ) = decode(packed);
+        (
+            uint16 gammaSizeLinBps,
+            uint16 gammaSizeQuadBps,
+            uint16 sizeFeeCapBps
+        ) = decodeSizeFee(packed);
 
         cfg = FeeConfig({
             baseBps: baseBps,
@@ -71,8 +89,21 @@ library FeePolicy {
             betaInvDevNumerator: betaInvDevNumerator,
             betaInvDevDenominator: betaInvDevDenominator,
             capBps: capBps,
-            decayPctPerBlock: decayPctPerBlock
+            decayPctPerBlock: decayPctPerBlock,
+            gammaSizeLinBps: gammaSizeLinBps,
+            gammaSizeQuadBps: gammaSizeQuadBps,
+            sizeFeeCapBps: sizeFeeCapBps
         });
+    }
+
+    function decodeSizeFee(uint256 packed)
+        internal
+        pure
+        returns (uint16 gammaSizeLinBps, uint16 gammaSizeQuadBps, uint16 sizeFeeCapBps)
+    {
+        gammaSizeLinBps = uint16((packed >> OFFSET_GAMMA_SIZE_LIN) & MASK_16);
+        gammaSizeQuadBps = uint16((packed >> OFFSET_GAMMA_SIZE_QUAD) & MASK_16);
+        sizeFeeCapBps = uint16((packed >> OFFSET_SIZE_FEE_CAP) & MASK_16);
     }
 
     function decode(uint256 packed)

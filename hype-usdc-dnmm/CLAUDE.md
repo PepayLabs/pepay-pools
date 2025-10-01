@@ -34,6 +34,9 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-01: Added size-aware fee curve (linear/quadratic surcharge with cap, parity tests, config plumbing) gated by `enableSizeFee`.
+- 2025-10-01: Implemented soft divergence haircut band (accept/soft/hard thresholds, `DivergenceHaircut/DivergenceRejected` events, hysteresis state) gated by `enableSoftDivergence`, with tests/docs/tooling updates.
+- 2025-10-01: Expanded zero-default `FeatureFlags`, added configuration plumbing/tests (`FeatureFlagsTest`), and synced docs/config/scripts/shadow-bot to require explicit enables for F03–F12 rollout.
 - 2025-10-01: Implemented automatic + manual `targetBaseXstar` rebalancing (`lastRebalancePrice`, `lastRebalanceAt`, `_checkAndRebalanceAuto`, `_cooldownElapsed`, `rebalanceTarget`, `_getFreshSpotPrice`), introduced `recenterCooldownSec`, added hardened governance guardrails, refreshed docs (`REBALANCING_IMPLEMENTATION.md`, `ARCHITECTURE.md`, `RUNBOOK.md`).
 - 2025-09-28: Hardened divergence gating (symmetric Pyth<->HyperCore delta + debug emit), reworked inventory solvers for floor-safe partial fills, handled zero-confidence Pyth confidence scaling, refreshed Quick Start script paths/docs for invariants and parity reports, and parameterised deployment scripts via `DNMM_*` env variables.
 - 2024-05-24: Folder initialized with contracts, docs, and Foundry harness.

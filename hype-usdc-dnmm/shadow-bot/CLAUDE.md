@@ -609,6 +609,8 @@ ws.on('trade', (data) => updateMetrics(data));
 
 ## Change Log
 
+- **2025-10-01**: Parsed expanded `oracleConfig()` (accept/soft/hard, haircut) and `feeConfig()` (size-fee gammas + cap) return values; synced feature flag environment toggles to the zero-default set (blend/soft divergence/size fee/BBO floor/inventory tilt/AOMQ/rebates/auto recenter).
+
 - **2025-09-29**: Initial implementation with correct SPOT_PX oracle integration
   - Fixed precompile selection (0x0808 for spot, not 0x0807)
   - Added price scaling (10^6 → 10^18 WAD)

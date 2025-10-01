@@ -13,6 +13,11 @@ contract DnmPoolQuoteTest is BaseTest {
         setUpBase();
         approveAll(alice);
         approveAll(bob);
+
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        flags.blendOn = true;
+        flags.debugEmit = true;
+        setFeatureFlags(flags);
     }
 
     function test_quote_symmetry_base_in_and_quote_in() public {
@@ -34,7 +39,7 @@ contract DnmPoolQuoteTest is BaseTest {
         pool.sync();
 
         DnmPool.QuoteResult memory res = quote(5_000 ether, true, IDnmPool.OracleMode.Spot);
-        (uint16 baseBps,,,,,,) = pool.feeConfig();
+        uint16 baseBps = defaultFeeConfig().baseBps;
         assertTrue(res.feeBpsUsed > baseBps, "fee includes signals");
         assertEq(res.midUsed, 1e18, "mid original");
         assertTrue(res.usedFallback, "ema fallback used");

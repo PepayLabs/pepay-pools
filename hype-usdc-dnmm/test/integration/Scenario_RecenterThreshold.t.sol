@@ -18,7 +18,7 @@ contract ScenarioRecenterThresholdTest is BaseTest {
 
         DnmPool.QuoteResult memory beforeQuote = quote(10_000 ether, true, IDnmPool.OracleMode.Spot);
         uint256 feeBefore = beforeQuote.feeBpsUsed;
-        (uint16 baseFee,,,,,,) = pool.feeConfig();
+        uint16 baseFee = defaultFeeConfig().baseBps;
         assertGt(feeBefore, baseFee, "inventory term active");
 
         vm.prank(alice);

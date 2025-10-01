@@ -34,6 +34,9 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-01: Added size-aware fee surcharge gated by `enableSizeFee` (gamma linear/quadratic coefficients, cap, notional normalization) with preview/swap parity handling and tests.
+- 2025-10-01: Added soft divergence haircut state machine (`divergenceAccept/Soft/Hard`, `haircutMin/slope`, events, hysteresis) gated behind `enableSoftDivergence`; updated fee plumbing and tests.
+- 2025-10-01: Expanded `FeatureFlags` to include zero-default toggles for upcoming F03–F09/F12 upgrades, defaulting all flags to `false` and adding governance tests for explicit enablement.
 - 2025-09-28: Added `Errors.OracleDiverged`, symmetric divergence gating with debug telemetry, floor-conserving inventory solvers (helper decomposition for partial fills), guarded `_confidenceToBps` against zero-confidence feeds, and aligned `MockOracleHC` response modes with fail-closed semantics for regression tests.
 - 2025-09-28: Rewired `OracleAdapterHC` to HyperCore's raw 32-byte precompiles (0x0806/0x0807/0x0808/0x080e) with fail-closed semantics; added address-pin tests and canonical constants.
 - 2025-09-22: Hardened oracle handling with precompile failure fallbacks, invalid orderbook guardrails, Pyth-only confidence blending + strict caps, timestamp regression checks, and explicit fee-on-transfer rejection in `DnmPool`.

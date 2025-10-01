@@ -34,4 +34,4 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- Update this section whenever significant architectural or dependency changes land.
+- 2025-10-01: Introduced explicit `features` block plus soft-divergence parameters (`divergenceAccept/Soft/Hard`, `haircutMin/slope`) and size-fee coefficients (`gammaSizeLin`, `gammaSizeQuad`, `sizeFeeCap`) in JSON configs for F03–F12 roll-out; documentation synced with DNMM L3 spec gating.

@@ -18,7 +18,7 @@ contract ScenarioDivergenceTripwireTest is BaseTest {
 
         (uint256 hcMid,,) = oracleHC.spot();
         uint256 expectedDelta = OracleUtils.computeDivergenceBps(hcMid, 12e17);
-        (,,,, uint16 divergenceCap,,,,,) = pool.oracleConfig();
+        uint16 divergenceCap = defaultOracleConfig().divergenceBps;
         vm.expectRevert(abi.encodeWithSelector(Errors.OracleDiverged.selector, expectedDelta, divergenceCap));
         quote(1_000 ether, true, IDnmPool.OracleMode.Spot);
 

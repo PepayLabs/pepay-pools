@@ -16,6 +16,10 @@ contract FeeDynamicsTest is BaseTest {
         approveAll(alice);
         approveAll(bob);
         approveAll(carol);
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        flags.blendOn = true;
+        flags.debugEmit = true;
+        setFeatureFlags(flags);
     }
 
     function test_B1_calm_fee_at_base() public {
@@ -240,6 +244,9 @@ contract FeeDynamicsTest is BaseTest {
         approveAll(bob);
         approveAll(carol);
         enableBlend();
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        flags.debugEmit = true;
+        setFeatureFlags(flags);
 
         FeePolicy.FeeConfig memory cfgAfter = _feeConfig();
 
@@ -413,7 +420,10 @@ contract FeeDynamicsTest is BaseTest {
             uint16 betaInvDevNumerator,
             uint16 betaInvDevDenominator,
             uint16 capBps,
-            uint16 decayPctPerBlock
+            uint16 decayPctPerBlock,
+            uint16 gammaSizeLinBps,
+            uint16 gammaSizeQuadBps,
+            uint16 sizeFeeCapBps
         ) = pool.feeConfig();
         cfg = FeePolicy.FeeConfig({
             baseBps: baseBps,
@@ -422,7 +432,10 @@ contract FeeDynamicsTest is BaseTest {
             betaInvDevNumerator: betaInvDevNumerator,
             betaInvDevDenominator: betaInvDevDenominator,
             capBps: capBps,
-            decayPctPerBlock: decayPctPerBlock
+            decayPctPerBlock: decayPctPerBlock,
+            gammaSizeLinBps: gammaSizeLinBps,
+            gammaSizeQuadBps: gammaSizeQuadBps,
+            sizeFeeCapBps: sizeFeeCapBps
         });
     }
 
@@ -469,5 +482,10 @@ contract FeeDynamicsTest is BaseTest {
         approveAll(alice);
         approveAll(bob);
         approveAll(carol);
+
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        flags.blendOn = true;
+        flags.debugEmit = true;
+        setFeatureFlags(flags);
     }
 }

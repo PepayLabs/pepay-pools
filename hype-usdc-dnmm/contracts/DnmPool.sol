@@ -59,6 +59,11 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint16 confWeightSigmaBps;
         uint16 confWeightPythBps;
         uint16 sigmaEwmaLambdaBps; // 0-10000 (1.0 -> 10000)
+        uint16 divergenceAcceptBps;
+        uint16 divergenceSoftBps;
+        uint16 divergenceHardBps;
+        uint16 haircutMinBps;
+        uint16 haircutSlopeBps;
     }
 
     struct MakerConfig {
@@ -70,6 +75,13 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         bool blendOn;
         bool parityCiOn;
         bool debugEmit;
+        bool enableSoftDivergence;
+        bool enableSizeFee;
+        bool enableBboFloor;
+        bool enableInvTilt;
+        bool enableAOMQ;
+        bool enableRebates;
+        bool enableAutoRecenter;
     }
 
     struct Guardians {
@@ -83,6 +95,13 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint128 lastObservedMid;
     }
 
+    struct SoftDivergenceState {
+        uint64 lastSampleAt;
+        uint16 lastDeltaBps;
+        uint8 healthyStreak;
+        bool active;
+    }
+
     struct OracleOutcome {
         uint256 mid;
         uint256 confBps;
@@ -94,6 +113,9 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 confPythBps;
         bool usedFallback;
         bytes32 reason;
+        uint256 divergenceBps;
+        uint16 divergenceHaircutBps;
+        bool softDivergenceActive;
     }
 
     TokenConfig public tokenConfig;
@@ -122,12 +144,15 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
     FeatureFlags public featureFlags;
     ConfidenceState private confidenceState;
+    SoftDivergenceState private softDivergenceState;
 
     bytes32 private constant REASON_NONE = bytes32(0);
     bytes32 private constant REASON_FLOOR = bytes32("FLOOR");
     bytes32 private constant REASON_EMA = bytes32("EMA");
     bytes32 private constant REASON_PYTH = bytes32("PYTH");
     bytes32 private constant REASON_SPREAD = bytes32("SPREAD");
+    bytes32 private constant REASON_HAIRCUT = bytes32("HAIRCUT");
+    uint8 private constant SOFT_DIVERGENCE_RECOVERY_STREAK = 3;
 
     event SwapExecuted(
         address indexed user,
@@ -161,6 +186,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     );
 
     event OracleDivergenceChecked(uint256 pythMid, uint256 hcMid, uint256 deltaBps, uint256 maxBps);
+    event DivergenceHaircut(uint256 deltaBps, uint256 extraFeeBps);
+    event DivergenceRejected(uint256 deltaBps);
 
     modifier onlyGovernance() {
         if (msg.sender != guardians.governance) revert Errors.NotGovernance();
@@ -197,6 +224,22 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         if (feeConfig_.capBps < feeConfig_.baseBps) revert Errors.InvalidConfig();
         if (oracleConfig_.confCapBpsStrict > oracleConfig_.confCapBpsSpot) revert Errors.InvalidConfig();
         if (oracleConfig_.sigmaEwmaLambdaBps > BPS) revert Errors.InvalidConfig();
+        if (oracleConfig_.divergenceSoftBps != 0 && oracleConfig_.divergenceSoftBps < oracleConfig_.divergenceAcceptBps) {
+            revert Errors.InvalidConfig();
+        }
+        uint16 ctorSoft = oracleConfig_.divergenceSoftBps != 0
+            ? oracleConfig_.divergenceSoftBps
+            : oracleConfig_.divergenceAcceptBps;
+        if (oracleConfig_.divergenceHardBps != 0 && ctorSoft != 0 && oracleConfig_.divergenceHardBps < ctorSoft) {
+            revert Errors.InvalidConfig();
+        }
+        uint256 ctorMaxDelta = 0;
+        if (ctorSoft > oracleConfig_.divergenceAcceptBps) {
+            ctorMaxDelta = ctorSoft - oracleConfig_.divergenceAcceptBps;
+        }
+        uint256 ctorMaxHaircut = uint256(oracleConfig_.haircutMinBps)
+            + uint256(oracleConfig_.haircutSlopeBps) * ctorMaxDelta;
+        if (ctorMaxHaircut >= BPS) revert Errors.InvalidConfig();
 
         uint256 baseScale = _pow10(baseDecimals_);
         uint256 quoteScale = _pow10(quoteDecimals_);
@@ -360,6 +403,15 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         return (cfg.baseToken, cfg.quoteToken, cfg.baseDecimals, cfg.quoteDecimals, cfg.baseScale, cfg.quoteScale);
     }
 
+    function getSoftDivergenceState()
+        external
+        view
+        returns (bool active, uint16 lastDeltaBps, uint8 healthyStreak)
+    {
+        SoftDivergenceState memory state = softDivergenceState;
+        return (state.active, state.lastDeltaBps, state.healthyStreak);
+    }
+
     function baseTokenAddress() external view override returns (address) {
         return BASE_TOKEN_;
     }
@@ -378,10 +430,22 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             uint16 betaInvDevNumerator,
             uint16 betaInvDevDenominator,
             uint16 capBps,
-            uint16 decayPctPerBlock
+            uint16 decayPctPerBlock,
+            uint16 gammaSizeLinBps,
+            uint16 gammaSizeQuadBps,
+            uint16 sizeFeeCapBps
         )
     {
-        return FeePolicy.decode(feeConfigPacked);
+        (
+            baseBps,
+            alphaConfNumerator,
+            alphaConfDenominator,
+            betaInvDevNumerator,
+            betaInvDevDenominator,
+            capBps,
+            decayPctPerBlock
+        ) = FeePolicy.decode(feeConfigPacked);
+        (gammaSizeLinBps, gammaSizeQuadBps, sizeFeeCapBps) = FeePolicy.decodeSizeFee(feeConfigPacked);
     }
 
     // --- Governance ---
@@ -391,6 +455,19 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             OracleConfig memory oldCfg = oracleConfig;
             OracleConfig memory newCfg = abi.decode(data, (OracleConfig));
             if (newCfg.confCapBpsStrict > newCfg.confCapBpsSpot) revert Errors.InvalidConfig();
+            if (newCfg.divergenceSoftBps != 0 && newCfg.divergenceSoftBps < newCfg.divergenceAcceptBps) {
+                revert Errors.InvalidConfig();
+            }
+            uint16 softRef = newCfg.divergenceSoftBps != 0 ? newCfg.divergenceSoftBps : newCfg.divergenceAcceptBps;
+            if (newCfg.divergenceHardBps != 0 && softRef != 0 && newCfg.divergenceHardBps < softRef) {
+                revert Errors.InvalidConfig();
+            }
+            uint256 maxDelta = 0;
+            if (softRef > newCfg.divergenceAcceptBps) {
+                maxDelta = softRef - newCfg.divergenceAcceptBps;
+            }
+            uint256 maxHaircut = uint256(newCfg.haircutMinBps) + uint256(newCfg.haircutSlopeBps) * maxDelta;
+            if (maxHaircut >= BPS) revert Errors.InvalidConfig();
             oracleConfig = newCfg;
             emit ParamsUpdated("ORACLE", abi.encode(oldCfg), data);
         } else if (kind == ParamKind.Fee) {
@@ -515,6 +592,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         );
 
         uint256 feeCfgPacked = feeConfigPacked;
+        FeePolicy.FeeConfig memory feeCfg = FeePolicy.unpack(feeCfgPacked);
+        MakerConfig memory makerCfg = makerConfig;
         uint16 feeBps;
         if (shouldSettleFee) {
             feeBps = FeePolicy.settlePacked(feeState, feeCfgPacked, outcome.confBps, invDevBps);
@@ -527,8 +606,28 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             if (previewState.lastFeeBps != feeBps) revert Errors.FeePreviewInvariant();
         }
 
+        if (flags.enableSizeFee && feeCfg.sizeFeeCapBps > 0 && makerCfg.s0Notional > 0) {
+            uint16 sizeFeeBps = _computeSizeFeeBps(amountIn, isBaseIn, outcome.mid, feeCfg, makerCfg.s0Notional);
+            if (sizeFeeBps > 0) {
+                uint256 updated = uint256(feeBps) + sizeFeeBps;
+                if (updated > feeCfg.capBps) {
+                    feeBps = feeCfg.capBps;
+                } else {
+                    feeBps = uint16(updated);
+                }
+            }
+        }
+
+        if (outcome.divergenceHaircutBps > 0) {
+            uint256 adjusted = uint256(feeBps) + outcome.divergenceHaircutBps;
+            if (adjusted > feeCfg.capBps) {
+                feeBps = feeCfg.capBps;
+            } else {
+                feeBps = uint16(adjusted);
+            }
+        }
+
         if (flags.debugEmit) {
-            FeePolicy.FeeConfig memory feeCfg = FeePolicy.unpack(feeCfgPacked);
             uint256 feeBaseComponent = feeCfg.baseBps;
             uint256 feeVolComponent = feeCfg.alphaConfDenominator == 0
                 ? 0
@@ -595,6 +694,51 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         reason = didPartial ? REASON_FLOOR : REASON_NONE;
+    }
+
+    function _computeSizeFeeBps(
+        uint256 amountIn,
+        bool isBaseIn,
+        uint256 mid,
+        FeePolicy.FeeConfig memory feeCfg,
+        uint128 s0Notional
+    ) internal view returns (uint16) {
+        if (s0Notional == 0) return 0;
+
+        uint256 tradeNotionalWad;
+        if (isBaseIn) {
+            uint256 amountBaseWad = FixedPointMath.mulDivDown(amountIn, ONE, BASE_SCALE_);
+            if (amountBaseWad == 0 || mid == 0) return 0;
+            tradeNotionalWad = FixedPointMath.mulDivDown(amountBaseWad, mid, ONE);
+        } else {
+            tradeNotionalWad = FixedPointMath.mulDivDown(amountIn, ONE, QUOTE_SCALE_);
+        }
+
+        if (tradeNotionalWad == 0) return 0;
+
+        uint256 s0NotionalWad = uint256(s0Notional);
+        if (s0NotionalWad == 0) return 0;
+
+        uint256 u = FixedPointMath.mulDivDown(tradeNotionalWad, ONE, s0NotionalWad);
+        if (u == 0) return 0;
+
+        uint256 sizeFeeLin = feeCfg.gammaSizeLinBps == 0
+            ? 0
+            : FixedPointMath.mulDivDown(u, feeCfg.gammaSizeLinBps, ONE);
+        uint256 sizeFeeQuad;
+        if (feeCfg.gammaSizeQuadBps > 0) {
+            uint256 uSquared = FixedPointMath.mulDivDown(u, u, ONE);
+            sizeFeeQuad = FixedPointMath.mulDivDown(uSquared, feeCfg.gammaSizeQuadBps, ONE);
+        }
+
+        uint256 sizeFee = sizeFeeLin + sizeFeeQuad;
+        if (sizeFee > feeCfg.sizeFeeCapBps) {
+            sizeFee = feeCfg.sizeFeeCapBps;
+        }
+        if (sizeFee > type(uint16).max) {
+            sizeFee = type(uint16).max;
+        }
+        return uint16(sizeFee);
     }
 
     function _checkAndRebalanceAuto(uint256 currentPrice) internal {
@@ -764,9 +908,23 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             outcome.reason == REASON_PYTH
         );
 
-        if (!outcome.usedFallback && pythFresh && cfg.divergenceBps > 0) {
+        if (!outcome.usedFallback && pythFresh) {
             uint256 divergenceBps = OracleUtils.computeDivergenceBps(outcome.mid, pythMid);
-            if (divergenceBps > cfg.divergenceBps) {
+            outcome.divergenceBps = divergenceBps;
+
+            if (flags.enableSoftDivergence) {
+                (uint16 acceptBps, uint16 softBps, uint16 hardBps) = _resolveDivergenceThresholds(cfg);
+                if (flags.debugEmit && hardBps > 0) {
+                    emit OracleDivergenceChecked(pythMid, outcome.mid, divergenceBps, hardBps);
+                }
+                uint16 haircutBps =
+                    _processSoftDivergence(divergenceBps, acceptBps, softBps, hardBps, cfg.haircutMinBps, cfg.haircutSlopeBps);
+                outcome.divergenceHaircutBps = haircutBps;
+                outcome.softDivergenceActive = softDivergenceState.active;
+                if (haircutBps > 0 && outcome.reason == REASON_NONE) {
+                    outcome.reason = REASON_HAIRCUT;
+                }
+            } else if (cfg.divergenceBps > 0 && divergenceBps > cfg.divergenceBps) {
                 if (flags.debugEmit) {
                     emit OracleDivergenceChecked(pythMid, outcome.mid, divergenceBps, cfg.divergenceBps);
                 }
@@ -775,6 +933,89 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         return outcome;
+    }
+
+    function _resolveDivergenceThresholds(OracleConfig memory cfg)
+        internal
+        pure
+        returns (uint16 acceptBps, uint16 softBps, uint16 hardBps)
+    {
+        acceptBps = cfg.divergenceAcceptBps;
+        if (acceptBps == 0) acceptBps = cfg.divergenceBps;
+
+        softBps = cfg.divergenceSoftBps;
+        if (softBps == 0) softBps = cfg.divergenceBps;
+        if (softBps < acceptBps) softBps = acceptBps;
+
+        hardBps = cfg.divergenceHardBps;
+        if (hardBps == 0) hardBps = cfg.divergenceBps;
+        if (hardBps < softBps) hardBps = softBps;
+    }
+
+    function _processSoftDivergence(
+        uint256 divergenceBps,
+        uint16 acceptBps,
+        uint16 softBps,
+        uint16 hardBps,
+        uint16 haircutMinBps,
+        uint16 haircutSlopeBps
+    ) internal returns (uint16 haircutBps) {
+        SoftDivergenceState storage state = softDivergenceState;
+        if (divergenceBps > type(uint16).max) {
+            state.lastDeltaBps = type(uint16).max;
+        } else {
+            state.lastDeltaBps = uint16(divergenceBps);
+        }
+        state.lastSampleAt = uint64(block.timestamp);
+
+        if (hardBps > 0 && divergenceBps > hardBps) {
+            state.active = true;
+            state.healthyStreak = 0;
+            emit DivergenceRejected(divergenceBps);
+            revert Errors.DivergenceHard(divergenceBps, hardBps);
+        }
+
+        if (acceptBps > 0 && divergenceBps > acceptBps) {
+            state.active = true;
+            state.healthyStreak = 0;
+
+            uint256 deltaOverAccept = divergenceBps - acceptBps;
+            if (softBps > acceptBps) {
+                uint256 maxDelta = softBps - acceptBps;
+                if (deltaOverAccept > maxDelta) {
+                    deltaOverAccept = maxDelta;
+                }
+            } else {
+                deltaOverAccept = 0;
+            }
+
+            uint256 haircut = haircutMinBps;
+            if (haircutSlopeBps > 0 && deltaOverAccept > 0) {
+                haircut += uint256(haircutSlopeBps) * deltaOverAccept;
+            }
+            if (haircut >= BPS) {
+                haircut = BPS - 1;
+            }
+            if (haircut > type(uint16).max) {
+                haircut = type(uint16).max;
+            }
+
+            emit DivergenceHaircut(divergenceBps, haircut);
+            return uint16(haircut);
+        }
+
+        if (state.active) {
+            if (state.healthyStreak < SOFT_DIVERGENCE_RECOVERY_STREAK) {
+                state.healthyStreak += 1;
+            }
+            if (state.healthyStreak >= SOFT_DIVERGENCE_RECOVERY_STREAK) {
+                state.active = false;
+            }
+        } else if (state.healthyStreak < SOFT_DIVERGENCE_RECOVERY_STREAK) {
+            state.healthyStreak += 1;
+        }
+
+        return 0;
     }
 
     function _computeConfidence(

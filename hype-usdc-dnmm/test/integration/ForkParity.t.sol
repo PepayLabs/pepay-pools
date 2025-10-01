@@ -21,15 +21,19 @@ contract ForkParityTest is BaseTest {
         approveAll(alice);
         approveAll(bob);
         approveAll(carol);
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        flags.blendOn = true;
+        flags.debugEmit = true;
+        setFeatureFlags(flags);
     }
 
     function test_fork_parity_paths_and_metrics() public {
-        uint32 maxAgeSec;
-        uint32 stallWindowSec;
-        uint16 capSpot;
-        uint16 capStrict;
-        uint16 divergenceCap;
-        (maxAgeSec, stallWindowSec, capSpot, capStrict, divergenceCap,,,,,) = pool.oracleConfig();
+        DnmPool.OracleConfig memory cfg = defaultOracleConfig();
+        uint32 maxAgeSec = cfg.maxAgeSec;
+        uint32 stallWindowSec = cfg.stallWindowSec;
+        uint16 capSpot = cfg.confCapBpsSpot;
+        uint16 capStrict = cfg.confCapBpsStrict;
+        uint16 divergenceCap = cfg.divergenceBps;
         assertGt(divergenceCap, 0, "divergence cap configured");
         string[] memory labels = new string[](EVENT_COUNT);
         bytes32[] memory sources = new bytes32[](EVENT_COUNT);

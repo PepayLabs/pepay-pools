@@ -1,0 +1,317 @@
+{
+  "prompt_name": "DNMM_L3_CONTINUOUS_UPGRADE_CoDEX_PROMPT",
+  "intent": "Audit the repo against the DNMM Level‑3 hybrid spec, detect gaps, propose and generate patches, extend docs/tests, and enhance shadow‑bot metrics with a strong focus on security, gas, reliability, and router friendliness.",
+  "baseline_reference": {
+    "spec_source": "DNMM_L3_HYBRID_UPGRADE v1.1 (features F01–F12)",
+    "principles": [
+      "Oracle‑anchored mid; incentives (fees/size) rebalance inventory.",
+      "Zero‑default feature flags; backwards compatible until enabled.",
+      "Two‑sided reliability (AOMQ): widen/shrink size rather than hard‑off.",
+      "Gas‑aware fast path, explicit safety gates (divergence/age/conf)."
+    ],
+    "must_have_flags": [
+      "enableSoftDivergence",
+      "enableSizeFee",
+      "enableBboFloor",
+      "enableInvTilt",
+      "enableAOMQ",
+      "enableRebates"
+    ]
+  },
+  "repository_context": {
+    "root": ".",
+    "globs": {
+      "contracts": [
+        "contracts/**/*.sol"
+      ],
+      "interfaces": [
+        "contracts/interfaces/**/*.sol"
+      ],
+      "libs": [
+        "contracts/lib/**/*.sol"
+      ],
+      "tests": [
+        "test/**/*.t.sol"
+      ],
+      "scripts": [
+        "scripts/**/*.ts",
+        "script/**/*.ts"
+      ],
+      "docs": [
+        "docs/**/*.md",
+        "RUNBOOK.md",
+        "CHANGELOG.md"
+      ],
+      "shadowbot": [
+        "shadow-bot/**/*.ts",
+        "monitoring/**/*.ts",
+        "dashboards/**/*.json"
+      ],
+      "configs": [
+        "config/**/*.json",
+        "deploy/**/*.json"
+      ]
+    }
+  },
+  "inputs_you_can_read": [
+    "All source files under the globs above.",
+    "Existing JSON/YAML/MD configs and runbooks.",
+    "Gas snapshots and test outputs if present."
+  ],
+  "do_first": [
+    "List all files under repository_context.globs.",
+    "Summarize existing implementation of F01–F12 (present/partial/missing).",
+    "Map current config fields to the baseline flags; note missing/unused fields.",
+    "Identify any view paths that mutate state (must be zero).",
+    "Capture current gas snapshot and test matrix from repo (if available)."
+  ],
+  "feature_review_matrix": [
+    {
+      "id": "F01_AUTO_MANUAL_RECENTER",
+      "verify": [
+        "State: lastRebalancePrice, lastRebalanceAt, recenterCooldownSec.",
+        "Functions: _checkAndRebalanceAuto, _performRebalance, rebalanceTarget.",
+        "Events: TargetBaseXstarUpdated, ManualRebalanceExecuted, RecenterCooldownSet.",
+        "Errors: MidUnset, RecenterThreshold, RecenterCooldown.",
+        "Auto hook is only called in state‑changing swap (after amounts settled), NOT in previews."
+      ],
+      "tests_expected": [
+        "auto triggers above threshold; manual reverts below; cooldown enforced; no writes in preview.",
+        "gas: fast‑path Δ ≤ 3k; commit ≤ 20k."
+      ]
+    },
+    {
+      "id": "F02_HC_SCALE_NORMALIZATION",
+      "verify": [
+        "Per‑market decimals/scale (num/den) to WAD for price and BBO.",
+        "Unit/fork test equivalence to API within epsilon.",
+        "No unchecked overflow; rounding consistent."
+      ]
+    },
+    {
+      "id": "F03_SOFT_DIVERGENCE_HAIRCUT",
+      "verify": [
+        "Accept/Soft/Hard thresholds; haircut term added; hysteresis to resume.",
+        "Events DivergenceHaircut / DivergenceRejected."
+      ]
+    },
+    {
+      "id": "F04_SIZE_AWARE_FEE",
+      "verify": [
+        "gammaSizeLinBps, gammaSizeQuadBps, sizeFeeCapBps, S0Notional.",
+        "Monotone in size; cap respected; parity between preview and swap."
+      ]
+    },
+    {
+      "id": "F05_BBO_AWARE_FLOOR",
+      "verify": [
+        "minFloor = max(absFloor, alpha% × bookSpread); applied AFTER discounts.",
+        "Cannot be undercut by any discount path."
+      ]
+    },
+    {
+      "id": "F06_INVENTORY_TILT_UPGRADE",
+      "verify": [
+        "Signed tilt based on instantaneous x* = (Q + P*B)/(2P).",
+        "Weights by spread/conf; capped; ask/bid adjust in opposite directions."
+      ]
+    },
+    {
+      "id": "F07_AOMQ",
+      "verify": [
+        "aomqMinQuoteNotional, aomqEmergencySpreadBps, triggers (soft divergence, floor proximity, stale mode).",
+        "Partial‑fill to exact floor; never bypass gates."
+      ]
+    },
+    {
+      "id": "F08_SIZE_LADDER_VIEW",
+      "verify": [
+        "previewFees(uint256[] sizesBase) view returns (uint256[]).",
+        "Bit‑exact with swap fee math."
+      ]
+    },
+    {
+      "id": "F09_REBATES_ALLOWLIST",
+      "verify": [
+        "mapping(address=>uint16) discountBps; setter with bounds; event.",
+        "Apply discount after fee compute but before floor enforcement; floor preserved."
+      ]
+    },
+    {
+      "id": "F10_VOLUME_TIERS_OFFPATH",
+      "verify": [
+        "Off‑path process doc; no per‑swap gas; anti‑gaming rules documented."
+      ]
+    },
+    {
+      "id": "F11_PARAM_GUARDS_TIMELOCK",
+      "verify": [
+        "Range checks; two‑step timelock for sensitive params; events; tests."
+      ]
+    },
+    {
+      "id": "F12_AUTOPAUSE_WATCHER",
+      "verify": [
+        "Watcher conditions; pause/unpause; integration test; runbook."
+      ]
+    }
+  ],
+  "shadowbot_metrics_spec": {
+    "collect_every_ms": 500,
+    "series": [
+      { "name": "delta_bps", "def": "10_000 * |HC.mid - Pyth.mid| / Pyth.mid" },
+      { "name": "pyth_conf_bps", "def": "10_000 * conf / price" },
+      { "name": "hc_spread_bps", "def": "10_000 * (ask - bid) / mid" },
+      { "name": "decision", "labels": ["accept","haircut","reject","aomq"] },
+      { "name": "fee_ask_bps", "def": "final ask fee applied" },
+      { "name": "fee_bid_bps", "def": "final bid fee applied" },
+      { "name": "size_bucket", "labels": ["<=S0","S0..2S0",">2S0"], "def": "trade notional vs S0" },
+      { "name": "inventory_dev_bps", "def": "10_000 * |B - x*_inst| / x*_inst" },
+      { "name": "ladder_points", "def": "previewFees for standard sizes [S0,2S0,5S0,10S0]" },
+      { "name": "recenter_commits_total", "def": "count of TargetBaseXstarUpdated" },
+      { "name": "two_sided_uptime_pct", "def": "time with both sides > 0 size" },
+      { "name": "reject_rate_pct_5m", "def": "rolling 5m rejects / total" },
+      { "name": "precompile_error_rate", "def": "HC precompile errors per 5m" }
+    ],
+    "alerts": [
+      "reject_rate_pct_5m > 0.5",
+      "delta_bps_p95_15m > divergenceSoftBps",
+      "precompile_error_rate > 0.1",
+      "two_sided_uptime_pct < 98.5",
+      "abs(mid/lastRebalancePrice - 1) > hard && recenter_commits_total == 0 in 24h"
+    ],
+    "dashboards": [
+      "Oracles Health",
+      "Quote Health",
+      "Economics (PnL/edge vs oracle by size bucket)",
+      "Inventory Balance and Tilt",
+      "Recenter Activity"
+    ]
+  },
+  "security_checklist": [
+    "No state mutation in any view/pure function; add PreviewMutation error guard if needed.",
+    "Checks‑Effects‑Interactions; nonReentrant on state‑changing paths.",
+    "Authority: onlyGovernance setters; bounds on all bps/sec; timelock for sensitive params.",
+    "Arithmetic: mulDivDown for fixed‑point; saturating clamps for bps; explicit casts.",
+    "Discounts cannot push below floor; floors cannot be negative; fee caps enforced.",
+    "Recenter threshold + cooldown + hysteresis present; manual path permissionless but reverts below threshold.",
+    "Oracle faults: divergence/age/conf gates; EMA fallback; autopause."
+  ],
+  "gas_guidelines": [
+    "Cache config and scales in memory within functions.",
+    "Early return fast‑paths (below thresholds) before heavy math.",
+    "Compute instantaneous x* in memory only; never SSTORE outside commit.",
+    "Pack config structs; co‑locate small ints; avoid redundant SLOADs.",
+    "Keep additional math branches under feature flags to avoid cost when disabled."
+  ],
+  "test_plan": {
+    "unit": [
+      "Fees_SizeCurve: monotonic in size; caps; parity with previewFees.",
+      "BBO_Floor_Discount: floor preserved after discount; SpreadFloorViolation on misorder (if asserted).",
+      "Inventory_Tilt: sign correctness; growth then cap; scaling by spread/conf.",
+      "Recenter: threshold/cooldown/hysteresis; no writes in preview; events.",
+      "Divergence_Haircut: Accept/Soft/Hard branches; hysteresis to resume.",
+      "AOMQ: micro quotes present in degraded states; partial fill to exact floor; disabled when healthy."
+    ],
+    "integration": [
+      "OracleGates transitions over time; labeled rejects; recovery via hysteresis.",
+      "Competitiveness: restorative side beats HC BBO (≤ epsilon) for |dev| in [3%,10%].",
+      "Rebates: allowlisted executor price improves; never sub‑floor.",
+      "Size ladder smoothness across S0..10S0 buckets."
+    ],
+    "fork": [
+      "HC scale normalization vs API within epsilon for mid & BBO.",
+      "24h replay: no sub‑floor quotes; two‑sided uptime ≥ 99% with AOMQ."
+    ],
+    "invariants": [
+      "fees ∈ [0,cap]; finalFee ≥ floor; ladder monotone in size; no reentrancy; parameter bounds respected."
+    ],
+    "perf": [
+      "swap fast‑path Δ ≤ 3k; recenter commit ≤ 20k; quote view Δ ≤ 1k; gas snapshots updated."
+    ],
+    "commands": [
+      "forge test -vvv --match-contract Fee_SizeCurveTest",
+      "forge test -vvv --match-contract Fee_BboFloorTest",
+      "forge test -vvv --match-contract InventoryTiltTest",
+      "forge test -vvv --match-contract RecenterTest",
+      "forge test -vvv --match-contract DivergenceHaircutTest",
+      "forge test -vvv --match-contract AOMQTest",
+      "forge test -vvv --match-contract HCScaleForkTest",
+      "forge test -vvv --match-contract InvariantsCore",
+      "forge test -vvv --match-contract GasSnapshots"
+    ]
+  },
+  "what_to_generate_if_missing": [
+    "Patches (unified diff) to implement missing feature pieces F01–F12 with zero‑default flags.",
+    "Tests as specified in test_plan (Foundry).",
+    "Docs: REBALANCING_IMPLEMENTATION.md (auto/manual; cooldown/hysteresis/gas), ARCHITECTURE.md (impact surrogates), RUNBOOK.md (alerts/actions), ROUTER_INTEGRATION.md (size ladder, TTL, partial fills), CHANGELOG.md.",
+    "Shadow‑bot metrics code with Prometheus exporters and dashboards JSON.",
+    "Governance param guards + timelock code + tests.",
+    "Watcher script (autopause) + tests."
+  },
+  "patch_output_format": {
+    "type": "unified-diff",
+    "rules": [
+      "Include file paths relative to repo root.",
+      "Keep changes behind feature flags where applicable.",
+      "Add events and errors with consistent naming and NatSpec.",
+      "Do not mutate existing function signatures unless also updating interfaces & tests.",
+      "Preserve existing behavior when feature flags are false."
+    ]
+  },
+  "review_and_autofix_loop": [
+    "Scan repo; mark feature status for F01–F12.",
+    "For each missing/partial item: propose diff with summary and gas/security notes.",
+    "Regenerate/extend tests; ensure preview parity with swap math.",
+    "Update docs and runbooks; add examples and operator steps.",
+    "Emit a consolidated CHANGELOG entry summarizing all deltas.",
+    "Output a verification checklist mapping each spec bullet to code/tests/docs lines."
+  ],
+  "acceptance_criteria": {
+    "economics": [
+      "Treatment maker PnL ≥ control over 72h canary at matched risk.",
+      "Adverse‑selection cost ↓ ≥10%."
+    ],
+    "reliability": [
+      "Reject rate <0.2% in healthy frames; labeled rejects.",
+      "Two‑sided uptime ≥99% with AOMQ."
+    ],
+    "performance": [
+      "Fast‑path gas Δ ≤ 3k; commit ≤ 20k; view Δ ≤ 1k."
+    ],
+    "security": [
+      "No sub‑floor quotes; no view mutation; timelock & bounds enforced."
+    ]
+  },
+  "style_guidelines": [
+    "Solidity 0.8.x; explicit units and WAD comments.",
+    "NatSpec on public/external functions and events; reference thresholds in bps/seconds.",
+    "One responsibility per function; branch early; emit events after state updates.",
+    "Tests: AAA pattern; arrange/given with named fixtures; assert with bounds where FP math."
+  ],
+  "final_deliverables": [
+    "feature_status.md (matrix of F01–F12 with links to code/tests/docs).",
+    "patches/*.diff (grouped by feature).",
+    "tests added/updated (Foundry).",
+    "docs updated (5 files).",
+    "shadow-bot metrics & dashboards.",
+    "gas-snapshots.txt refreshed.",
+    "AB_plan.md for canary rollout."
+  ],
+  "example_commit_messages": [
+    "feat(pool): add auto/manual recenter with cooldown+hysteresis; emit ManualRebalanceExecuted; tests+gas",
+    "feat(fees): add size-aware fee (lin+quad) and BBO-aware floor; previewFees view; tests",
+    "feat(inventory): directional tilt weighted by spread/conf; caps; tests",
+    "feat(aomq): two-sided micro quotes under degraded states; partial fill to floor; tests",
+    "feat(governance): param guards+timelock; watcher autopause; docs/runbook",
+    "chore(metrics): shadow-bot Prometheus series + dashboards; canary A/B scaffolding"
+  ],
+  "instructions_to_model": [
+    "Be surgical: only modify where needed; respect existing interfaces unless justified.",
+    "When uncertain about an existing pattern, match the project’s prevailing style.",
+    "Prefer adding small internal helpers (pure/view) for math clarity and testability.",
+    "Every patch must include or update corresponding tests and docs.",
+    "Summarize gas and security implications per patch.",
+    "Produce verifiable output: a matrix mapping spec items to lines changed."
+  ]
+}

@@ -863,7 +863,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         );
 
         bytes32 finalReason = reason != REASON_NONE ? reason : outcome.reason;
-        if (aomqDecision.triggered && aomqDecision.clamp && appliedAmountIn > 0) {
+        if (aomqDecision.triggered && appliedAmountIn > 0) {
             finalReason = REASON_AOMQ;
             uint256 quoteNotional = isBaseIn ? amountOut : appliedAmountIn;
             _handleAomqState(
@@ -968,23 +968,26 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
         bool softActive = outcome.softDivergenceActive;
         bool fallbackActive = outcome.usedFallback && (outcome.reason == REASON_EMA || outcome.reason == REASON_PYTH);
+        uint256 availableQuote = Inventory.availableInventory(quoteReservesLocal, invCfg.floorBps);
+        uint256 availableBase = Inventory.availableInventory(baseReservesLocal, invCfg.floorBps);
+
         bool nearFloor;
         if (aomqCfg.floorEpsilonBps > 0 && makerCfg.s0Notional > 0) {
-            if (isBaseIn) {
-                uint256 availableQuote = Inventory.availableInventory(quoteReservesLocal, invCfg.floorBps);
-                if (availableQuote > 0) {
-                    uint256 slackBps = FixedPointMath.toBps(availableQuote, uint256(makerCfg.s0Notional));
-                    nearFloor = slackBps <= aomqCfg.floorEpsilonBps;
+            uint256 s0QuoteUnits = FixedPointMath.mulDivDown(uint256(makerCfg.s0Notional), invTokens.quoteScale, ONE);
+            if (s0QuoteUnits == 0) {
+                s0QuoteUnits = uint256(makerCfg.s0Notional);
+            }
+
+            uint256 slackQuoteNotional = isBaseIn
+                ? availableQuote
+                : FixedPointMath.mulDivDown(availableBase, outcome.mid, invTokens.baseScale);
+
+            if (slackQuoteNotional > 0 && s0QuoteUnits > 0) {
+                uint256 threshold = FixedPointMath.mulDivDown(s0QuoteUnits, aomqCfg.floorEpsilonBps, BPS);
+                if (threshold == 0) {
+                    threshold = 1;
                 }
-            } else {
-                uint256 availableBase = Inventory.availableInventory(baseReservesLocal, invCfg.floorBps);
-                if (availableBase > 0) {
-                    uint256 availableQuoteNotional = FixedPointMath.mulDivDown(availableBase, outcome.mid, invTokens.baseScale);
-                    if (availableQuoteNotional > 0) {
-                        uint256 slackBps = FixedPointMath.toBps(availableQuoteNotional, uint256(makerCfg.s0Notional));
-                        nearFloor = slackBps <= aomqCfg.floorEpsilonBps;
-                    }
-                }
+                nearFloor = slackQuoteNotional <= threshold;
             }
         }
 
@@ -1011,55 +1014,55 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         decision.spreadFloorBps = spreadFloor;
 
         uint256 minQuote = uint256(aomqCfg.minQuoteNotional);
-        if (minQuote == 0) {
-            decision.triggered = false;
-            decision.trigger = bytes32(0);
-            return decision;
-        }
-
         if (isBaseIn) {
-            uint256 availableQuote = Inventory.availableInventory(quoteReservesLocal, invCfg.floorBps);
             if (availableQuote == 0) {
                 decision.triggered = false;
                 decision.trigger = bytes32(0);
                 return decision;
             }
-            if (availableQuote < minQuote) {
-                minQuote = availableQuote;
-            }
-            if (minQuote == 0) {
+
+            uint256 targetQuote = nearFloor ? availableQuote : minQuote;
+            if (targetQuote == 0) {
                 decision.triggered = false;
                 decision.trigger = bytes32(0);
                 return decision;
             }
+            if (targetQuote > availableQuote) {
+                targetQuote = availableQuote;
+            }
 
-            uint256 targetAmount = _baseInForQuoteNotional(minQuote, outcome.mid, feeBps, invTokens);
+            uint256 targetAmount = _baseInForQuoteNotional(targetQuote, outcome.mid, feeBps, invTokens);
             if (targetAmount == 0) {
                 decision.triggered = false;
                 decision.trigger = bytes32(0);
                 return decision;
             }
+
+            decision.targetQuoteNotional = targetQuote;
             if (targetAmount < workingAmountIn) {
                 decision.clamp = true;
                 decision.targetAmountIn = targetAmount;
-                decision.targetQuoteNotional = minQuote;
             }
         } else {
-            uint256 availableBase = Inventory.availableInventory(baseReservesLocal, invCfg.floorBps);
             if (availableBase == 0) {
                 decision.triggered = false;
                 decision.trigger = bytes32(0);
                 return decision;
             }
 
-            uint256 targetAmount = minQuote;
-            if (targetAmount > workingAmountIn) {
-                targetAmount = workingAmountIn;
+            uint256 targetBase = nearFloor ? availableBase : FixedPointMath.mulDivDown(minQuote, invTokens.baseScale, outcome.mid);
+            if (targetBase == 0) {
+                decision.triggered = false;
+                decision.trigger = bytes32(0);
+                return decision;
             }
-            if (targetAmount < workingAmountIn) {
+            if (targetBase > availableBase) {
+                targetBase = availableBase;
+            }
+            if (targetBase < workingAmountIn) {
                 decision.clamp = true;
-                decision.targetAmountIn = targetAmount;
-                decision.targetQuoteNotional = targetAmount;
+                decision.targetAmountIn = targetBase;
+                decision.targetQuoteNotional = FixedPointMath.mulDivDown(targetBase, outcome.mid, invTokens.baseScale);
             }
         }
 

@@ -117,6 +117,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     uint256 public lastMid;
     uint64 public lastMidTimestamp;
     uint256 public lastRebalancePrice;
+    uint64 public lastRebalanceAt;
+    uint32 public recenterCooldownSec = 120;
 
     FeatureFlags public featureFlags;
     ConfidenceState private confidenceState;
@@ -144,6 +146,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     event Unpaused(address indexed caller);
     event TargetBaseXstarUpdated(uint128 oldTarget, uint128 newTarget, uint256 mid, uint64 timestamp);
     event ManualRebalanceExecuted(address indexed caller, uint256 price, uint64 timestamp);
+    event RecenterCooldownSet(uint32 oldCooldown, uint32 newCooldown);
     event TokenFeeUnsupported(address indexed user, bool isBaseIn, uint256 expectedAmountIn, uint256 receivedAmountIn);
     event ConfidenceDebug(
         uint256 confSpreadBps,
@@ -434,8 +437,15 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
         invCfg.targetBaseXstar = newTarget;
         lastRebalancePrice = freshMid;
+        lastRebalanceAt = uint64(block.timestamp);
 
         emit TargetBaseXstarUpdated(oldTarget, newTarget, freshMid, uint64(block.timestamp));
+    }
+
+    function setRecenterCooldownSec(uint32 newCooldownSec) external onlyGovernance {
+        uint32 oldCooldown = recenterCooldownSec;
+        recenterCooldownSec = newCooldownSec;
+        emit RecenterCooldownSet(oldCooldown, newCooldownSec);
     }
 
     /**
@@ -444,9 +454,11 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
      */
     function rebalanceTarget() external {
         uint256 currentPrice = _getFreshSpotPrice();
+        if (!_cooldownElapsed()) revert Errors.RecenterCooldown();
         uint256 previousPrice = lastRebalancePrice;
         if (previousPrice == 0) {
             lastRebalancePrice = currentPrice;
+            lastRebalanceAt = uint64(block.timestamp);
             return;
         }
 
@@ -594,6 +606,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             return;
         }
 
+        if (!_cooldownElapsed()) return;
+
         uint16 thresholdBps = inventoryConfig.recenterThresholdPct;
         uint256 priceChange = FixedPointMath.absDiff(currentPrice, previousPrice);
         if (FixedPointMath.toBps(priceChange, previousPrice) < thresholdBps) {
@@ -635,6 +649,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint128 oldTarget = invCfg.targetBaseXstar;
         invCfg.targetBaseXstar = newTarget;
         lastRebalancePrice = currentPrice;
+        lastRebalanceAt = uint64(block.timestamp);
 
         emit TargetBaseXstarUpdated(oldTarget, newTarget, currentPrice, uint64(block.timestamp));
         return true;
@@ -655,6 +670,16 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         return midRes.mid;
+    }
+
+    function _cooldownElapsed() internal view returns (bool) {
+        uint32 cooldown = recenterCooldownSec;
+        if (cooldown == 0) return true;
+
+        uint64 lastAt = lastRebalanceAt;
+        if (lastAt == 0) return true;
+
+        return block.timestamp >= uint256(lastAt) + cooldown;
     }
 
     function _readOracle(OracleMode mode, bytes calldata oracleData, FeatureFlags memory flags, OracleConfig memory cfg)

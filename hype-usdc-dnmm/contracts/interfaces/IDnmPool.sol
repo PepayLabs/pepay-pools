@@ -36,6 +36,8 @@ interface IDnmPool {
 
     function rebalanceTarget() external;
 
+    function setRecenterCooldownSec(uint32 newCooldownSec) external;
+
     function tokens()
         external
         view

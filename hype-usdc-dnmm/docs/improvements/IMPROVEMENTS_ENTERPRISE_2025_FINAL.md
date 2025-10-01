@@ -5,7 +5,9 @@
 *Status: Production-Ready Implementation Plan*
 *Philosophy: **Validate First, Build Right, Scale Smart***
 
-> **Implementation Update (2025-10-01):** Automated + manual `targetBaseXstar` rebalancing shipped in `contracts/DnmPool.sol`. The design details below are preserved for provenance; see `docs/REBALANCING_IMPLEMENTATION.md` for the live Solidity.
+
+> **Implementation Update (2025-10-01):** Automated + manual `targetBaseXstar` rebalancing (fresh-mid validation + cooldown gating) shipped in `contracts/DnmPool.sol`. The design details below are preserved for provenance; see `docs/REBALANCING_IMPLEMENTATION.md` for the live Solidity.
+
 
 ---
 

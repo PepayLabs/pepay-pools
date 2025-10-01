@@ -51,6 +51,8 @@ abstract contract BaseTest is MathAsserts {
         _setOracleDefaults();
 
         pool = _deployPool(defaultInventoryConfig(), defaultOracleConfig(), defaultFeeConfig(), defaultMakerConfig());
+        vm.prank(gov);
+        pool.setRecenterCooldownSec(0);
         seedPOL(
             DeployConfig({
                 baseLiquidity: 100_000 ether,

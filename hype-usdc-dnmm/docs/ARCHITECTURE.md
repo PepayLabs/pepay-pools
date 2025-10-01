@@ -17,7 +17,7 @@ Supporting libraries provide fixed-point math, inventory deviation helpers, and 
 2. **Fee computation** – Confidence proxy and inventory deviation feed into the DNMM fee surface with exponential decay back to base.
 3. **Partial fill guard** – Before returning, the pool ensures post-trade reserves stay above floor thresholds; if not, it returns the maximal safe input amount.
 4. **Swap execution** – `swapExactIn` reuses quote math, performs ERC20 transfers, updates fee state, emits telemetry events, and enforces reentrancy + deadline checks.
-5. **Rebalancing** – Each swap calls `_checkAndRebalanceAuto` to refresh `targetBaseXstar` once drift > `recenterThresholdPct`, with permissionless `rebalanceTarget()` as the keeper-friendly fallback and `setTargetBaseXstar` retained for governance overrides.
+5. **Rebalancing** – Each swap calls `_checkAndRebalanceAuto` (respecting `recenterCooldownSec`) to refresh `targetBaseXstar` once drift > `recenterThresholdPct`; permissionless `rebalanceTarget()` provides a keeper fallback, and governance retains `setTargetBaseXstar` for manual overrides.
 
 ## Storage Layout
 

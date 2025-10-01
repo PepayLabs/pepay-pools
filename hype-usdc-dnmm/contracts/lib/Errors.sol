@@ -25,6 +25,7 @@ library Errors {
     error InsufficientBaseReserves();
     error MidUnset();
     error RecenterThreshold();
+    error RecenterCooldown();
     error FeeCapExceeded();
     error FeePreviewInvariant();
 }

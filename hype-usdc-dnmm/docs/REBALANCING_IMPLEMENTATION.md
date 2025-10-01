@@ -74,10 +74,10 @@ Layer 2: Manual Rebalancing (Separate Function)
 
 ### Implementation Summary (2025-10-01)
 
-- ✅ `contracts/DnmPool.sol`: introduced `lastRebalancePrice`, automatic `_checkAndRebalanceAuto`, shared `_performRebalance`, permissionless `rebalanceTarget`, governance-side `_getFreshSpotPrice`, and `ManualRebalanceExecuted` telemetry.
-- ✅ `contracts/interfaces/IDnmPool.sol`: surfaced the new `rebalanceTarget()` entrypoint for keepers and tests.
-- ✅ `test/unit/DnmPool_Rebalance.t.sol`: added regression coverage for automatic triggers, manual fallback, threshold guards, and revert paths.
-- ✅ Updated docs/runbooks (this file, `docs/ARCHITECTURE.md`, `RUNBOOK.md`) to describe the dual-layer system post implementation.
+- ✅ `contracts/DnmPool.sol`: tracks `lastRebalancePrice` and `lastRebalanceAt`, enforces a governance-set `recenterCooldownSec`, adds `_cooldownElapsed()` alongside `_checkAndRebalanceAuto`, shares `_performRebalance()` across auto/manual paths, validates spot freshness via `_getFreshSpotPrice()`, and emits both `ManualRebalanceExecuted` + `RecenterCooldownSet` events.
+- ✅ `contracts/interfaces/IDnmPool.sol`: exposes `rebalanceTarget()` (manual keeper hook) and the cooldown setter for integration tests.
+- ✅ `test/unit/DnmPool_Rebalance.t.sol`: regression coverage for automatic triggers, cooldown suppression, manual freshness & cooldown reverts, and stale-oracle handling.
+- ✅ Updated docs/runbooks (this file, `docs/ARCHITECTURE.md`, `RUNBOOK.md`) to describe the dual-layer system, oracle gating, and cooldown operations.
 
 ### 1. Add State Variable
 
@@ -198,9 +198,12 @@ function _performRebalance(uint256 currentPrice, uint16 thresholdBps) internal r
 ```solidity
 function rebalanceTarget() external {
     uint256 currentPrice = _getFreshSpotPrice();
+    if (!_cooldownElapsed()) revert Errors.RecenterCooldown();
+
     uint256 previousPrice = lastRebalancePrice;
     if (previousPrice == 0) {
         lastRebalancePrice = currentPrice;
+        lastRebalanceAt = uint64(block.timestamp);
         return;
     }
 
@@ -218,7 +221,7 @@ function rebalanceTarget() external {
 
 **Why permissionless?**
 - Anyone can call = no governance bottleneck
-- Threshold validation prevents spam
+- Cooldown + threshold validation prevent spam / thrash while keeping keeper UX predictable
 - Caller pays gas (no protocol cost)
 - Lifinity uses this model successfully
 - Always reads a fresh HyperCore spot mid via `_getFreshSpotPrice`, so keepers do not need a priming swap/quote during quiet periods
@@ -248,21 +251,44 @@ function _getFreshSpotPrice() internal view returns (uint256 mid) {
 - Provides a single revert surface (`Errors.OracleStale`) for stale data, simplifying audits.
 - Lets governance overrides share the same validation path as keeper-triggered updates.
 
-### 6. Add Event
+### 6. Add `_cooldownElapsed`
 
-**Location**: After line 144 (after `TargetBaseXstarUpdated` event)
+**Location**: `contracts/DnmPool.sol` helper section (next to `_getFreshSpotPrice`)
+
+```solidity
+function _cooldownElapsed() internal view returns (bool) {
+    uint32 cooldown = recenterCooldownSec;
+    if (cooldown == 0) return true;
+
+    uint64 lastAt = lastRebalanceAt;
+    if (lastAt == 0) return true;
+
+    return block.timestamp >= uint256(lastAt) + cooldown;
+}
+```
+
+**Purpose**
+- Shared by auto + manual paths to enforce time hysteresis and prevent churn in whipsaw markets.
+- `recenterCooldownSec` is governance-tunable (seconds); production default is 120s, tests toggle to 0 for fast iteration.
+
+### 7. Add Events
+
+**Location**: After existing `TargetBaseXstarUpdated` declaration
 
 ```solidity
 event ManualRebalanceExecuted(address indexed caller, uint256 price, uint64 timestamp);
+event RecenterCooldownSet(uint32 oldCooldown, uint32 newCooldown);
 ```
 
----
+### 8. Update Error Library
 
-### 7. Update Error Library
+**Location**: `contracts/lib/Errors.sol`
 
-**Location**: `contracts/lib/Errors.sol` (if needed)
+```solidity
+error RecenterCooldown();
+```
 
-No new errors required - reuses existing `Errors.RecenterThreshold()` and `Errors.MidUnset()`.
+Raised when a rebalance attempt occurs before the configured cooldown interval has elapsed.
 
 ---
 
@@ -271,21 +297,21 @@ No new errors required - reuses existing `Errors.RecenterThreshold()` and `Error
 ### Automatic Rebalancing (In Swap)
 
 ```typescript
-// Fast path (price deviation < threshold): +2k gas
-SLOAD lastRebalancePrice: 2.1k
-Subtract + compare: 100
-Total: 2.2k
+// Fast path (price deviation < threshold): ~2.6k gas
+SLOAD lastRebalancePrice / lastRebalanceAt / recenterCooldownSec: ~2.4k
+Subtract + compare: ~200
+Total: ~2.6k
 
-// Rebalance path (price deviation >= threshold): +15k gas
-Fast path: 2.2k
+// Rebalance path (price deviation >= threshold): ~19.5k gas
+Fast path: ~2.6k
 Calculate new target: 5k
 Update storage: 5k (SSTORE targetBaseXstar)
-Update lastRebalancePrice: 5k (SSTORE)
+Update lastRebalancePrice / lastRebalanceAt: 5k (SSTORE ×2)
 Emit event: 2k
-Total: ~19.2k
+Total: ~19.5k
 
 // Weighted average (rebalance ~1% of swaps):
-0.99 × 2.2k + 0.01 × 19.2k = 2.178k + 0.192k = 2.37k average
+0.99 × 2.6k + 0.01 × 19.5k ≈ 2.24k + 0.20k ≈ 2.44k average
 ```
 
 **Result**: +2.4k gas per swap on average (+1.1% vs 225k baseline)

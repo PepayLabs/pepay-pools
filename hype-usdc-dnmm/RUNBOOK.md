@@ -21,6 +21,7 @@
 1. Transfer HYPE and USDC into the pool contract proportionally to desired inventory.
 2. Execute `sync()` to align internal reserves.
 3. Trigger an initial price sample (small `swapExactIn` or `rebalanceTarget()` call) to seed `lastRebalancePrice`; use `setTargetBaseXstar` only if governance wants a custom override.
+4. Set `recenterCooldownSec` via `setRecenterCooldownSec(<seconds>)` (120s recommended for majors, 180-300s for long-tail pairs) before enabling public swaps.
 
 ## 4. Smoke Tests
 - Run `terragon-forge.sh test --match-test testSwapBaseForQuoteHappyPath`.
@@ -33,11 +34,11 @@
 3. Monitor `QuoteFilled` for partial fills and expiry behaviour.
 
 ## 6. Observability Bring-Up
-- Connect indexer to `SwapExecuted`, `QuoteServed`, `ParamsUpdated`, `Paused`, `Unpaused`.
+- Connect indexer to `SwapExecuted`, `QuoteServed`, `ParamsUpdated`, `Paused`, `Unpaused`, `ManualRebalanceExecuted`, `RecenterCooldownSet`.
 - Publish Grafana dashboard using metrics defined in `docs/OBSERVABILITY.md`.
 - Persist test artifacts from `metrics/` (CSV/JSON) and `gas-snapshots.txt` into the monitoring pipeline for historical comparisons.
 - Wire the parity freshness check after any long invariant run: execute `script/run_invariants.sh` (or `script/check_invariants_and_parity.sh`) and verify `reports/metrics/freshness_report.json` reports `status=pass` for all parity CSVs.
-- Deploy `OracleWatcher` alongside the pool, configure thresholds, and run `scripts/watch_oracles.ts` to stream `OracleAlert` / `AutoPauseRequested`. Route `critical=true` alerts to on-call and wire the optional pause handler contract if using auto-pause.
+- Deploy `OracleWatcher` alongside the pool, configure thresholds, and run `scripts/watch_oracles.ts` to stream `OracleAlert` / `AutoPauseRequested`. Route `critical=true` alerts to on-call and wire the optional pause handler contract if using auto-pause. Track `lastRebalancePrice`, `lastRebalanceAt`, and cooldown adherence (time since last rebalance vs `recenterCooldownSec`) in dashboards/alerts.
 
 ## 7. Incident Response
 - Use `pause()` to halt swaps on oracle divergence or vault issues.

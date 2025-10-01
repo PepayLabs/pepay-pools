@@ -5,7 +5,7 @@
 *Current: Lifinity v2 Port with HyperCore/Pyth Oracles*
 *Philosophy: **Volume First, Margins Second, Gas Third***
 
-> **Implementation Update (2025-10-01):** The rebalancing automation described here is now live. See `docs/REBALANCING_IMPLEMENTATION.md` for the implemented Solidity + tests.
+> **Implementation Update (2025-10-01):** The rebalancing automation described here (including cooldown + fresh-mid guards) is now live. See `docs/REBALANCING_IMPLEMENTATION.md` for the implemented Solidity + tests.
 
 ---
 

@@ -86,6 +86,29 @@ contract DnmPoolRebalanceTest is BaseTest {
         pool.rebalanceTarget();
     }
 
+    function test_rebalanceRespectsCooldown() public {
+        vm.prank(gov);
+        pool.setRecenterCooldownSec(180);
+        assertEq(pool.recenterCooldownSec(), 180, "cooldown param set");
+
+        vm.prank(alice);
+        pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+
+        _setOraclePrice(1_250_000_000_000_000_000);
+        vm.prank(alice);
+        pool.swapExactIn(400 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        uint64 firstRebalanceAt = pool.lastRebalanceAt();
+        assertGt(firstRebalanceAt, 0, "cooldown seeded");
+
+        _setOraclePrice(1_480_000_000_000_000_000);
+        vm.prank(alice);
+        pool.swapExactIn(400 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+        assertEq(pool.lastRebalanceAt(), firstRebalanceAt, "cooldown blocks second rebalance");
+        assertEq(pool.lastRebalancePrice(), 1_250_000_000_000_000_000, "price baseline held");
+
+        // Once governance clears the cooldown, subsequent swaps can trigger rebalances again (covered elsewhere).
+    }
+
     function test_manualRebalanceRevertsWhenOracleStale() public {
         vm.prank(alice);
         pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
@@ -97,6 +120,55 @@ contract DnmPoolRebalanceTest is BaseTest {
         vm.prank(bob);
         vm.expectRevert(Errors.OracleStale.selector);
         pool.rebalanceTarget();
+    }
+
+    function test_manualRebalanceHonorsCooldown() public {
+        vm.prank(gov);
+        pool.setRecenterCooldownSec(240);
+        assertEq(pool.recenterCooldownSec(), 240, "manual cooldown set");
+
+        vm.prank(alice);
+        pool.swapExactIn(1_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+
+        _setOraclePrice(1_300_000_000_000_000_000);
+        vm.prank(bob);
+        pool.rebalanceTarget();
+        uint64 firstManual = pool.lastRebalanceAt();
+        assertGt(firstManual, 0, "timestamp recorded");
+        assertEq(firstManual, block.timestamp, "timestamp matches block");
+
+        _setOraclePrice(1_480_000_000_000_000_000);
+        assertEq(pool.lastRebalancePrice(), 1_300_000_000_000_000_000, "baseline locked");
+        (, uint256 currentAge, bool currentSuccess) = _readSpot();
+        assertTrue(currentSuccess, "spot success");
+        assertEq(currentAge, 0, "fresh age");
+        assertEq(_currentSpot(), 1_480_000_000_000_000_000, "fresh mid");
+        assertLt(block.timestamp, uint256(firstManual) + pool.recenterCooldownSec(), "still in cooldown window");
+        vm.prank(bob);
+        try pool.rebalanceTarget() {
+            fail("expected cooldown revert");
+        } catch (bytes memory err) {
+            bytes4 sel;
+            assembly {
+                sel := mload(add(err, 32))
+            }
+            assertEq(sel, Errors.RecenterCooldown.selector, "cooldown revert");
+        }
+
+        // No need to assert post-cooldown behavior here; other tests cover rebalancing success paths.
+    }
+
+    function _currentSpot() internal view returns (uint256) {
+        (uint256 mid,,) = oracleHC.spot();
+        return mid;
+    }
+
+    function _readSpot()
+        internal
+        view
+        returns (uint256 mid, uint256 ageSec, bool success)
+    {
+        return oracleHC.spot();
     }
 
     function _computeTarget(uint128 baseReserves, uint128 quoteReserves, uint256 mid)

@@ -41,6 +41,14 @@ Supporting libraries provide fixed-point math, inventory deviation helpers, and 
 - When the order book spread is unavailable (e.g., EMA/Pyth fallback), the absolute floor (`betaFloorBps`) is used so quotes never collapse to zero.
 - Both swap execution and preview paths share the same helper, ensuring routers cannot undercut the configured minimum even when rebates are introduced in later upgrades.
 
+### Inventory Tilt Upgrade (F06)
+
+- Tilt parameters sit in `InventoryConfig` (`invTiltBpsPer1pct`, `invTiltMaxBps`, `tiltConfWeightBps`, `tiltSpreadWeightBps`) and are guarded by `featureFlags.enableInvTilt`.
+- The instantaneous neutral inventory is computed as `x* = (Q + P × B) / (2P)` using live reserves; the deviation `Δ = B - x*` determines the tilt direction (positive = base-heavy).
+- The raw adjustment is `tiltBase = |Δ|_bps × invTiltBpsPer1pct / 100`, then re-weighted by `(1 + tiltConfWeightBps × confBps / 10_000 + tiltSpreadWeightBps × spreadBps / 10_000)` and finally capped by `invTiltMaxBps`.
+- Trades that worsen the deviation (e.g., base-heavy + base-in) receive a fee surcharge, while restorative trades are discounted symmetrically; adjustments never push below zero or above `FeeConfig.capBps`.
+- The helper runs in both swap and preview paths so routers observe matching incentives, and all math is performed in-memory (no extra storage writes).
+
 ## Storage Layout
 
 | Slot | Component | Notes |

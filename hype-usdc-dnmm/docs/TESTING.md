@@ -10,6 +10,7 @@
 | `test/unit/FeePolicy.t.sol` | Fee surface math, caps, decay behaviour. |
 | `test/unit/Inventory.t.sol` | Partial fill solver, deviation calculations. |
 | `test/unit/DnmPool_Rebalance.t.sol` | Auto/manual recenter gating, cooldown, hysteresis streak, stale oracle guards. |
+| `test/unit/InventoryTiltTest.t.sol` | Inventory tilt incentives (base-heavy/light) and weighting by spread/conf. |
 | `test/unit/BboFloorTest.t.sol` | BBO-aware floor clamp, spread fallback, fee-cap saturation. |
 | `test/unit/ConfigSchema.t.sol` | Config schema coverage for tilt/BBO/AOMQ knobs and governance bounds. |
 | `test/unit/DnmPool.t.sol` | Swap happy path, fallback usage, divergence revert. |

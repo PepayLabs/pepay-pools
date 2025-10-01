@@ -19,6 +19,13 @@
 - `|baseReserves - targetBaseXstar| / poolNotional × 10_000` using latest mid price.
 - `targetBaseXstar` updates only when price change exceeds `recenterThresholdPct` (7.5% default).
 
+### Inventory Tilt (F06)
+- When `featureFlags.enableInvTilt` is true the pool applies an additional signed adjustment derived from the instantaneous neutral inventory `x* = (Q + P × B) / (2P)`.
+- `invTiltBpsPer1pct` defines the base adjustment per percentage point of deviation; `invTiltMaxBps` clamps the final change.
+- Weighting knobs scale the base adjustment: `tiltConfWeightBps` (confidence) and `tiltSpreadWeightBps` (order-book spread) operate in BPS space so `1.0 = 10_000`.
+- Trades that worsen the deviation (e.g., base-heavy + base-in) receive a surcharge, while restorative trades are discounted. The helper runs in both swap and preview flows and the result is still bounded by `FeeConfig.capBps`.
+- See `test/unit/InventoryTiltTest.t.sol` for regression coverage and `shadow-bot/shadow-bot.ts` for telemetry exposure of the new inventory knobs.
+
 ## Floors & Partial Fills (`Inventory` Library)
 - `floorBps` reserves safeguarded per side (default 3%).
 - `Inventory.quoteBaseIn` / `quoteQuoteIn` ensure post-trade reserves stay above floor; if not, they compute maximal safe input and flag partial fills.

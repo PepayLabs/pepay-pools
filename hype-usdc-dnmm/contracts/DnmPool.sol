@@ -663,6 +663,28 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             }
         }
 
+        if (flags.enableInvTilt) {
+            int256 tiltAdj = _computeInventoryTiltBps(
+                isBaseIn,
+                outcome.mid,
+                outcome.spreadBps,
+                outcome.confBps,
+                inventoryConfig,
+                invTokens,
+                baseReservesLocal,
+                quoteReservesLocal
+            );
+            if (tiltAdj != 0) {
+                if (tiltAdj > 0) {
+                    uint256 increased = uint256(feeBps) + uint256(tiltAdj);
+                    feeBps = increased > feeCfg.capBps ? feeCfg.capBps : uint16(increased);
+                } else {
+                    uint256 decrease = uint256(-tiltAdj);
+                    feeBps = decrease >= feeBps ? 0 : uint16(uint256(feeBps) - decrease);
+                }
+            }
+        }
+
         if (outcome.divergenceHaircutBps > 0) {
             uint256 adjusted = uint256(feeBps) + outcome.divergenceHaircutBps;
             if (adjusted > feeCfg.capBps) {
@@ -810,6 +832,72 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         return alphaFloor > betaFloor ? alphaFloor : betaFloor;
+    }
+
+    function _computeInventoryTiltBps(
+        bool isBaseIn,
+        uint256 mid,
+        uint256 spreadBps,
+        uint256 confBps,
+        InventoryConfig memory invCfg,
+        Inventory.Tokens memory invTokens,
+        uint256 baseReservesLocal,
+        uint256 quoteReservesLocal
+    ) internal pure returns (int256) {
+        if (invCfg.invTiltBpsPer1pct == 0 || invCfg.invTiltMaxBps == 0) return 0;
+        if (mid == 0) return 0;
+
+        uint256 baseWad = FixedPointMath.mulDivDown(baseReservesLocal, ONE, invTokens.baseScale);
+        uint256 quoteWad = FixedPointMath.mulDivDown(quoteReservesLocal, ONE, invTokens.quoteScale);
+        if (baseWad == 0 && quoteWad == 0) return 0;
+
+        uint256 baseNotionalWad = FixedPointMath.mulDivDown(baseWad, mid, ONE);
+        uint256 numerator = quoteWad + baseNotionalWad;
+        if (numerator == 0) return 0;
+
+        uint256 denom = mid * 2;
+        if (denom == 0) return 0;
+
+        uint256 xStarWad = FixedPointMath.mulDivDown(numerator, ONE, denom);
+        if (xStarWad == 0) return 0;
+
+        int256 deltaSign;
+        uint256 deltaWad;
+        if (baseWad >= xStarWad) {
+            deltaSign = 1;
+            deltaWad = baseWad - xStarWad;
+        } else {
+            deltaSign = -1;
+            deltaWad = xStarWad - baseWad;
+        }
+        if (deltaWad == 0) return 0;
+
+        uint256 deltaBps = FixedPointMath.toBps(deltaWad, xStarWad);
+        if (deltaBps == 0) return 0;
+
+        uint256 tiltBase = FixedPointMath.mulDivDown(deltaBps, invCfg.invTiltBpsPer1pct, 100);
+        if (tiltBase == 0) return 0;
+
+        uint256 weightFactorBps = BPS;
+        if (invCfg.tiltConfWeightBps > 0 && confBps > 0) {
+            weightFactorBps += FixedPointMath.mulDivDown(confBps, invCfg.tiltConfWeightBps, BPS);
+        }
+        if (invCfg.tiltSpreadWeightBps > 0 && spreadBps > 0) {
+            weightFactorBps += FixedPointMath.mulDivDown(spreadBps, invCfg.tiltSpreadWeightBps, BPS);
+        }
+
+        uint256 weightedTilt = FixedPointMath.mulDivDown(tiltBase, weightFactorBps, BPS);
+        if (weightedTilt == 0) return 0;
+        if (weightedTilt > invCfg.invTiltMaxBps) {
+            weightedTilt = invCfg.invTiltMaxBps;
+        }
+
+        int256 signedTilt = deltaSign * int256(weightedTilt);
+        if (!isBaseIn) {
+            signedTilt = -signedTilt;
+        }
+
+        return signedTilt;
     }
 
     function _checkAndRebalanceAuto(uint256 currentPrice) internal {

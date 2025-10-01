@@ -122,7 +122,12 @@ abstract contract BaseTest is MathAsserts {
             confWeightSpreadBps: 10_000,
             confWeightSigmaBps: 10_000,
             confWeightPythBps: 10_000,
-            sigmaEwmaLambdaBps: 9000
+            sigmaEwmaLambdaBps: 9000,
+            divergenceAcceptBps: 30,
+            divergenceSoftBps: 60,
+            divergenceHardBps: 75,
+            haircutMinBps: 3,
+            haircutSlopeBps: 1
         });
     }
 
@@ -137,7 +142,12 @@ abstract contract BaseTest is MathAsserts {
             confWeightSpreadBps: 10_000,
             confWeightSigmaBps: 10_000,
             confWeightPythBps: 10_000,
-            sigmaEwmaLambdaBps: 9000
+            sigmaEwmaLambdaBps: 9000,
+            divergenceAcceptBps: 15,
+            divergenceSoftBps: 20,
+            divergenceHardBps: 25,
+            haircutMinBps: 2,
+            haircutSlopeBps: 1
         });
     }
 
@@ -149,7 +159,10 @@ abstract contract BaseTest is MathAsserts {
             betaInvDevNumerator: 12,
             betaInvDevDenominator: 100,
             capBps: 150,
-            decayPctPerBlock: 20
+            decayPctPerBlock: 20,
+            gammaSizeLinBps: 0,
+            gammaSizeQuadBps: 0,
+            sizeFeeCapBps: 0
         });
     }
 
@@ -161,7 +174,10 @@ abstract contract BaseTest is MathAsserts {
             betaInvDevNumerator: 8,
             betaInvDevDenominator: 100,
             capBps: 120,
-            decayPctPerBlock: 10
+            decayPctPerBlock: 10,
+            gammaSizeLinBps: 0,
+            gammaSizeQuadBps: 0,
+            sizeFeeCapBps: 0
         });
     }
 
@@ -170,12 +186,46 @@ abstract contract BaseTest is MathAsserts {
     }
 
     function defaultFeatureFlags() internal pure returns (DnmPool.FeatureFlags memory) {
-        return DnmPool.FeatureFlags({blendOn: true, parityCiOn: true, debugEmit: true});
+        return DnmPool.FeatureFlags({
+            blendOn: false,
+            parityCiOn: false,
+            debugEmit: false,
+            enableSoftDivergence: false,
+            enableSizeFee: false,
+            enableBboFloor: false,
+            enableInvTilt: false,
+            enableAOMQ: false,
+            enableRebates: false,
+            enableAutoRecenter: false
+        });
     }
 
     function getFeatureFlags() internal view returns (DnmPool.FeatureFlags memory flags) {
-        (bool blendOn, bool parityCiOn, bool debugEmit) = pool.featureFlags();
-        flags = DnmPool.FeatureFlags({blendOn: blendOn, parityCiOn: parityCiOn, debugEmit: debugEmit});
+        (
+            bool blendOn,
+            bool parityCiOn,
+            bool debugEmit,
+            bool enableSoftDivergence,
+            bool enableSizeFee,
+            bool enableBboFloor,
+            bool enableInvTilt,
+            bool enableAOMQ,
+            bool enableRebates,
+            bool enableAutoRecenter
+        ) = pool.featureFlags();
+
+        flags = DnmPool.FeatureFlags({
+            blendOn: blendOn,
+            parityCiOn: parityCiOn,
+            debugEmit: debugEmit,
+            enableSoftDivergence: enableSoftDivergence,
+            enableSizeFee: enableSizeFee,
+            enableBboFloor: enableBboFloor,
+            enableInvTilt: enableInvTilt,
+            enableAOMQ: enableAOMQ,
+            enableRebates: enableRebates,
+            enableAutoRecenter: enableAutoRecenter
+        });
     }
 
     function setFeatureFlags(DnmPool.FeatureFlags memory flags) internal {

@@ -39,7 +39,10 @@ contract FeeHandler {
             betaInvDevNumerator: 10,
             betaInvDevDenominator: 100,
             capBps: 250,
-            decayPctPerBlock: 15
+            decayPctPerBlock: 15,
+            gammaSizeLinBps: 0,
+            gammaSizeQuadBps: 0,
+            sizeFeeCapBps: 0
         });
         lastConf = 0;
         lastInv = 0;

@@ -28,4 +28,5 @@ library Errors {
     error RecenterCooldown();
     error FeeCapExceeded();
     error FeePreviewInvariant();
+    error DivergenceHard(uint256 deltaBps, uint256 hardBps);
 }

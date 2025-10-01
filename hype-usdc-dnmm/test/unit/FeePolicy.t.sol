@@ -17,7 +17,10 @@ contract FeePolicyTest is Test {
             betaInvDevNumerator: 12,
             betaInvDevDenominator: 100,
             capBps: 250,
-            decayPctPerBlock: 20
+            decayPctPerBlock: 20,
+            gammaSizeLinBps: 0,
+            gammaSizeQuadBps: 0,
+            sizeFeeCapBps: 0
         });
     }
 
@@ -71,6 +74,9 @@ contract FeePolicyTest is Test {
         assertEq(unpacked.betaInvDevDenominator, cfg.betaInvDevDenominator, "beta den");
         assertEq(unpacked.capBps, cfg.capBps, "cap");
         assertEq(unpacked.decayPctPerBlock, cfg.decayPctPerBlock, "decay");
+        assertEq(unpacked.gammaSizeLinBps, cfg.gammaSizeLinBps, "gamma lin");
+        assertEq(unpacked.gammaSizeQuadBps, cfg.gammaSizeQuadBps, "gamma quad");
+        assertEq(unpacked.sizeFeeCapBps, cfg.sizeFeeCapBps, "size cap");
     }
 
     function test_preview_packed_matches_struct() public {

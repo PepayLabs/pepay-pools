@@ -50,6 +50,11 @@ interface IDnmPool {
             uint256 quoteScale
         );
 
+    function getSoftDivergenceState()
+        external
+        view
+        returns (bool active, uint16 lastDeltaBps, uint8 healthyStreak);
+
     function baseTokenAddress() external view returns (address);
 
     function quoteTokenAddress() external view returns (address);

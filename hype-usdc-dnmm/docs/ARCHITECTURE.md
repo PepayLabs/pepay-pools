@@ -19,6 +19,20 @@ Supporting libraries provide fixed-point math, inventory deviation helpers, and 
 4. **Swap execution** – `swapExactIn` reuses quote math, performs ERC20 transfers, updates fee state, emits telemetry events, and enforces reentrancy + deadline checks.
 5. **Rebalancing** – Each swap calls `_checkAndRebalanceAuto` (respecting `recenterCooldownSec`) to refresh `targetBaseXstar` once drift > `recenterThresholdPct`; permissionless `rebalanceTarget()` provides a keeper fallback, and governance retains `setTargetBaseXstar` for manual overrides.
 
+### Divergence Bands & Haircuts
+
+- **Accept band** (`divergenceAcceptBps`): normal operations. When the soft-divergence feature flag is enabled, the pool records every sample in `softDivergenceState` while no extra fees are applied.
+- **Soft band** (`divergenceSoftBps`): quotes remain online but the pool emits `DivergenceHaircut(deltaBps, extraFeeBps)` and adds `haircutMinBps + haircutSlopeBps × (delta - accept)` to the fee (capped by `FeeConfig.capBps`).
+- **Hard band** (`divergenceHardBps`): emits `DivergenceRejected(deltaBps)` and reverts with `Errors.DivergenceHard(deltaBps, hardBps)`. Subsequent upgrades hook this into the AOMQ micro-liquidity path instead of a cold shutdown.
+- **Hysteresis**: `getSoftDivergenceState()` exposes `(active, lastDeltaBps, healthyStreak)` so keepers can monitor recovery. Three consecutive healthy samples (`delta ≤ accept`) are required before the state toggles back to inactive, preventing alert flapping.
+
+### Size-Aware Fee Curve
+
+- Controlled via `FeeConfig.gammaSizeLinBps`, `gammaSizeQuadBps`, and `sizeFeeCapBps`, gated by the `enableSizeFee` feature flag.
+- The pool normalises trade size by the maker-configured `s0Notional` (quote notional in WAD). `u = tradeNotional / s0Notional` produces a dimensionless multiplier.
+- The additional surcharge is `gammaSizeLinBps × u + gammaSizeQuadBps × u²`, capped by `sizeFeeCapBps` and then by the global fee cap.
+- Works symmetrically for base-in and quote-in trades (quote notional derived from the mid price). Previews, swaps, and RFQ settlement all reuse the same helper ensuring parity.
+
 ## Storage Layout
 
 | Slot | Component | Notes |

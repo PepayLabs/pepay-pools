@@ -184,7 +184,12 @@ contract OracleWatcher is ReentrancyGuard {
             uint16 confWeightSpreadBps,
             uint16 confWeightSigmaBps,
             uint16 confWeightPythBps,
-            uint16 sigmaEwmaLambdaBps
+            uint16 sigmaEwmaLambdaBps,
+            uint16 divergenceAcceptBps,
+            uint16 divergenceSoftBps,
+            uint16 divergenceHardBps,
+            uint16 haircutMinBps,
+            uint16 haircutSlopeBps
         ) = POOL_.oracleConfig();
         cfg = DnmPool.OracleConfig({
             maxAgeSec: maxAgeSec,
@@ -196,7 +201,12 @@ contract OracleWatcher is ReentrancyGuard {
             confWeightSpreadBps: confWeightSpreadBps,
             confWeightSigmaBps: confWeightSigmaBps,
             confWeightPythBps: confWeightPythBps,
-            sigmaEwmaLambdaBps: sigmaEwmaLambdaBps
+            sigmaEwmaLambdaBps: sigmaEwmaLambdaBps,
+            divergenceAcceptBps: divergenceAcceptBps,
+            divergenceSoftBps: divergenceSoftBps,
+            divergenceHardBps: divergenceHardBps,
+            haircutMinBps: haircutMinBps,
+            haircutSlopeBps: haircutSlopeBps
         });
     }
 

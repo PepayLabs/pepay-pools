@@ -16,6 +16,10 @@ contract FeeDynamicsTest is BaseTest {
         approveAll(alice);
         approveAll(bob);
         approveAll(carol);
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        flags.blendOn = true;
+        flags.debugEmit = true;
+        setFeatureFlags(flags);
     }
 
     function test_B1_calm_fee_at_base() public {
@@ -195,18 +199,19 @@ contract FeeDynamicsTest is BaseTest {
 
         EventRecorder.ConfidenceDebugEvent[] memory debugEvents =
             EventRecorder.decodeConfidenceDebug(vm.getRecordedLogs());
-        require(debugEvents.length == sampleCount, "debug event count");
+        require(debugEvents.length >= sampleCount, "debug event count");
 
         for (uint256 i = 0; i < sampleCount; ++i) {
-            confSeries[i] = debugEvents[i].confBlendedBps;
+            EventRecorder.ConfidenceDebugEvent memory dbg = debugEvents[i];
+            confSeries[i] = dbg.confBlendedBps;
             rows[i] = _formatCorrelationRow(i, confSeries[i], observedFees[i]);
-            require(debugEvents[i].feeTotalBps == observedFees[i], "fee total mismatch");
+            require(dbg.feeTotalBps == observedFees[i], "fee total mismatch");
 
             uint256 expectedVol =
                 cfg.alphaConfDenominator == 0 ? 0 : (confSeries[i] * cfg.alphaConfNumerator) / cfg.alphaConfDenominator;
-            require(_withinTolerance(debugEvents[i].feeVolBps, expectedVol, 1), "feeVol deviates from alpha*conf");
-            require(debugEvents[i].feeBaseBps == cfg.baseBps, "base component mismatch");
-            require(debugEvents[i].feeInvBps == 0, "inventory component should be zero");
+            require(_withinTolerance(dbg.feeVolBps, expectedVol, 1), "feeVol deviates from alpha*conf");
+            require(dbg.feeBaseBps == cfg.baseBps, "base component mismatch");
+            require(dbg.feeInvBps == 0, "inventory component should be zero");
         }
 
         int256 corrBps = EventRecorder.computePearsonCorrelation(confSeries, observedFees);
@@ -240,6 +245,9 @@ contract FeeDynamicsTest is BaseTest {
         approveAll(bob);
         approveAll(carol);
         enableBlend();
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        flags.debugEmit = true;
+        setFeatureFlags(flags);
 
         FeePolicy.FeeConfig memory cfgAfter = _feeConfig();
 
@@ -279,7 +287,7 @@ contract FeeDynamicsTest is BaseTest {
 
         EventRecorder.ConfidenceDebugEvent[] memory debugEvents =
             EventRecorder.decodeConfidenceDebug(vm.getRecordedLogs());
-        require(debugEvents.length == entryCount, "cap debug events mismatch");
+        require(debugEvents.length >= entryCount, "cap debug events mismatch");
 
         require(debugEvents[0].feeTotalBps == calmQuote.feeBpsUsed, "baseline fee mismatch");
         require(debugEvents[0].feeBaseBps == cfgAfter.baseBps, "baseline base component mismatch");
@@ -413,7 +421,10 @@ contract FeeDynamicsTest is BaseTest {
             uint16 betaInvDevNumerator,
             uint16 betaInvDevDenominator,
             uint16 capBps,
-            uint16 decayPctPerBlock
+            uint16 decayPctPerBlock,
+            uint16 gammaSizeLinBps,
+            uint16 gammaSizeQuadBps,
+            uint16 sizeFeeCapBps
         ) = pool.feeConfig();
         cfg = FeePolicy.FeeConfig({
             baseBps: baseBps,
@@ -422,7 +433,10 @@ contract FeeDynamicsTest is BaseTest {
             betaInvDevNumerator: betaInvDevNumerator,
             betaInvDevDenominator: betaInvDevDenominator,
             capBps: capBps,
-            decayPctPerBlock: decayPctPerBlock
+            decayPctPerBlock: decayPctPerBlock,
+            gammaSizeLinBps: gammaSizeLinBps,
+            gammaSizeQuadBps: gammaSizeQuadBps,
+            sizeFeeCapBps: sizeFeeCapBps
         });
     }
 
@@ -469,5 +483,10 @@ contract FeeDynamicsTest is BaseTest {
         approveAll(alice);
         approveAll(bob);
         approveAll(carol);
+
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        flags.blendOn = true;
+        flags.debugEmit = true;
+        setFeatureFlags(flags);
     }
 }

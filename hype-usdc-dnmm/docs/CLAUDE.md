@@ -34,5 +34,8 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-01: Documented size-aware fee curve (gamma lin/quad coefficients, S0 normalisation, cap) in `ARCHITECTURE.md`.
+- 2025-10-01: Documented soft divergence haircut bands (accept/soft/hard), new events, and hysteresis behaviour across `ARCHITECTURE.md` and `DIVERGENCE_POLICY.md`.
+- 2025-10-01: Updated `CONFIG.md` to cover zero-default feature flags and the new `features` JSON block aligning with DNMM L3 gating plan.
 - 2025-09-28: Added divergence guard reference (`docs/DIVERGENCE_POLICY.md`) and floor-invariant explainer (`docs/INVENTORY_FLOOR.md`).
 - 2024-07-12: Documented confidence blending weights, EWMA sigma, and the `ConfidenceDebug` telemetry stream.

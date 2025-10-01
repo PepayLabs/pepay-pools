@@ -83,7 +83,12 @@ contract TupleSweepTest is Test {
             confWeightSpreadBps: 10_000,
             confWeightSigmaBps: 10_000,
             confWeightPythBps: 10_000,
-            sigmaEwmaLambdaBps: 9000
+            sigmaEwmaLambdaBps: 9000,
+            divergenceAcceptBps: 30,
+            divergenceSoftBps: 70,
+            divergenceHardBps: 90,
+            haircutMinBps: 3,
+            haircutSlopeBps: 1
         });
         FeePolicy.FeeConfig memory feeCfg = FeePolicy.FeeConfig({
             baseBps: 12,
@@ -92,7 +97,10 @@ contract TupleSweepTest is Test {
             betaInvDevNumerator: 10,
             betaInvDevDenominator: 100,
             capBps: 220,
-            decayPctPerBlock: 20
+            decayPctPerBlock: 20,
+            gammaSizeLinBps: 0,
+            gammaSizeQuadBps: 0,
+            sizeFeeCapBps: 0
         });
         DnmPool.MakerConfig memory makerCfg = DnmPool.MakerConfig({s0Notional: uint128(1_000 * baseScale), ttlMs: 200});
         DnmPool.Guardians memory guardians = DnmPool.Guardians({governance: address(this), pauser: address(this)});
@@ -108,7 +116,18 @@ contract TupleSweepTest is Test {
             oracleCfg,
             feeCfg,
             makerCfg,
-            DnmPool.FeatureFlags({blendOn: true, parityCiOn: true, debugEmit: true}),
+            DnmPool.FeatureFlags({
+                blendOn: true,
+                parityCiOn: true,
+                debugEmit: true,
+                enableSoftDivergence: false,
+                enableSizeFee: false,
+                enableBboFloor: false,
+                enableInvTilt: false,
+                enableAOMQ: false,
+                enableRebates: false,
+                enableAutoRecenter: false
+            }),
             guardians
         );
 

@@ -15,7 +15,7 @@ contract ScenarioCalmFlowTest is BaseTest {
 
     function test_calm_flow_sequence() public {
         updateBidAsk(99998e14, 100002e14, 4, true);
-        (uint16 baseFee,,,,,,) = pool.feeConfig();
+        uint16 baseFee = defaultFeeConfig().baseBps;
         DnmPool.QuoteResult memory preQuote = quote(10 ether, true, IDnmPool.OracleMode.Spot);
         uint256 calmFee = preQuote.feeBpsUsed;
         assertLe(calmFee, baseFee + 20, "calm fee bound");

@@ -45,7 +45,12 @@ contract DivergencePolicyTest is Test {
             confWeightSpreadBps: 10_000,
             confWeightSigmaBps: 10_000,
             confWeightPythBps: 10_000,
-            sigmaEwmaLambdaBps: 9_000
+            sigmaEwmaLambdaBps: 9_000,
+            divergenceAcceptBps: 25,
+            divergenceSoftBps: 40,
+            divergenceHardBps: 50,
+            haircutMinBps: 3,
+            haircutSlopeBps: 1
         });
         FeePolicy.FeeConfig memory feeCfg = FeePolicy.FeeConfig({
             baseBps: 15,
@@ -54,10 +59,24 @@ contract DivergencePolicyTest is Test {
             betaInvDevNumerator: 12,
             betaInvDevDenominator: 100,
             capBps: 150,
-            decayPctPerBlock: 20
+            decayPctPerBlock: 20,
+            gammaSizeLinBps: 0,
+            gammaSizeQuadBps: 0,
+            sizeFeeCapBps: 0
         });
         DnmPool.MakerConfig memory makerCfg = DnmPool.MakerConfig({s0Notional: 5_000 ether, ttlMs: 300});
-        DnmPool.FeatureFlags memory flags = DnmPool.FeatureFlags({blendOn: true, parityCiOn: true, debugEmit: true});
+        DnmPool.FeatureFlags memory flags = DnmPool.FeatureFlags({
+            blendOn: true,
+            parityCiOn: true,
+            debugEmit: true,
+            enableSoftDivergence: false,
+            enableSizeFee: false,
+            enableBboFloor: false,
+            enableInvTilt: false,
+            enableAOMQ: false,
+            enableRebates: false,
+            enableAutoRecenter: false
+        });
 
         pool = new DnmPool(
             address(baseToken),
@@ -117,7 +136,18 @@ contract DivergencePolicyTest is Test {
     }
 
     function test_noDebugEventWhenFlagOff() public {
-        DnmPool.FeatureFlags memory flags = DnmPool.FeatureFlags({blendOn: true, parityCiOn: true, debugEmit: false});
+        DnmPool.FeatureFlags memory flags = DnmPool.FeatureFlags({
+            blendOn: true,
+            parityCiOn: true,
+            debugEmit: false,
+            enableSoftDivergence: false,
+            enableSizeFee: false,
+            enableBboFloor: false,
+            enableInvTilt: false,
+            enableAOMQ: false,
+            enableRebates: false,
+            enableAutoRecenter: false
+        });
         vm.prank(GOV);
         pool.updateParams(DnmPool.ParamKind.Feature, abi.encode(flags));
 

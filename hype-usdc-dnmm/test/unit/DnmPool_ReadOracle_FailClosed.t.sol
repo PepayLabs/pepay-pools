@@ -52,7 +52,12 @@ contract DnmPoolReadOracleFailClosedTest is Test {
             confWeightSpreadBps: 10_000,
             confWeightSigmaBps: 10_000,
             confWeightPythBps: 10_000,
-            sigmaEwmaLambdaBps: 9_000
+            sigmaEwmaLambdaBps: 9_000,
+            divergenceAcceptBps: 30,
+            divergenceSoftBps: 60,
+            divergenceHardBps: 75,
+            haircutMinBps: 3,
+            haircutSlopeBps: 1
         });
         FeePolicy.FeeConfig memory feeCfg = FeePolicy.FeeConfig({
             baseBps: 15,
@@ -61,10 +66,24 @@ contract DnmPoolReadOracleFailClosedTest is Test {
             betaInvDevNumerator: 12,
             betaInvDevDenominator: 100,
             capBps: 150,
-            decayPctPerBlock: 20
+            decayPctPerBlock: 20,
+            gammaSizeLinBps: 0,
+            gammaSizeQuadBps: 0,
+            sizeFeeCapBps: 0
         });
         DnmPool.MakerConfig memory makerCfg = DnmPool.MakerConfig({s0Notional: 5_000 ether, ttlMs: 300});
-        DnmPool.FeatureFlags memory flags = DnmPool.FeatureFlags({blendOn: true, parityCiOn: true, debugEmit: false});
+        DnmPool.FeatureFlags memory flags = DnmPool.FeatureFlags({
+            blendOn: true,
+            parityCiOn: true,
+            debugEmit: false,
+            enableSoftDivergence: false,
+            enableSizeFee: false,
+            enableBboFloor: false,
+            enableInvTilt: false,
+            enableAOMQ: false,
+            enableRebates: false,
+            enableAutoRecenter: false
+        });
 
         pool = new DnmPool(
             address(baseToken),

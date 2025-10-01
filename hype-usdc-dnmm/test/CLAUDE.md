@@ -34,6 +34,9 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-01: Added `SizeFeeCurveTest` validating linear/quadratic surcharge monotonicity, cap enforcement, and preview↔swap parity.
+- 2025-10-01: Added `SoftDivergenceTest` covering haircut math, hard-band rejections, and hysteresis recovery alongside new `getSoftDivergenceState()` helper.
+- 2025-10-01: Added `FeatureFlagsTest` to enforce zero-default toggles and governance-controlled enablement; updated quote suite bootstrapping for explicit debug/blend opt-ins.
 - 2025-09-28: Added divergence policy regression (unit) and floor monotonicity/property fuzz suites to cover partial-fill invariants.
 - 2025-09-28: Introduced HyperCore precompile harness (`MockHyperCorePx/Bbo`) and canonical-address etching helpers to exercise raw 32-byte interfaces plus fail-closed regression tests.
 - 2025-09-22: Added fork parity regression suite (incl. full precompile matrix), preview↔settlement parity (base, quote, RFQ), Pyth hygiene/divergence flap suites, canary observer shadow tests, timestamp guard, DoS gas campaign, and 5k-load metrics exports.

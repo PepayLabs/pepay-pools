@@ -34,4 +34,6 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-01: Extended deployment fee config to include size-fee defaults (gamma lin/quad, cap) alongside zero-default feature flags.
+- 2025-10-01: Updated `Deploy.s.sol` to pass zero-default feature flags (all `false`) per DNMM L3 gating requirements.
 - 2025-09-28: Parameterised `script/Deploy.s.sol` via `DNMM_*` environment variables and documented required inputs in `docs/OPERATIONS.md`.

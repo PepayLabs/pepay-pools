@@ -39,4 +39,5 @@
 - 2025-10-02: Mapped Hypertrade legs to per-DEX adapters (HyperSwap, Hybra, Kittenswap, Gliquid, Ramses v3) with rate-limited execution, per-leg CSV rows, and FAST_QUOTE_PLAN for quick smoke tests.
 - 2025-10-02: Upgraded Kittenswap Algebra adapter to struct-based Quoter V2 ABI for native fee/slippage decoding.
 - 2025-10-02: Aligned TypeScript compiler with NodeNext module resolution and hardened metrics output sanitization/tests to unblock `npm run build`.
-- 2025-10-02: Added Hypertrade dexWhitelist-backed adapters for Curve, Hyperliquid, Project X, and remaining HyperEVM DEX targets; refreshed dex-docs registry notes and timestamps.
+- 2025-10-02: Added Hypertrade dexWhitelist-backed adapters for Curve, Project X, and the remaining HyperEVM DEX targets as interim coverage; refreshed dex-docs registry notes and timestamps.
+- 2025-10-02: Implemented Hyperliquid order-book adapter via the official /info API so HYPE/USDC quotes run without Hypertrade fallbacks and capture depth usage per request.

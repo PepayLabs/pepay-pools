@@ -5,8 +5,8 @@
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": "https://api.hyperliquid.xyz/info",
-    "last_checked_at": "2025-10-02T18:11:12.000Z",
-    "notes": "Gitbook documents REST info/l2 endpoints; Hypertrade leg filtering isolates Hyperliquid router liquidity while dedicated swap API remains closed beta."
+    "last_checked_at": "2025-10-02T18:24:21.000Z",
+    "notes": "Using /info spotMeta + l2Book to simulate order-book fills for HYPE/USDC; adapter works without Hypertrade and records depth used per quote."
   },
   {
     "name": "Project X",

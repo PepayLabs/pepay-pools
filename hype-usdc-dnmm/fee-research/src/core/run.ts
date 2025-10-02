@@ -5,6 +5,7 @@ import { buildAdapters } from './adapters.js';
 import { buildQuotePlan, newRunId } from './quotePlan.js';
 import { findChain } from '../registries/chains.js';
 import { findToken } from '../registries/tokens.js';
+import { loadDexDocs } from '../registries/dexDocs.js';
 import { logger } from '../utils/logger.js';
 import { MetricsWriter } from './metricsWriter.js';
 import { QuoteDirection } from '../types.js';
@@ -81,6 +82,7 @@ export async function runEvaluation(): Promise<void> {
 
   const plan = buildQuotePlan();
   const adapters = buildAdapters();
+  const dexDocs = await loadDexDocs();
   const metricsWriter = new MetricsWriter({ metricsDir: path.resolve(process.cwd(), 'metrics/hype-metrics') });
 
   const adaptersWithSuccess: string[] = [];
@@ -292,10 +294,78 @@ export async function runEvaluation(): Promise<void> {
                 response: quote,
               }
             );
+        rows += 1;
+
+        if (quote.success && quote.legs && quote.legs.length > 0) {
+          for (const leg of quote.legs) {
+            const portion = Number(leg.portion);
+            const portionSafe = Number.isFinite(portion) ? Math.max(portion, 0) : 0;
+            const legDocs = dexDocs.find((d) => d.name.toLowerCase() === leg.dex.toLowerCase());
+            const legDocsUrl = legDocs?.official_docs_url ?? legDocs?.http_quote_base_url ?? null;
+            const amountInTokensLeg = amountInTokensNumber * portionSafe;
+            const amountInUsdLeg = amountUsd * portionSafe;
+            const amountOutTokensLeg = parseFloat(leg.amount_out_tokens);
+            const effectivePriceLeg = amountOutTokensLeg > 0 ? amountInTokensLeg / amountOutTokensLeg : null;
+            const effectiveUsdPriceLeg = amountOutTokensLeg > 0 ? amountInUsdLeg / amountOutTokensLeg : null;
+            const priceImpactLeg = directionMid && amountOutTokensLeg > 0
+              ? computePriceImpactBps({
+                  amountInTokens: amountInTokensLeg,
+                  amountOutTokens: amountOutTokensLeg,
+                  idealOutTokens: amountInTokensLeg * directionMid,
+                })
+              : null;
+
+            metricsWriter.addRow(
+              {
+                run_id: runId,
+                timestamp_iso: timestamp,
+                dex: leg.dex,
+                integration_kind: 'dex_via_hypertrade',
+                docs_url: legDocsUrl,
+                chain_id: chain.chain_id,
+                chain_name: chain.name,
+                direction,
+                token_in_symbol: tokens.symbol,
+                token_in_address: tokens.address,
+                decimals_in: tokens.decimals,
+                token_out_symbol: counter.symbol,
+                token_out_address: counter.address,
+                decimals_out: counter.decimals,
+                amount_in_tokens: amountInTokensLeg.toString(),
+                amount_in_usd: amountInUsdLeg,
+                amount_out_tokens: leg.amount_out_tokens,
+                amount_out_usd: null,
+                mid_price_out_per_in: directionMid ?? null,
+                effective_price_in_per_out: effectivePriceLeg,
+                effective_price_usd_per_out: effectiveUsdPriceLeg,
+                price_impact_bps: priceImpactLeg,
+                fee_bps: leg.fee_bps,
+                gas_estimate: null,
+                gas_price: null,
+                gas_cost_native: null,
+                native_usd: null,
+                gas_cost_usd: null,
+                route_summary: leg.pool_address ? `${leg.dex} pool ${leg.pool_address}` : leg.dex,
+                sdk_or_api_version: quote.sdk_or_api_version,
+                quote_latency_ms: latency,
+                success: true,
+                failure_reason: null,
+              },
+              {
+                run_id: runId,
+                timestamp_iso: timestamp,
+                adapter: leg.dex,
+                direction,
+                amount_usd: amountInUsdLeg,
+                leg,
+              }
+            );
             rows += 1;
-          })
-        );
-      }
+          }
+        }
+      })
+    );
+  }
     }
 
     await Promise.all(tasks);

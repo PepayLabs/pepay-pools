@@ -103,7 +103,7 @@
     "official_docs_url": "https://docs.ht.xyz/api",
     "sdk_package_name": null,
     "sdk_repo_url": null,
-    "http_quote_base_url": "https://core.ht.xyz/api/v1/trade/getSwapInfo",
+    "http_quote_base_url": "https://api.ht.xyz/api/v1/simulation",
     "last_checked_at": "2025-10-02T14:55:00.000Z",
     "notes": "REST endpoint returns cross-DEX route splits, calldata, and fee data for HyperEVM swaps."
   },

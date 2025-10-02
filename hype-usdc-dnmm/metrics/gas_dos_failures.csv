@@ -1,4 +1,4 @@
-case,gas_used,cap
-floor_breach,140416,150000
-oracle_stale,33023,120000
-divergence_reject,78582,120000
+reason,avg_gas,max_gas
+STALE,59468,59663
+SPREAD,60233,60429
+DIVERGENCE,100931,101213

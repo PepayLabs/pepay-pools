@@ -26,7 +26,7 @@ contract InvariantMidSelectionGates is StdInvariant, BaseTest {
         if (lastErrored) {
             if (err.length < 4) revert("missing selector");
             bytes4 selector;
-            assembly {
+            assembly ("memory-safe") {
                 selector := mload(add(err, 32))
             }
             assertTrue(

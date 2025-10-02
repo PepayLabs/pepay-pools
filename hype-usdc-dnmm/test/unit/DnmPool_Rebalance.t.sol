@@ -161,7 +161,7 @@ contract DnmPoolRebalanceTest is BaseTest {
             fail("expected cooldown revert");
         } catch (bytes memory err) {
             bytes4 sel;
-            assembly {
+            assembly ("memory-safe") {
                 sel := mload(add(err, 32))
             }
             assertEq(sel, Errors.RecenterCooldown.selector, "cooldown revert");

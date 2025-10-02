@@ -22,7 +22,7 @@ contract DosEconomicsTest is BaseTest {
         string[] memory rows = new string[](3);
         uint256 rowIdx;
 
-        rowIdx = _recordBurst(rows, rowIdx, "STALE", Errors.OracleStale.selector, _configureStaleScenario);
+        rowIdx = _recordBurst(rows, rowIdx, "STALE", Errors.MidUnset.selector, _configureStaleScenario);
         rowIdx = _recordBurst(rows, rowIdx, "SPREAD", Errors.OracleSpread.selector, _configureSpreadScenario);
         rowIdx = _recordBurst(rows, rowIdx, "DIVERGENCE", Errors.OracleDiverged.selector, _configureDivergenceScenario);
 
@@ -94,7 +94,7 @@ contract DosEconomicsTest is BaseTest {
     function _decodeRevertSelector(bytes memory revertData) internal pure returns (bytes4) {
         if (revertData.length < 4) return bytes4(0);
         bytes4 selector;
-        assembly {
+        assembly ("memory-safe") {
             selector := mload(add(revertData, 32))
         }
         return selector;

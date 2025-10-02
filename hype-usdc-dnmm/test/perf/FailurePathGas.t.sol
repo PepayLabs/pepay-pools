@@ -147,7 +147,7 @@ contract FailurePathGasTest is BaseTest {
     function _revertMatches(bytes memory ret, bytes4 expectedSelector) internal pure returns (bool) {
         if (ret.length < 4) return false;
         bytes4 selector;
-        assembly {
+        assembly ("memory-safe") {
             selector := mload(add(ret, 0x20))
         }
         return selector == expectedSelector;

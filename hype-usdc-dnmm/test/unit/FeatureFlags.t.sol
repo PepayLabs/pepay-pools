@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 contract FeatureFlagsTest is BaseTest {
     function setUp() public virtual {
@@ -76,5 +77,38 @@ contract FeatureFlagsTest is BaseTest {
         assertTrue(enableAOMQ, "AOMQ enabled");
         assertTrue(enableRebates, "rebates enabled");
         assertTrue(enableAutoRecenter, "auto recenter enabled");
+    }
+
+    function test_debugEmitFlagGatesConfidenceEvent() public {
+        vm.recordLogs();
+        quote(10 ether, true, IDnmPool.OracleMode.Spot);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 debugSig = keccak256(
+            "ConfidenceDebug(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)"
+        );
+        bool found;
+        for (uint256 i = 0; i < logs.length; ++i) {
+            if (logs[i].topics[0] == debugSig) {
+                found = true;
+                break;
+            }
+        }
+        assertFalse(found, "debug event suppressed when flag off");
+
+        DnmPool.FeatureFlags memory flags = getFeatureFlags();
+        flags.debugEmit = true;
+        setFeatureFlags(flags);
+
+        found = false;
+        vm.recordLogs();
+        quote(10 ether, true, IDnmPool.OracleMode.Spot);
+        logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; ++i) {
+            if (logs[i].topics[0] == debugSig) {
+                found = true;
+                break;
+            }
+        }
+        assertTrue(found, "debug event fires when flag enabled");
     }
 }

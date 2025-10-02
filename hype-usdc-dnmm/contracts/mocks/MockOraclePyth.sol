@@ -6,19 +6,35 @@ import {FixedPointMath} from "../lib/FixedPointMath.sol";
 
 contract MockOraclePyth is IOracleAdapterPyth {
     PythResult public result;
+    uint256 public readCount;
+    bool public forceReadRevert;
+    bool public forcePeekRevert;
 
     error SweepFailed();
     error SweepRecipientZero();
+    error ForcedRead();
+    error ForcedPeek();
 
     function setResult(PythResult memory newResult) external {
         result = newResult;
     }
 
+    function setForceReadRevert(bool shouldRevert) external {
+        forceReadRevert = shouldRevert;
+    }
+
+    function setForcePeekRevert(bool shouldRevert) external {
+        forcePeekRevert = shouldRevert;
+    }
+
     function readPythUsdMid(bytes calldata) external payable override returns (PythResult memory) {
+        readCount += 1;
+        if (forceReadRevert) revert ForcedRead();
         return result;
     }
 
     function peekPythUsdMid() external view override returns (PythResult memory) {
+        if (forcePeekRevert) revert ForcedPeek();
         return result;
     }
 

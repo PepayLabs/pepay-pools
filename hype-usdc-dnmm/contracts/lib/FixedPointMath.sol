@@ -54,7 +54,7 @@ library FixedPointMath {
         unchecked {
             uint256 prod0;
             uint256 prod1;
-            assembly {
+            assembly ("memory-safe") {
                 let mm := mulmod(x, y, not(0))
                 prod0 := mul(x, y)
                 prod1 := sub(sub(mm, prod0), lt(mm, prod0))
@@ -71,18 +71,18 @@ library FixedPointMath {
             if (denominator <= prod1) revert MathOverflow();
 
             uint256 remainder;
-            assembly {
+            assembly ("memory-safe") {
                 remainder := mulmod(x, y, denominator)
             }
             bool shouldRound = roundUp && remainder != 0;
 
-            assembly {
+            assembly ("memory-safe") {
                 prod1 := sub(prod1, gt(remainder, prod0))
                 prod0 := sub(prod0, remainder)
             }
 
             uint256 twos = denominator & (~denominator + 1);
-            assembly {
+            assembly ("memory-safe") {
                 denominator := div(denominator, twos)
                 prod0 := div(prod0, twos)
                 twos := add(div(sub(0, twos), twos), 1)

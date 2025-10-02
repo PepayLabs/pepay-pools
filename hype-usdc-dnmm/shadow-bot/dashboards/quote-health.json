@@ -1,0 +1,159 @@
+{
+  "dashboard": {
+    "title": "DNMM L3 - Quote Health",
+    "tags": ["dnmm", "quotes", "uptime"],
+    "timezone": "utc",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Two-Sided Uptime (%)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "dnmm_two_sided_uptime_pct",
+            "legendFormat": "Two-Sided Uptime"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 98.5, "color": "yellow"},
+                {"value": 99, "color": "green"}
+              ]
+            }
+          }
+        },
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "lt",
+                "params": [98.5]
+              },
+              "query": {
+                "model": {
+                  "expr": "dnmm_two_sided_uptime_pct",
+                  "refId": "A"
+                },
+                "params": ["15m", "now"]
+              },
+              "reducer": {
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "message": "Two-sided uptime below 98.5% threshold. AOMQ may be degraded.",
+          "name": "Low Uptime Alert"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Ask Fee (BPS)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "dnmm_fee_ask_bps",
+            "legendFormat": "Ask Fee (Base -> Quote)"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "BPS",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Bid Fee (BPS)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "dnmm_fee_bid_bps",
+            "legendFormat": "Bid Fee (Quote -> Base)"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "BPS",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Size Bucket Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "rate(dnmm_size_bucket_total[1h])",
+            "legendFormat": "{{bucket}}"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Fee Ladder (Size Multipliers)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "dnmm_ladder_fee_bps{size_multiplier=\"1x\"}",
+            "legendFormat": "1x S0"
+          },
+          {
+            "expr": "dnmm_ladder_fee_bps{size_multiplier=\"2x\"}",
+            "legendFormat": "2x S0"
+          },
+          {
+            "expr": "dnmm_ladder_fee_bps{size_multiplier=\"5x\"}",
+            "legendFormat": "5x S0"
+          },
+          {
+            "expr": "dnmm_ladder_fee_bps{size_multiplier=\"10x\"}",
+            "legendFormat": "10x S0"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Fee BPS",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Decision Type Rate (per 5m)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(dnmm_decision_total{decision=\"accept\"}[5m]) * 300",
+            "legendFormat": "Accept"
+          },
+          {
+            "expr": "rate(dnmm_decision_total{decision=\"haircut\"}[5m]) * 300",
+            "legendFormat": "Haircut (Soft Divergence)"
+          },
+          {
+            "expr": "rate(dnmm_decision_total{decision=\"aomq\"}[5m]) * 300",
+            "legendFormat": "AOMQ (Micro-Quote)"
+          },
+          {
+            "expr": "rate(dnmm_decision_total{decision=\"reject\"}[5m]) * 300",
+            "legendFormat": "Reject (Hard Divergence)"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Quotes per 5min",
+            "format": "short"
+          }
+        ]
+      }
+    ]
+  }
+}

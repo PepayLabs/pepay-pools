@@ -6,6 +6,8 @@
   - `pyth_conf_bps` – Pyth confidence scaled to BPS.
   - `hc_spread_bps` – Live HyperCore order-book spread in BPS.
   - `decision{decision}` – Counter labelling accept / haircut / reject / aomq outcomes.
+  - `pyth_reads_total` – Counter bumped whenever the swap pipeline executes a paid Pyth adapter read; track alongside quote gas to ensure lazy gating keeps calls sparse.
+  - `pyth_peek_reverts_total` – Preview-only gauge capturing forced Pyth peek fallbacks; sustained growth signals oracle staleness or misconfigured gating.
 - **Economics**
   - `fee_ask_bps`, `fee_bid_bps` – Applied fees per side after discounts/floors.
   - `size_bucket{bucket}` – Counter for trade notional buckets (`<=S0`, `S0..2S0`, `>2S0`).
@@ -54,6 +56,7 @@
 - `preview_stale_reverts_total` derivative > 0.5/min – routers hitting stale snapshots; check keepers.
 - Partial fills > 10% of swap notional in an hour.
 - `reason` = `"PYTH"` or `"EMA"` exceeding baseline (oracle degradation).
+- `pyth_reads_total / swap_executed_total > 0.05` over 15 minutes – lazy gating regressed; inspect HyperCore freshness before the adapter spend spikes gas.
 
 ## Telemetry Integration
 - Ingest events via an indexer (e.g., Subsquid on HyperEVM) and push to Prometheus/Grafana.

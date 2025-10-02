@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
+import {MockOraclePyth} from "../../contracts/mocks/MockOraclePyth.sol";
 
 contract PreviewViewPurityTest is BaseTest {
     function setUp() public {
@@ -35,5 +36,28 @@ contract PreviewViewPurityTest is BaseTest {
         pool.previewLadder(0);
         (, writes) = vm.accesses(address(pool));
         assertEq(writes.length, 0, "previewLadder should be view-only");
+    }
+
+    function test_previewFreshSkipsPythWhenHealthy() public {
+        oraclePyth.setForcePeekRevert(true);
+
+        uint256[] memory sizes = new uint256[](1);
+        sizes[0] = 2e17;
+        pool.previewFeesFresh(IDnmPool.OracleMode.Spot, bytes(""), sizes);
+
+        oraclePyth.setForcePeekRevert(false);
+    }
+
+    function test_previewFreshRequiresPythWhenFallback() public {
+        oraclePyth.setForcePeekRevert(true);
+        updateSpot(0, 0, false);
+        updateEma(0, 0, false);
+
+        uint256[] memory sizes = new uint256[](1);
+        sizes[0] = 3e17;
+        vm.expectRevert(MockOraclePyth.ForcedPeek.selector);
+        pool.previewFeesFresh(IDnmPool.OracleMode.Spot, bytes(""), sizes);
+
+        oraclePyth.setForcePeekRevert(false);
     }
 }

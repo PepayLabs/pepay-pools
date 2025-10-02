@@ -1,6 +1,6 @@
 metric,value
 total_swaps,5000
-partial_swaps,2293
+partial_swaps,2294
 spread_rejects,0
 stale_rejects,0
 divergence_rejects,0

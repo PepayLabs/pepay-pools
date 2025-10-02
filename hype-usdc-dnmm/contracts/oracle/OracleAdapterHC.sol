@@ -114,7 +114,7 @@ contract OracleAdapterHC is IOracleAdapterHC {
         uint64 bidWord;
         uint64 askWord;
         if (data.length == 16) {
-            assembly {
+            assembly ("memory-safe") {
                 let word := mload(add(data, 0x20))
                 bidWord := shr(192, word)
                 askWord := and(shr(128, word), 0xFFFFFFFFFFFFFFFF)

@@ -36,14 +36,14 @@ contract MockHyperCorePx {
     fallback(bytes calldata data) external returns (bytes memory) {
         if (data.length != 32 && data.length != 4) revert("MockHyperCorePx:bad-len");
         uint32 key;
-        assembly {
+        assembly ("memory-safe") {
             key := shr(224, calldataload(0))
         }
         Result memory res = results[key];
         if (!res.configured) revert("MockHyperCorePx:missing");
         if (!res.success) {
             bytes memory revertData = res.revertData.length > 0 ? res.revertData : bytes("HC fail");
-            assembly {
+            assembly ("memory-safe") {
                 revert(add(revertData, 0x20), mload(revertData))
             }
         }
@@ -80,7 +80,7 @@ contract MockHyperCoreBbo {
     fallback(bytes calldata data) external returns (bytes memory) {
         if (data.length != 32 && data.length != 4) revert("MockHyperCoreBbo:bad-len");
         uint32 key;
-        assembly {
+        assembly ("memory-safe") {
             key := shr(224, calldataload(0))
         }
         Result memory res = results[key];

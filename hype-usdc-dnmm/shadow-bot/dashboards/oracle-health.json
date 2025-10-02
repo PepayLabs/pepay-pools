@@ -1,0 +1,169 @@
+{
+  "dashboard": {
+    "title": "DNMM L3 - Oracle Health",
+    "tags": ["dnmm", "oracles"],
+    "timezone": "utc",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Oracle Divergence (Delta BPS)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "dnmm_delta_bps",
+            "legendFormat": "HC vs Pyth Delta"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "BPS",
+            "format": "short"
+          }
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "gt",
+                "params": [50]
+              },
+              "query": {
+                "model": {
+                  "expr": "dnmm_delta_bps",
+                  "refId": "A"
+                },
+                "params": ["5m", "now"]
+              },
+              "reducer": {
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "message": "Oracle divergence exceeded soft threshold (50 bps). AOMQ may activate.",
+          "name": "Soft Divergence Alert"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Pyth Confidence (BPS)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "dnmm_pyth_conf_bps",
+            "legendFormat": "Pyth Confidence"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "BPS",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "HyperCore Spread (BPS)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "dnmm_hc_spread_bps",
+            "legendFormat": "HC Order Book Spread"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "BPS",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Divergence Decision Breakdown",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "rate(dnmm_decision_total[5m])",
+            "legendFormat": "{{decision}}"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Reject Rate (5min Rolling)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "dnmm_reject_rate_pct_5m",
+            "legendFormat": "Reject Rate %"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Percentage",
+            "format": "percent",
+            "max": 100
+          }
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "gt",
+                "params": [0.5]
+              },
+              "query": {
+                "model": {
+                  "expr": "dnmm_reject_rate_pct_5m",
+                  "refId": "A"
+                },
+                "params": ["5m", "now"]
+              },
+              "reducer": {
+                "type": "last"
+              },
+              "type": "query"
+            }
+          ],
+          "message": "Reject rate exceeded 0.5% over 5 minutes. Investigate oracle health.",
+          "name": "High Reject Rate Alert"
+        }
+      },
+      {
+        "id": 6,
+        "title": "Precompile Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "dnmm_precompile_error_rate",
+            "legendFormat": "HC Precompile Errors/5m"
+          }
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "gt",
+                "params": [0.1]
+              },
+              "query": {
+                "model": {
+                  "expr": "dnmm_precompile_error_rate",
+                  "refId": "A"
+                },
+                "params": ["5m", "now"]
+              },
+              "reducer": {
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "message": "HC precompile error rate > 0.1/5m. Check HyperCore availability.",
+          "name": "Precompile Error Alert"
+        }
+      }
+    ]
+  }
+}

@@ -1,5 +1,11 @@
 # Change Log
 
+## 2025-10-03
+- perf(pool): cache feature flags as a single word, tighten AOMQ/fee toggles, and lazily read Pyth to shave quote/swap gas while keeping preview paths view-only.
+- fix(rfq): mark inline assembly blocks memory-safe to restore 0.8.24 builds, extend tests for domain caching and ERC1271 fast-path parity.
+- test: add gating scenarios ensuring Pyth adapters are skipped when HyperCore is fresh, preview freshness stays pure, and debug emission obeys flags.
+- docs: document new oracle gating metrics/alerts in `OBSERVABILITY.md` and note flag bitmask optimisation.
+
 ## 2025-10-02
 - feat(pool): wire F09 aggregator rebates (`setAggregatorDiscount`, pipeline discount before floor) with events/tests and enforce 3 bps cap.
 - feat(pool): harden governance with timelock queue/execute/cancel, `TimelockDelayUpdated`, and `setPauser` helper (F11).

@@ -1,0 +1,125 @@
+{
+  "dashboard": {
+    "title": "DNMM L3 - Inventory & Rebalancing",
+    "tags": ["dnmm", "inventory", "recenter"],
+    "timezone": "utc",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Inventory Deviation (BPS from x*)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "dnmm_inventory_dev_bps",
+            "legendFormat": "Deviation from Instantaneous x*"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "BPS",
+            "format": "short"
+          }
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "gt",
+                "params": [750]
+              },
+              "query": {
+                "model": {
+                  "expr": "dnmm_inventory_dev_bps",
+                  "refId": "A"
+                },
+                "params": ["30m", "now"]
+              },
+              "reducer": {
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "message": "Inventory deviation exceeded recenter threshold (750 bps) for 30+ min. Manual recenter may be needed.",
+          "name": "High Inventory Deviation Alert"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Recenter Commits (Cumulative)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "dnmm_recenter_commits_total",
+            "legendFormat": "Total Recenter Events"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Count",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Recenter Rate (per hour)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(dnmm_recenter_commits_total[1h]) * 3600",
+            "legendFormat": "Recenter Events/hr"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Events/hr",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Restorative Trade Win Rate (%)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "dnmm_restorative_win_rate_pct",
+            "legendFormat": "Restorative Side Beats Street"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Win Rate %",
+            "format": "percent",
+            "min": 0,
+            "max": 100
+          }
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "lt",
+                "params": [60]
+              },
+              "query": {
+                "model": {
+                  "expr": "dnmm_restorative_win_rate_pct",
+                  "refId": "A"
+                },
+                "params": ["15m", "now"]
+              },
+              "reducer": {
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "message": "Restorative trade win rate below 60% for 15min. Inventory tilt may be miscalibrated.",
+          "name": "Low Restorative Win Rate Alert"
+        }
+      }
+    ]
+  }
+}

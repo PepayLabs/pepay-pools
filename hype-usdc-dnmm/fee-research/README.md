@@ -18,6 +18,8 @@ This package orchestrates deterministic quoting runs across HyperEVM DEXs and ro
 4. Execute the evaluator: `pnpm start -- --run live` (or use `tsx evaluate_hype.ts` during development).
 5. Inspect artifacts in `metrics/hype-metrics`, and append run summaries to `README.md` as needed.
 
+> Quick iteration tip: set `FAST_QUOTE_PLAN=1` (or `FAST_MODE=1`) to reduce the quote ladder to `[1, 10, 100, 1000]` during local development.
+
 ## Testing
 - `pnpm unit` for deterministic math/config tests.
 - `pnpm integration` for adapter fallback and concurrency tests.
@@ -35,7 +37,7 @@ This package orchestrates deterministic quoting runs across HyperEVM DEXs and ro
 - Extend adapter coverage for non-aggregator DEXes once official docs or ABIs land.
 
 ## Latest Run Snapshot — 2025-10-02
-- **run_id**: `2025-10-02T15:30:44.203Z__ab9nhs`
-- **successful adapters**: Hypertrade Aggregator (baseline), HyperSwap, Hybra, Kittenswap Finance, Gliquid (all via Hypertrade legs on HyperEVM)
-- **pending integrations**: 1inch, 0x, Odos, ParaSwap (chain 999 unsupported), Curve Finance, Upheaval Finance, Drip.Trade, HyperBrick, HX Finance, Project X, Hyperliquid (Hypertrade legs not exposed for final hop; follow-up requires router ABIs or per-DEX filters)
-- **artifacts**: see `metrics/hype-metrics/hype-usdc-quotes__2025-10-02__2025-10-02T15:30:44.203Z__ab9nhs.{csv,jsonl}` and `metrics/hype-metrics/run-logs.jsonl`
+- **run_id**: `2025-10-02T16:55:02.153Z__6wlgdv`
+- **successful adapters**: Hypertrade Aggregator (baseline) with per-leg enrichment for HyperSwap, Kittenswap Finance, Project X, and Ramses v3 produced straight from Hypertrade routing legs
+- **pending integrations**: 1inch, 0x, Odos, ParaSwap (chain 999 unsupported on HyperEVM), Curve Finance, Hybra, Gliquid, Upheaval Finance, Drip.Trade, HyperBrick, HX Finance, Hyperliquid (Hypertrade still reroutes these legs via other venues; direct router docs or ABI discovery remains TODO)
+- **artifacts**: see `metrics/hype-metrics/hype-usdc-quotes__2025-10-02__2025-10-02T16:55:02.153Z__6wlgdv.{csv,jsonl}` and `metrics/hype-metrics/run-logs.jsonl`

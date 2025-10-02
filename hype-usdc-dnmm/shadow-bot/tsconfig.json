@@ -12,6 +12,12 @@
     "lib": ["ES2022"],
     "types": ["node"]
   },
-  "include": ["*.ts"],
-  "exclude": ["node_modules"]
+  "include": ["**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "metrics-exporter.ts",
+    "monitor.ts",
+    "analysis.ts",
+    "analysis.js"
+  ]
 }

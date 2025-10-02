@@ -41,6 +41,17 @@
 - Add preview health panels: `dnmm_preview_snapshot_age_sec`, `dnmm_preview_stale_reverts_total`, ladder ask/bid series by bucket, and clamp gauges. Alert when snapshot age > `previewMaxAgeSec` or stale reverts increase.
 - Wire the parity freshness check after any long invariant run: execute `script/run_invariants.sh` (or `script/check_invariants_and_parity.sh`) and verify `reports/metrics/freshness_report.json` reports `status=pass` for all parity CSVs.
 - Deploy `OracleWatcher` alongside the pool, configure thresholds, and run `scripts/watch_oracles.ts` to stream `OracleAlert` / `AutoPauseRequested`. Route `critical=true` alerts to on-call and wire the optional pause handler contract if using auto-pause. Track `lastRebalancePrice`, `lastRebalanceAt`, and cooldown adherence (time since last rebalance vs `recenterCooldownSec`) in dashboards/alerts.
+- Publish Grafana annotations for DNMM params changes (`ParamsUpdated`) and auto-pause events; annotate any manual overrides (fee cap, floor, target) for future incident reviews.
+
+### Shadow Bot Alert Playbook
+
+| Alert Condition | First Response | Follow-up |
+| --- | --- | --- |
+| `dnmm_snapshot_age_sec > SNAPSHOT_MAX_AGE_SEC` for >2 loops | Trigger `refreshPreviewSnapshot(IDnmPool.OracleMode.Spot, bytes(""))` via keeper/governance. | Validate HyperCore midpoint is updating; check RPC metrics for error spikes. |
+| `increase(dnmm_precompile_errors_total[5m]) > 0` | Fail over to a healthy RPC; confirm HyperCore precompile keys match prod mapping. | Inspect HyperCore status dashboards; pause routing if errors persist >10 minutes. |
+| `dnmm_delta_bps{quantile="0.95"} > oracle.divergenceSoftBps` | Move routers to strict/EMA mode and widen price tolerance. | Examine DivergenceHaircut events, compare against CEX mid, consider pausing swaps if spread persists. |
+| `dnmm_two_sided_uptime_pct < 98.5` during 15 min window | Review latest CSV probes for `clamp_flags`; rebalance inventory or widen caps. | Confirm keepers are refreshing previews and no on-chain clamp toggles are stuck. |
+| Rising `dnmm_preview_stale_reverts_total` | Refresh snapshot manually and check `previewConfig()` parameters. | Reduce `INTERVAL_MS` or enable preview fresh mode if staleness is systemic. |
 
 ## 7. Timelock Operations
 1. If enabling the timelock, queue `updateParams(ParamKind.Governance, abi.encode({timelockDelaySec: <seconds>}))` while delay is `0`.

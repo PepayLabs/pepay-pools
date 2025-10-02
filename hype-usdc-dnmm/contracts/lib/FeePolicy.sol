@@ -178,8 +178,7 @@ library FeePolicy {
         returns (uint16)
     {
         (uint16 feeBps, FeeState memory newState) = preview(state, cfg, confBps, inventoryDeviationBps, block.number);
-        state.lastBlock = newState.lastBlock;
-        state.lastFeeBps = newState.lastFeeBps;
+        _writeState(state, newState);
         return feeBps;
     }
 
@@ -243,9 +242,15 @@ library FeePolicy {
     {
         (uint16 feeBps, FeeState memory newState) =
             previewPacked(state, packedCfg, confBps, inventoryDeviationBps, block.number);
-        state.lastBlock = newState.lastBlock;
-        state.lastFeeBps = newState.lastFeeBps;
+        _writeState(state, newState);
         return feeBps;
+    }
+
+    function _writeState(FeeState storage state, FeeState memory newState) private {
+        uint256 packed = (uint256(newState.lastFeeBps) << 64) | uint64(newState.lastBlock);
+        assembly ("memory-safe") {
+            sstore(state.slot, packed)
+        }
     }
 
     function _powScaled(uint256 factor, uint256 exponent, uint256 scale) private pure returns (uint256 result) {

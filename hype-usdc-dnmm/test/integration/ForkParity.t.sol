@@ -74,7 +74,7 @@ contract ForkParityTest is BaseTest {
         vm.warp(block.timestamp + 1);
         uint256 emaMid = 995e15; // 0.995 * 1e18
         updateSpot(1e18, 4, true);
-        updateBidAsk(980e15, 1_020e15, 220, true);
+        updateBidAsk(970e15, 1_030e15, 600, true);
         updateEma(emaMid, 5, true);
         updatePyth(1e18, 1e18, 3, 3, 20, 20);
 
@@ -158,7 +158,7 @@ contract ForkParityTest is BaseTest {
         unchecked {
             ++staleAttempts;
         }
-        vm.expectRevert(Errors.OracleStale.selector);
+        vm.expectRevert(Errors.MidUnset.selector);
         quote(10 ether, true, IDnmPool.OracleMode.Spot);
         unchecked {
             ++staleRejections;

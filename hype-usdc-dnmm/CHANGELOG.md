@@ -9,6 +9,8 @@
 - docs: document new oracle gating metrics/alerts in `OBSERVABILITY.md` and note flag bitmask optimisation.
 
 ## 2025-10-02
+- fix(pool): allow `previewConfig.maxAgeSec` to remain zero (disable staleness guards) while guarding `revertOnStalePreview` checks, update deploy script/test defaults, and standardize zero-mid fallbacks on `Errors.MidUnset`.
+- test: recalibrated `Scenario_AOMQ`, `Scenario_Preview_AOMQ`, and `ForkParity` to assert events/flags instead of revert strings, tuned AOMQ knobs (lower min-notional, wider floor epsilon), and refreshed near-floor preview invariants.
 - feat(pool): wire F09 aggregator rebates (`setAggregatorDiscount`, pipeline discount before floor) with events/tests and enforce 3 bps cap.
 - feat(pool): harden governance with timelock queue/execute/cancel, `TimelockDelayUpdated`, and `setPauser` helper (F11).
 - feat(observer): add `DnmPauseHandler` autopause bridge + integration test, extend runbook for wiring (F12).

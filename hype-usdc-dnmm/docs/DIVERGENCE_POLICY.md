@@ -24,6 +24,7 @@ This symmetric normalisation ensures we measure deviation relative to the larger
 - **Soft band (`accept < delta ≤ soft`)**: the pool emits `DivergenceHaircut(deltaBps, extraFeeBps)` and adds `haircutMinBps + haircutSlopeBps × (delta - accept)` to the fee (capped at `FeeConfig.capBps`).
 - **Hard band (`delta > hard`)**: the pool emits `DivergenceRejected(deltaBps)` and reverts with `Errors.DivergenceHard(deltaBps, hardBps)` (future upgrades can route this into AOMQ micro-quotes instead of a hard fail).
 - **Legacy behaviour**: when `enableSoftDivergence` is `false`, the historical `divergenceBps` guard remains in force and reverts with `Errors.OracleDiverged(deltaBps, divergenceBps)`.
+- **All feeds dark/zero**: if HyperCore spot, EMA fallback, and Pyth reports all fail-or-zero simultaneously, the pool now reverts with `Errors.MidUnset()` instead of `Errors.OracleStale()`, signalling that no mid-price could be sourced (not merely that data was old).
 - Reverts occur from `_readOracle`, so **quotes and swaps both fail** before touching inventory or fee state.
 - HyperCore fallback paths (EMA, Pyth substitution) bypass the check by design—fail-closed semantics remain intact for degraded oracle regimes.
 

@@ -83,9 +83,9 @@ contract Deploy is Script {
         });
 
         DnmPool.PreviewConfig memory previewCfg = DnmPool.PreviewConfig({
-            maxAgeSec: 30,
-            snapshotCooldownSec: 10,
-            revertOnStalePreview: true,
+            maxAgeSec: 0,
+            snapshotCooldownSec: 0,
+            revertOnStalePreview: false,
             enablePreviewFresh: false
         });
 

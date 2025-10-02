@@ -61,6 +61,7 @@ Supporting libraries provide fixed-point math, inventory deviation helpers, and 
 
 - A compact `PreviewSnapshot` records oracle mid, confidence/sigma proxies, divergence metadata, and AOMQ flags. It is refreshed after every successful swap (CEI order preserved) and via the permissionless `refreshPreviewSnapshot(mode, oracleData)` call, which respects `snapshotCooldownSec`.
 - `PreviewConfig` (gated via governance) controls `maxAgeSec`, `snapshotCooldownSec`, `revertOnStalePreview`, and `enablePreviewFresh` (live peek without snapshot reliance).
+- The default governance configuration leaves `maxAgeSec = 0` and `revertOnStalePreview = false`, which disables staleness reverts until operators flip the toggles during rollout; downstream tooling should treat snapshot age as advisory in that mode.
 - `previewFees(uint256[] sizesBaseWad)` replays the full fee pipeline (size curve, tilt, divergence haircut, BBO floor, AOMQ clamps) using the cached snapshot and current reserves. The call is `view` and returns ask/bid fee ladders in bps.
 - `previewLadder(uint256 s0BaseWad)` provides the canonical `[S0, 2S0, 5S0, 10S0]` buckets plus clamp flags, snapshot timestamp, and mid. Routers pre-compute slices without incurring swap gas.
 - `previewFeesFresh` (optional) peeks HyperCore/Pyth via view-only adapters and mirrors swap fee ordering without mutating state, useful for analytics when snapshots are stale but a refresh is undesirable.
@@ -68,7 +69,7 @@ Supporting libraries provide fixed-point math, inventory deviation helpers, and 
 ### Preview Snapshot Storage & CLA
 
 - Snapshots are designed to fit within a single storage slot (packed `uint96` / `uint64` / `uint32` fields). Activation flags encode soft divergence, fallback usage, and AOMQ ask/bid state.
-- Cooldown-enforced refreshes prevent spamming oracle reads while still allowing keepers to refresh before router usage. Stale snapshots (age > `maxAgeSec`) revert when `revertOnStalePreview` is enabled, signalling routers to refresh or fall back to the fresh path.
+- Cooldown-enforced refreshes prevent spamming oracle reads while still allowing keepers to refresh before router usage. When governance sets `maxAgeSec > 0` **and** enables `revertOnStalePreview`, snapshots older than the threshold revert, signalling routers to refresh or fall back to the fresh path.
 
 ## Storage Layout
 

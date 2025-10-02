@@ -9,7 +9,7 @@ const QUOTER_V2_ADDRESS = '0xc58874216AFe47779ADED27B8AAd77E8Bd6eBEBb';
 const POOL_ADDRESS = '0x12df9913e9e08453440e3c4b1ae73819160b513e';
 
 const QUOTER_V2_ABI = [
-  'function quoteExactInputSingle(address tokenIn, address tokenOut, uint256 amountIn, uint160 limitSqrtPrice) returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)'
+  'function quoteExactInputSingle((address tokenIn,address tokenOut,uint256 amountIn,uint160 limitSqrtPrice)) returns (uint256 amountOut,uint256 amountInUsed,uint160 sqrtPriceX96After,uint32 initializedTicksCrossed,uint256 gasEstimate,uint16 fee)'
 ];
 
 const POOL_ABI = [
@@ -87,12 +87,12 @@ export class KittenswapAdapter extends BaseAdapter {
   private async computeMidPrice(tokens: TokenPair): Promise<number | null> {
     const smallAmountIn = ethers.parseUnits('1', tokens.in.decimals);
     try {
-      const [amountOutSmall] = await this.quoter.quoteExactInputSingle.staticCall(
-        tokens.in.address,
-        tokens.out.address,
-        smallAmountIn,
-        0n
-      );
+      const [amountOutSmall] = await this.quoter.quoteExactInputSingle.staticCall({
+        tokenIn: tokens.in.address,
+        tokenOut: tokens.out.address,
+        amountIn: smallAmountIn,
+        limitSqrtPrice: 0n,
+      });
       if (amountOutSmall === 0n) {
         return null;
       }
@@ -117,21 +117,22 @@ export class KittenswapAdapter extends BaseAdapter {
     const poolState = await this.loadPoolState();
 
     try {
-      const [amountOutWei,, , gasEstimateRaw] = await this.quoter.quoteExactInputSingle.staticCall(
-        tokens.in.address,
-        tokens.out.address,
-        params.amount_in_wei,
-        0n
-      );
+      const [amountOutWei, , , , gasEstimateRaw, feeFromQuote] = await this.quoter.quoteExactInputSingle.staticCall({
+        tokenIn: tokens.in.address,
+        tokenOut: tokens.out.address,
+        amountIn: params.amount_in_wei,
+        limitSqrtPrice: 0n,
+      });
 
       const amountOutTokens = ethers.formatUnits(amountOutWei, tokens.out.decimals);
       const midPrice = await this.computeMidPrice(tokens);
+      const feeFromQuoteNumber = feeFromQuote != null ? Number(feeFromQuote) : null;
 
       const feeRaw = poolState
         ? params.direction === 'USDC->HYPE'
           ? poolState.feeZto
           : poolState.feeOtz
-        : null;
+        : feeFromQuoteNumber;
       const feeBps = typeof feeRaw === 'number' ? feeRaw / 100 : null;
 
       return {

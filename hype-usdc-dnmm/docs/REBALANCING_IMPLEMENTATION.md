@@ -92,7 +92,7 @@ The Level-3 refresh introduced an operator-friendly preview surface without touc
 
 Operational expectations:
 
-1. Keep snapshot age < `previewMaxAgeSec` in production. When the pool is idle, a keeper/monitor should call `refreshPreviewSnapshot` after ensuring oracles are fresh.
+1. When governance enables a non-zero `previewMaxAgeSec`, keep snapshot age below that bound. With the zero-default configuration there is no enforced staleness guard, but operators SHOULD still refresh snapshots opportunistically after quiet periods.
 2. Routers SHOULD read `previewSnapshotAge()` and fall back to fresh reads if snapshots are stale and the pool is configured to revert on stale preview.
 3. AOMQ clamp flags surface in previews so routers can detect edge cases (micro quotes) before routing size across venues; the actual rebalancing flow remains unchanged.
 

@@ -34,5 +34,6 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-02: Reworked `Scenario_AOMQ` (lower min-notional, higher floor epsilon, event assertions), `Scenario_Preview_AOMQ` (near-floor calibration, governance-tunable preview defaults), and `ForkParity` (spread-spike fallback, `MidUnset` parity) to stabilise the Level-3 regression suite under the new config defaults.
 - 2025-09-22: Added fork parity matrix (FP1–FP5), Pyth hygiene/delta flap scenarios, preview↔settlement parity (base, quote, RFQ), canary shadow observer coverage, and timestamp guard tests.
 - 2024-07-12: Established Phase-8 confidence blend, fee dynamics, and fallback regression scenarios.

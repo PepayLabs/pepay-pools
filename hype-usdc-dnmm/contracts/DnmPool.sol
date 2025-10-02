@@ -360,8 +360,9 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 ctorMaxHaircut = uint256(oracleConfig_.haircutMinBps)
             + uint256(oracleConfig_.haircutSlopeBps) * ctorMaxDelta;
         if (ctorMaxHaircut >= BPS) revert Errors.InvalidConfig();
-        if (previewConfig_.maxAgeSec == 0) revert Errors.InvalidConfig();
-        if (previewConfig_.snapshotCooldownSec > previewConfig_.maxAgeSec) revert Errors.InvalidConfig();
+        if (previewConfig_.maxAgeSec > 0 && previewConfig_.snapshotCooldownSec > previewConfig_.maxAgeSec) {
+            revert Errors.InvalidConfig();
+        }
 
         uint256 baseScale = _pow10(baseDecimals_);
         uint256 quoteScale = _pow10(quoteDecimals_);
@@ -712,8 +713,9 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         } else if (kind == IDnmPool.ParamKind.Preview) {
             PreviewConfig memory oldCfg = previewConfig;
             PreviewConfig memory newCfg = abi.decode(data, (PreviewConfig));
-            if (newCfg.maxAgeSec == 0) revert Errors.InvalidConfig();
-            if (newCfg.snapshotCooldownSec > newCfg.maxAgeSec) revert Errors.InvalidConfig();
+            if (newCfg.maxAgeSec > 0 && newCfg.snapshotCooldownSec > newCfg.maxAgeSec) {
+                revert Errors.InvalidConfig();
+            }
             previewConfig = newCfg;
             emit ParamsUpdated("PREVIEW", abi.encode(oldCfg), data);
         } else if (kind == IDnmPool.ParamKind.Governance) {
@@ -1097,7 +1099,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         if (snap.timestamp == 0) revert PreviewSnapshotUnset();
         ageSec = block.timestamp - snap.timestamp;
         PreviewConfig memory cfg = previewConfig;
-        if (cfg.revertOnStalePreview && ageSec > cfg.maxAgeSec) {
+        if (cfg.revertOnStalePreview && cfg.maxAgeSec > 0 && ageSec > cfg.maxAgeSec) {
             revert PreviewSnapshotStale(ageSec, cfg.maxAgeSec);
         }
     }

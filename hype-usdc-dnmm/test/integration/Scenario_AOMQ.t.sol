@@ -9,6 +9,7 @@ import {FeePolicy} from "../../contracts/lib/FeePolicy.sol";
 import {Errors} from "../../contracts/lib/Errors.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 import {EventRecorder} from "../utils/EventRecorder.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 contract ScenarioAomqTest is BaseTest {
     bytes32 private constant REASON_AOMQ = bytes32("AOMQ");
@@ -45,9 +46,9 @@ contract ScenarioAomqTest is BaseTest {
         vm.prank(gov);
         pool.updateParams(IDnmPool.ParamKind.Oracle, abi.encode(oracleCfg));
 
-        _configureAomq(50_000000, 120, 100);
+        _configureAomq(25_000000, 120, 250);
         (uint128 minQuote,,) = pool.aomqConfig();
-        assertEq(minQuote, 50_000000, "min quote configured");
+        assertEq(minQuote, 25_000000, "min quote configured");
 
         updateSpot(1e18, 10, true);
         updateBidAsk(995e15, 1_005e15, 40, true);
@@ -59,7 +60,7 @@ contract ScenarioAomqTest is BaseTest {
         assertEq(quoteResult.reason, REASON_AOMQ, "reason AOMQ");
         assertGt(quoteResult.partialFillAmountIn, 0, "partial flag");
         assertLt(quoteResult.partialFillAmountIn, 10_000 ether, "clamped");
-        assertApproxEqAbs(quoteResult.amountOut, 50_000000, 2, "micro notional");
+        assertApproxEqAbs(quoteResult.amountOut, 25_000000, 2, "micro notional");
 
         assertEq(events.length, 1, "event count");
         assertEq(events[0].trigger, TRIGGER_SOFT, "trigger soft");
@@ -94,7 +95,7 @@ contract ScenarioAomqTest is BaseTest {
         approveAll(alice);
         approveAll(bob);
 
-        _configureAomq(80_000000, 90, 600);
+        _configureAomq(60_000000, 90, 900);
 
         hype.transfer(alice, 1_200_000 ether);
         vm.startPrank(alice);
@@ -109,7 +110,7 @@ contract ScenarioAomqTest is BaseTest {
         uint256 slackBps = s0Notional > 0
             ? FixedPointMath.toBps(availableQuote, uint256(s0Notional))
             : 0;
-        assertLe(slackBps, 600, "inventory near floor");
+        assertLe(slackBps, 900, "inventory near floor");
 
         hype.transfer(bob, 50_000 ether);
         approveAll(bob);
@@ -117,11 +118,16 @@ contract ScenarioAomqTest is BaseTest {
         recordLogs();
         vm.prank(bob);
         pool.swapExactIn(40_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
-        EventRecorder.SwapEvent[] memory swaps = EventRecorder.decodeSwapEvents(vm.getRecordedLogs());
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        EventRecorder.SwapEvent[] memory swaps = EventRecorder.decodeSwapEvents(logs);
+        EventRecorder.AomqEvent[] memory aomqEvents = EventRecorder.decodeAomqEvents(logs);
 
         assertEq(swaps.length, 1, "swap event count");
         assertTrue(swaps[0].isPartial, "partial swap");
         assertEq(swaps[0].reason, REASON_AOMQ, "partial reason AOMQ");
+        assertEq(aomqEvents.length, 1, "aomq event emitted");
+        assertEq(aomqEvents[0].trigger, TRIGGER_FLOOR, "floor trigger flagged");
+        assertTrue(aomqEvents[0].isBaseIn, "base-side clamp recorded");
 
         (, uint128 quoteReserveAfter) = pool.reserves();
         assertEq(uint256(quoteReserveAfter), expectedFloor, "floor preserved");
@@ -140,12 +146,12 @@ contract ScenarioAomqTest is BaseTest {
         updateEma(0, 0, false);
         updatePyth(0, 0, 0, 0, 0, 0);
 
-        vm.expectRevert(Errors.OracleStale.selector);
+        vm.expectRevert(Errors.MidUnset.selector);
         quote(5_000 ether, true, IDnmPool.OracleMode.Spot);
     }
 
     function test_aomqHonoursBboFloorSpread() public {
-        _configureAomq(40_000000, 10, 200);
+        _configureAomq(30_000000, 10, 300);
 
         DnmPool.MakerConfig memory makerCfg = defaultMakerConfig();
         makerCfg.alphaBboBps = 2000; // 20% of spread
@@ -157,8 +163,13 @@ contract ScenarioAomqTest is BaseTest {
         updateBidAsk(998e15, 1_002e15, 400, true);
         updatePyth(1_020e18, 1e18, 0, 0, 0, 0);
 
+        recordLogs();
         DnmPool.QuoteResult memory result = quote(5_000 ether, true, IDnmPool.OracleMode.Spot);
         assertEq(result.reason, REASON_AOMQ, "AOMQ reason");
         assertGe(result.feeBpsUsed, 25, "fee respects BBO floor");
+        EventRecorder.AomqEvent[] memory aomqEvents = EventRecorder.decodeAomqEvents(vm.getRecordedLogs());
+        assertEq(aomqEvents.length, 1, "event emitted");
+        assertTrue(aomqEvents[0].isBaseIn, "base-in activation");
+        assertGe(aomqEvents[0].spreadBps, 10, "emergency spread floor");
     }
 }

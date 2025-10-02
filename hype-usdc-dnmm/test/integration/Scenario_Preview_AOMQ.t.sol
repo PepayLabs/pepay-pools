@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {FixedPointMath} from "../../contracts/lib/FixedPointMath.sol";
+import {Inventory} from "../../contracts/lib/Inventory.sol";
+import {IOracleAdapterPyth} from "../../contracts/interfaces/IOracleAdapterPyth.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 
 contract ScenarioPreviewAomqTest is BaseTest {
@@ -32,14 +34,22 @@ contract ScenarioPreviewAomqTest is BaseTest {
         flags.enableSizeFee = true;
         setFeatureFlags(flags);
 
+        DnmPool.OracleConfig memory oracleCfg = defaultOracleConfig();
+        oracleCfg.divergenceBps = 150;
+        oracleCfg.divergenceSoftBps = 150;
+        oracleCfg.divergenceHardBps = 200;
+        vm.prank(gov);
+        pool.updateParams(IDnmPool.ParamKind.Oracle, abi.encode(oracleCfg));
+
         DnmPool.AomqConfig memory aomqCfg = defaultAomqConfig();
-        aomqCfg.minQuoteNotional = 40_000000;
+        aomqCfg.minQuoteNotional = 35_000000;
         aomqCfg.emergencySpreadBps = 150;
-        aomqCfg.floorEpsilonBps = 200;
+        aomqCfg.floorEpsilonBps = 300;
         vm.prank(gov);
         pool.updateParams(IDnmPool.ParamKind.Aomq, abi.encode(aomqCfg));
 
         DnmPool.MakerConfig memory makerCfg = defaultMakerConfig();
+        makerCfg.s0Notional = 10_000 ether;
         makerCfg.alphaBboBps = 5_000;
         makerCfg.betaFloorBps = 20;
         vm.prank(gov);
@@ -48,10 +58,35 @@ contract ScenarioPreviewAomqTest is BaseTest {
         // Make the pool quote reserves scarce so AOMQ clamps large asks.
         usdc.transfer(address(pool), 500_000000);
         pool.sync();
+        (, uint128 quoteReserveBefore) = pool.reserves();
+        uint256 targetQuoteReserves = 300_000000; // ~300 quote units (6 decimals)
+        if (quoteReserveBefore > targetQuoteReserves) {
+            uint256 burnAmount = uint256(quoteReserveBefore) - targetQuoteReserves;
+            vm.prank(address(pool));
+            usdc.transfer(address(0xdead), burnAmount);
+            pool.sync();
+        }
+        (, uint128 quoteReserve) = pool.reserves();
+        uint16 floorBps;
+        (, floorBps, , , , ,) = pool.inventoryConfig();
+        uint256 floorAmount = Inventory.floorAmount(uint256(quoteReserve), floorBps);
+        uint256 availableQuote = uint256(quoteReserve) - floorAmount;
+        uint256 s0QuoteUnits = FixedPointMath.mulDivDown(uint256(makerCfg.s0Notional), quoteScale, WAD);
+        if (s0QuoteUnits == 0) {
+            s0QuoteUnits = uint256(makerCfg.s0Notional);
+        }
+        uint256 epsilonWindow = FixedPointMath.mulDivDown(s0QuoteUnits, aomqCfg.floorEpsilonBps, BPS);
+        if (epsilonWindow == 0) {
+            epsilonWindow = 1;
+        }
+        assertLe(availableQuote, epsilonWindow, "near-floor slack");
 
         updateSpot(1e18, 5, true);
         updateBidAsk(999e15, 1_001e15, 200, true);
-        updatePyth(1_015e18, 1e18, 0, 0, 5, 5);
+        updatePyth(1015e15, 1e18, 0, 0, 5, 5);
+        IOracleAdapterPyth.PythResult memory latest = oraclePyth.peekPythUsdMid();
+        (uint256 pairMid,,) = oraclePyth.computePairMid(latest);
+        assertApproxEqAbs(pairMid, 1015e15, 1, "pyth mid configured");
 
         vm.warp(block.timestamp + 20);
         pool.refreshPreviewSnapshot(IDnmPool.OracleMode.Spot, bytes(""));

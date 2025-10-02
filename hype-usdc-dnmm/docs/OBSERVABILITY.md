@@ -52,7 +52,7 @@
 - `precompile_error_rate > 0.1` – HyperCore read instability.
 - `two_sided_uptime_pct < 98.5` – points to AOMQ / floor exhaustion.
 - `abs(mid / lastRebalancePrice - 1) > divergenceHard && recenter_commits_total == 0` within 24h – recenter automation gap.
-- `preview_snapshot_age_sec > previewMaxAgeSec` for two consecutive samples.
+- `preview_snapshot_age_sec > previewMaxAgeSec` for two consecutive samples (only when governance has set a non-zero max-age).
 - `preview_stale_reverts_total` derivative > 0.5/min – routers hitting stale snapshots; check keepers.
 - Partial fills > 10% of swap notional in an hour.
 - `reason` = `"PYTH"` or `"EMA"` exceeding baseline (oracle degradation).

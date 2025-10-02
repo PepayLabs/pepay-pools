@@ -34,6 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-02: Clarified preview snapshot defaults (`maxAgeSec = 0`, opt-in staleness reverts) across `ARCHITECTURE.md`, `RFQ.md`, `REBALANCING_IMPLEMENTATION.md`, and `OBSERVABILITY.md`; documented `Errors.MidUnset` fail-closed semantics in `DIVERGENCE_POLICY.md`.
 - 2025-10-02: Added `ROUTER_INTEGRATION.md` for volume tiers/off-path process and updated `FEES_AND_INVENTORY.md`, `CONFIG.md`, `OBSERVABILITY.md`, `RUNBOOK.md`, and `CHANGELOG.md` for rebates, timelock, autopause, and preview freshness.
 - 2025-10-01: Refreshed `REBALANCING_IMPLEMENTATION.md` for auto-recenter flag gating + hysteresis, and `TESTING.md` for the new `DnmPool_Rebalance` suite + CI guidance.
 - 2025-10-01: Documented size-aware fee curve (gamma lin/quad coefficients, S0 normalisation, cap) in `ARCHITECTURE.md`.

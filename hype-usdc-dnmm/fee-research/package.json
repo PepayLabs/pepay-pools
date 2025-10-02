@@ -1,0 +1,36 @@
+{
+  "name": "@dlmm/hype-fee-research",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/evaluate_hype.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node --enable-source-maps dist/evaluate_hype.js",
+    "dev": "tsx evaluate_hype.ts",
+    "unit": "vitest run --coverage",
+    "integration": "LIVE_TESTS=0 vitest run src/**/__tests__/integration.*.ts",
+    "live": "LIVE_TESTS=1 vitest run src/**/__tests__/live.*.ts"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.4.0",
+    "dayjs": "^1.11.11",
+    "ethers": "^6.15.0",
+    "fast-json-stable-stringify": "^2.1.0",
+    "p-limit": "^5.0.0",
+    "p-retry": "^6.0.0",
+    "pino": "^9.1.0",
+    "pino-pretty": "^10.3.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.9",
+    "csv-parse": "^5.5.3",
+    "csv-stringify": "^6.5.0",
+    "dotenv": "^16.4.5",
+    "prettier": "^3.3.2",
+    "tsx": "^4.11.0",
+    "typescript": "^5.5.3",
+    "vitest": "^1.6.0"
+  }
+}

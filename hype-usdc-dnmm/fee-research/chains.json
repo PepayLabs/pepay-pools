@@ -1,0 +1,10 @@
+[
+  {
+    "chain_id": 999,
+    "name": "HyperEVM",
+    "rpc_url_env": "HYPE_RPC_URL",
+    "native_symbol": "HYPE",
+    "block_explorer_api_env": "HYPE_EXPLORER_API_KEY",
+    "block_explorer_kind": "blockscout"
+  }
+]

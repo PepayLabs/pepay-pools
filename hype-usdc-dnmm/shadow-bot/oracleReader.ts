@@ -23,16 +23,16 @@ function decodeUint64(data: string, label: string): bigint {
   if (data.length <= 18) {
     return BigInt(data);
   }
-  const [value] = coder.decode(['uint64'], data) as [bigint];
+  const [value] = coder.decode(['uint64'], data) as unknown as [bigint];
   return BigInt(value);
 }
 
 function decodeBbo(data: string): { bid: bigint; ask: bigint; spread?: bigint } {
   try {
-    const decoded = coder.decode(['uint64', 'uint64', 'uint64'], data) as [bigint, bigint, bigint];
+    const decoded = coder.decode(['uint64', 'uint64', 'uint64'], data) as unknown as [bigint, bigint, bigint];
     return { bid: BigInt(decoded[0]), ask: BigInt(decoded[1]), spread: BigInt(decoded[2]) };
   } catch (error) {
-    const fallback = coder.decode(['uint64', 'uint64'], data) as [bigint, bigint];
+    const fallback = coder.decode(['uint64', 'uint64'], data) as unknown as [bigint, bigint];
     return { bid: BigInt(fallback[0]), ask: BigInt(fallback[1]) };
   }
 }

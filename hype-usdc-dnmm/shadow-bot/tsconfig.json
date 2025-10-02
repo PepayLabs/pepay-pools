@@ -13,5 +13,11 @@
     "types": ["node"]
   },
   "include": ["**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "metrics-exporter.ts",
+    "monitor.ts",
+    "analysis.ts",
+    "analysis.js"
+  ]
 }

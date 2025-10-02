@@ -22,8 +22,8 @@ const HEADER = [
   'latency_ms'
 ].join(',');
 
-function ensureDir(directory: string): Promise<void> {
-  return fs.mkdir(directory, { recursive: true });
+async function ensureDir(directory: string): Promise<void> {
+  await fs.mkdir(directory, { recursive: true });
 }
 
 function toDateKey(timestampMs: number): string {

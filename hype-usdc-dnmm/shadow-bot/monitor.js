@@ -14,11 +14,13 @@ export class ShadowBotMonitor {
     ALERT_REJECT_DURATION_SEC = Number(process.env.ALERT_REJECT_DURATION_SEC || 60);
     ALERT_SPREAD_BPS = Number(process.env.ALERT_SPREAD_BPS || 100);
     ALERT_CONF_BPS = Number(process.env.ALERT_CONF_BPS || 90);
+    ALERT_PREVIEW_AGE = Number(process.env.ALERT_PREVIEW_AGE || 60);
     // Monitoring state
     rejectStartTime;
     consecutiveRejects = 0;
     lastAlertTime = {};
     ALERT_COOLDOWN = 300; // 5 minutes between same alerts
+    lastPreviewStaleCount = 0;
     constructor() {
         this.provider = new JsonRpcProvider(process.env.RPC_URL);
         this.webhookUrl = process.env.ALERT_WEBHOOK_URL;
@@ -52,6 +54,7 @@ export class ShadowBotMonitor {
             this.checkConfidenceAlert(metrics);
             this.checkInventoryAlert(metrics);
             this.checkDecisionPatterns(metrics);
+            this.checkPreviewHealth(metrics);
             // Store history
             this.metricsHistory.push(metrics);
             if (this.metricsHistory.length > 720) { // Keep 1 hour of data at 5s intervals
@@ -71,7 +74,9 @@ export class ShadowBotMonitor {
             sigma_bps: 0,
             inventory_deviation_bps: 0,
             fee_bps: 0,
-            decision_counts: {}
+            decision_counts: {},
+            preview_age_sec: 0,
+            preview_stale_reverts: 0
         };
         for (const line of lines) {
             if (line.startsWith('dnmm_delta_bps ')) {
@@ -91,6 +96,12 @@ export class ShadowBotMonitor {
             }
             else if (line.startsWith('dnmm_fee_bps ')) {
                 metrics.fee_bps = parseFloat(line.split(' ')[1]);
+            }
+            else if (line.startsWith('dnmm_preview_snapshot_age_sec ')) {
+                metrics.preview_age_sec = parseFloat(line.split(' ')[1]);
+            }
+            else if (line.startsWith('dnmm_preview_stale_reverts_total ')) {
+                metrics.preview_stale_reverts = parseFloat(line.split(' ')[1]);
             }
             else if (line.includes('dnmm_decisions_total{decision=')) {
                 const match = line.match(/decision="([^"]+)"\}\s+(\d+)/);
@@ -178,6 +189,29 @@ export class ShadowBotMonitor {
                 this.rejectStartTime = undefined;
             }
         }
+    }
+    checkPreviewHealth(metrics) {
+        if (metrics.preview_age_sec > this.ALERT_PREVIEW_AGE) {
+            this.addAlert({
+                level: 'warning',
+                type: 'PREVIEW_STALE',
+                message: `Preview snapshot age ${metrics.preview_age_sec}s exceeds threshold`,
+                value: metrics.preview_age_sec,
+                threshold: this.ALERT_PREVIEW_AGE,
+                timestamp: Date.now()
+            });
+        }
+        if (metrics.preview_stale_reverts > this.lastPreviewStaleCount) {
+            this.addAlert({
+                level: 'warning',
+                type: 'PREVIEW_STALE_REVERTS',
+                message: `Preview calls reverting as stale`,
+                value: metrics.preview_stale_reverts,
+                threshold: this.lastPreviewStaleCount,
+                timestamp: Date.now()
+            });
+        }
+        this.lastPreviewStaleCount = metrics.preview_stale_reverts;
     }
     addAlert(alert) {
         // Check cooldown

@@ -71,7 +71,10 @@ export class ProviderManager implements ProviderClients {
   }
 
   async getGasPrice(label = 'getGasPrice'): Promise<bigint> {
-    const executor = () => this.rpc.getGasPrice();
+    const executor = async () => {
+      const hex = await this.rpc.send('eth_gasPrice', []);
+      return BigInt(hex);
+    };
     return this.executeWithRetries(executor, label);
   }
 

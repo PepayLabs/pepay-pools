@@ -1,0 +1,137 @@
+[
+  {
+    "name": "Hyperliquid",
+    "official_docs_url": "https://docs.hyperliquid.xyz/",
+    "sdk_package_name": null,
+    "sdk_repo_url": null,
+    "http_quote_base_url": "https://api.hyperliquid.xyz/info",
+    "last_checked_at": "2025-10-02T12:00:00.000Z",
+    "notes": "REST API exposes /info endpoints for market data; no public swap SDK documented."
+  },
+  {
+    "name": "Project X",
+    "official_docs_url": null,
+    "sdk_package_name": null,
+    "sdk_repo_url": null,
+    "http_quote_base_url": null,
+    "last_checked_at": "2025-10-02T12:00:00.000Z",
+    "notes": "No official documentation located after multiple searches; requires follow up with project maintainers."
+  },
+  {
+    "name": "HyperSwap",
+    "official_docs_url": "https://docs.hyperliquid.xyz/evm/hyperswap",
+    "sdk_package_name": null,
+    "sdk_repo_url": null,
+    "http_quote_base_url": null,
+    "last_checked_at": "2025-10-02T12:00:00.000Z",
+    "notes": "Liquidity provisioning docs cover pools; quoting requires router ABI on HyperEVM."
+  },
+  {
+    "name": "Hybra",
+    "official_docs_url": null,
+    "sdk_package_name": null,
+    "sdk_repo_url": null,
+    "http_quote_base_url": null,
+    "last_checked_at": "2025-10-02T12:00:00.000Z",
+    "notes": "Unable to discover official API or SDK documentation through public search."
+  },
+  {
+    "name": "Upheaval Finance",
+    "official_docs_url": null,
+    "sdk_package_name": null,
+    "sdk_repo_url": null,
+    "http_quote_base_url": null,
+    "last_checked_at": "2025-10-02T12:00:00.000Z",
+    "notes": "No authoritative sources identified; suspected private or rebranded DEX."
+  },
+  {
+    "name": "Kittenswap Finance",
+    "official_docs_url": null,
+    "sdk_package_name": null,
+    "sdk_repo_url": null,
+    "http_quote_base_url": null,
+    "last_checked_at": "2025-10-02T12:00:00.000Z",
+    "notes": "Searches returned unrelated community posts; need direct contact for API details."
+  },
+  {
+    "name": "Curve Finance",
+    "official_docs_url": "https://docs.curve.fi/",
+    "sdk_package_name": "curve-js",
+    "sdk_repo_url": "https://github.com/curvefi/curve-js",
+    "http_quote_base_url": null,
+    "last_checked_at": "2025-10-02T12:00:00.000Z",
+    "notes": "curve-js SDK supports multi-chain pool queries; HTTP pricing available via Curve Router API."
+  },
+  {
+    "name": "Gliquid",
+    "official_docs_url": null,
+    "sdk_package_name": null,
+    "sdk_repo_url": null,
+    "http_quote_base_url": null,
+    "last_checked_at": "2025-10-02T12:00:00.000Z",
+    "notes": "No public technical docs surfaced; treat integration as speculative."
+  },
+  {
+    "name": "Drip.Trade",
+    "official_docs_url": null,
+    "sdk_package_name": null,
+    "sdk_repo_url": null,
+    "http_quote_base_url": null,
+    "last_checked_at": "2025-10-02T12:00:00.000Z",
+    "notes": "Only marketing material identified; no API references."
+  },
+  {
+    "name": "HyperBrick",
+    "official_docs_url": null,
+    "sdk_package_name": null,
+    "sdk_repo_url": null,
+    "http_quote_base_url": null,
+    "last_checked_at": "2025-10-02T12:00:00.000Z",
+    "notes": "Pending confirmation of router ABI and endpoints."
+  },
+  {
+    "name": "HX Finance",
+    "official_docs_url": null,
+    "sdk_package_name": null,
+    "sdk_repo_url": null,
+    "http_quote_base_url": null,
+    "last_checked_at": "2025-10-02T12:00:00.000Z",
+    "notes": "No reliable documentation discovered; treat as blocked."
+  },
+  {
+    "name": "1inch",
+    "official_docs_url": "https://docs.1inch.io/",
+    "sdk_package_name": "@1inch/fusion-sdk",
+    "sdk_repo_url": "https://github.com/1inch/fusion-sdk",
+    "http_quote_base_url": "https://api.1inch.dev/swap",
+    "last_checked_at": "2025-10-02T12:00:00.000Z",
+    "notes": "Use Swap API v6 for quotes; requires API key via dashboard."
+  },
+  {
+    "name": "0x",
+    "official_docs_url": "https://docs.0x.org/introduction/introduction-to-0x",
+    "sdk_package_name": null,
+    "sdk_repo_url": null,
+    "http_quote_base_url": "https://api.0x.org/swap/v1/quote",
+    "last_checked_at": "2025-10-02T12:00:00.000Z",
+    "notes": "Public Swap API v1 returns price and gas estimates; API key optional for rate limits."
+  },
+  {
+    "name": "Odos",
+    "official_docs_url": "https://docs.odos.xyz/",
+    "sdk_package_name": "@odos-xyz/sdk",
+    "sdk_repo_url": "https://github.com/Odos-API",
+    "http_quote_base_url": "https://api.odos.xyz/",
+    "last_checked_at": "2025-10-02T12:00:00.000Z",
+    "notes": "SOR API supports POST /sor/quote for multi-hop aggregation."
+  },
+  {
+    "name": "ParaSwap",
+    "official_docs_url": "https://docs.paraswap.network/",
+    "sdk_package_name": "@paraswap/sdk",
+    "sdk_repo_url": "https://github.com/paraswap/paraswap-sdk",
+    "http_quote_base_url": "https://apiv5.paraswap.io/prices",
+    "last_checked_at": "2025-10-02T12:00:00.000Z",
+    "notes": "Price API returns transaction data and price impact; requires optional API key for higher throughput."
+  }
+]

@@ -3,8 +3,9 @@
  * This helps us identify any integration issues before running the full suite
  */
 
-import { main, aggregateQuotes, fetchQuote } from './evaluate_avax';
 import { ethers } from 'ethers';
+import { aggregateQuotes } from './evaluate_avax.js';
+import type { QuoteResult } from './evaluate_avax.js';
 
 const AVALANCHE_RPC = 'https://api.avax.network/ext/bc/C/rpc';
 
@@ -25,23 +26,23 @@ async function quickTest() {
 
   try {
     // This will test all enabled DEXs
-    const results = await aggregateQuotes(provider);
+    const results: QuoteResult[] = await aggregateQuotes(provider);
 
     console.log('\n' + '='.repeat(60));
     console.log('RESULTS SUMMARY');
     console.log('='.repeat(60));
 
-    const successful = results.filter(r => !r.error);
-    const failed = results.filter(r => r.error);
+    const successful = results.filter((result) => !result.error);
+    const failed = results.filter((result) => result.error);
 
     console.log(`\nSuccessful: ${successful.length}`);
-    successful.forEach(r => {
-      console.log(`  ✅ ${r.dex}: ${r.amountOutFormatted} AVAX (${r.effectivePrice} USDC/AVAX)`);
+    successful.forEach((result) => {
+      console.log(`  ✅ ${result.dex}: ${result.amountOutFormatted} AVAX (${result.effectivePrice} USDC/AVAX)`);
     });
 
     console.log(`\nFailed: ${failed.length}`);
-    failed.forEach(r => {
-      console.log(`  ❌ ${r.dex}: ${r.error}`);
+    failed.forEach((result) => {
+      console.log(`  ❌ ${result.dex}: ${result.error}`);
     });
 
     console.log('\n' + '='.repeat(60));

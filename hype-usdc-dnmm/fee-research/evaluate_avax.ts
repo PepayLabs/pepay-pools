@@ -569,3 +569,4 @@ if (require.main === module) {
 }
 
 export { main, aggregateQuotes, fetchQuote, exportToCSV };
+export type { QuoteResult };

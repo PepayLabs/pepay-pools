@@ -506,8 +506,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             midRes.mid,
             invTokens
         );
-        FeePolicy.FeeState memory state =
-            FeePolicy.FeeState({lastBlock: feeState.lastBlock, lastFeeBps: feeState.lastFeeBps});
+        FeePolicy.FeeState memory state = _loadFeeState();
         FeePolicy.FeeState memory previewState;
         uint16 feeBps;
         (feeBps, previewState) = FeePolicy.previewPacked(state, feeConfigPacked, confBps, invDev, block.number);
@@ -860,8 +859,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         if (shouldSettleFee) {
             baseFeeBps = FeePolicy.settlePacked(feeState, feeCfgPacked, outcome.confBps, invDevBps);
         } else {
-            FeePolicy.FeeState memory state =
-                FeePolicy.FeeState({lastBlock: feeState.lastBlock, lastFeeBps: feeState.lastFeeBps});
+            FeePolicy.FeeState memory state = _loadFeeState();
             FeePolicy.FeeState memory previewState;
             (baseFeeBps, previewState) =
                 FeePolicy.previewPacked(state, feeCfgPacked, outcome.confBps, invDevBps, block.number);
@@ -1150,7 +1148,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             invTokens
         );
 
-        FeePolicy.FeeState memory state = FeePolicy.FeeState({lastBlock: feeState.lastBlock, lastFeeBps: feeState.lastFeeBps});
+        FeePolicy.FeeState memory state = _loadFeeState();
         FeePolicy.FeeState memory previewState;
         uint16 baseFeeBps;
         (baseFeeBps, previewState) =
@@ -1571,6 +1569,15 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         invTokens.quoteScale = QUOTE_SCALE_;
     }
 
+    function _loadFeeState() internal view returns (FeePolicy.FeeState memory state) {
+        uint256 word;
+        assembly ("memory-safe") {
+            word := sload(feeState.slot)
+        }
+        state.lastBlock = uint64(word);
+        state.lastFeeBps = uint16(word >> 64);
+    }
+
     function _featureFlagsWord() internal view returns (uint256 word) {
         assembly ("memory-safe") {
             word := sload(featureFlags.slot)
@@ -1866,12 +1873,11 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         bool spotMode = mode == OracleMode.Spot;
 
         bool needsPythConfidence = !spotMode && blendOn && cfg.confWeightPythBps > 0;
-        bool needsPythDivergence = !spotMode
-            && (softDivEnabled
-                || cfg.divergenceBps > 0
-                || cfg.divergenceAcceptBps > 0
-                || cfg.divergenceSoftBps > 0
-                || cfg.divergenceHardBps > 0);
+        bool needsPythDivergence = softDivEnabled
+            || cfg.divergenceBps > 0
+            || cfg.divergenceAcceptBps > 0
+            || cfg.divergenceSoftBps > 0
+            || cfg.divergenceHardBps > 0;
 
         PythCache memory pyth;
         pyth.age = type(uint256).max;
@@ -1907,7 +1913,9 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         if (outcome.mid == 0 && address(ORACLE_PYTH_) != address(0)) {
-            (bool fetched, uint256 mid, uint256 age, uint256 conf) = _readPyth(oracleData);
+            (bool fetched, uint256 mid, uint256 age, uint256 conf) = oracleData.length > 0
+                ? _readPyth(oracleData)
+                : _peekPyth();
             if (fetched) {
                 pyth.fetched = true;
                 pyth.mid = mid;
@@ -1938,7 +1946,9 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         spreadAvailable = spreadAvailable && (outcome.reason != REASON_PYTH);
 
         if ((needsPythConfidence || needsPythDivergence) && !pyth.fetched && address(ORACLE_PYTH_) != address(0)) {
-            (bool fetched, uint256 mid, uint256 age, uint256 conf) = _readPyth(oracleData);
+            (bool fetched, uint256 mid, uint256 age, uint256 conf) = oracleData.length > 0
+                ? _readPyth(oracleData)
+                : _peekPyth();
             if (fetched) {
                 pyth.fetched = true;
                 pyth.mid = mid;
@@ -1967,30 +1977,30 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             uint256 divergenceBps = OracleUtils.computeDivergenceBps(outcome.mid, pyth.mid);
             outcome.divergenceBps = divergenceBps;
 
-            if (softDivEnabled) {
-                (uint16 acceptBps, uint16 softBps, uint16 hardBps) = _resolveDivergenceThresholds(cfg);
-                if (debugEmit && hardBps > 0) {
-                    emit OracleDivergenceChecked(pyth.mid, outcome.mid, divergenceBps, hardBps);
-                }
-                (uint16 appliedHaircut, bool activeAfter) = _processSoftDivergence(
-                    divergenceBps,
-                    acceptBps,
-                    softBps,
-                    hardBps,
-                    cfg.haircutMinBps,
-                    cfg.haircutSlopeBps
-                );
-                outcome.divergenceHaircutBps = appliedHaircut;
-                outcome.softDivergenceActive = activeAfter;
-                if (appliedHaircut > 0 && outcome.reason == REASON_NONE) {
-                    outcome.reason = REASON_HAIRCUT;
-                }
-            } else if (!spotMode && cfg.divergenceBps > 0 && divergenceBps > cfg.divergenceBps) {
-                if (debugEmit) {
-                    emit OracleDivergenceChecked(pyth.mid, outcome.mid, divergenceBps, cfg.divergenceBps);
-                }
-                revert Errors.OracleDiverged(divergenceBps, cfg.divergenceBps);
+        if (softDivEnabled) {
+            (uint16 acceptBps, uint16 softBps, uint16 hardBps) = _resolveDivergenceThresholds(cfg);
+            if (debugEmit && hardBps > 0) {
+                emit OracleDivergenceChecked(pyth.mid, outcome.mid, divergenceBps, hardBps);
             }
+            (uint16 appliedHaircut, bool activeAfter) = _processSoftDivergence(
+                divergenceBps,
+                acceptBps,
+                softBps,
+                hardBps,
+                cfg.haircutMinBps,
+                cfg.haircutSlopeBps
+            );
+            outcome.divergenceHaircutBps = appliedHaircut;
+            outcome.softDivergenceActive = activeAfter;
+            if (appliedHaircut > 0 && outcome.reason == REASON_NONE) {
+                outcome.reason = REASON_HAIRCUT;
+            }
+        } else if (cfg.divergenceBps > 0 && divergenceBps > cfg.divergenceBps) {
+            if (debugEmit) {
+                emit OracleDivergenceChecked(pyth.mid, outcome.mid, divergenceBps, cfg.divergenceBps);
+            }
+            revert Errors.OracleDiverged(divergenceBps, cfg.divergenceBps);
+        }
         }
 
         return outcome;

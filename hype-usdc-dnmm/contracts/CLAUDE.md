@@ -34,6 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-02: Tightened HyperCore/Pyth divergence guard for spot quotes via peek-based fallback, restored `DosEconomics` fail-closed expectations, and cached fee state loads to trim quote/preview gas.
 - 2025-10-02: Landed F09 rebates (`setAggregatorDiscount`, capped 3 bps) + pipeline integration and eventing; swap/preview now honor allow-listed discounts without breaching floors.
 - 2025-10-02: Hardened governance (F11) with timelock queue/execute/cancel, pending payload storage, helper label hashes, and `setPauser` for autopause delegations.
 - 2025-10-02: Fixed oracle fail-closed semantics by bubbling `Errors.MidUnset` for both swap/preview and kept `previewFeesFresh` view-only via shared `_readOracleView` helper.

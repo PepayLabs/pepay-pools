@@ -1,6 +1,8 @@
 # Change Log
 
 ## 2025-10-03
+- fix(pool): enforce HyperCore vs Pyth divergence guard for spot quotes using lightweight peek reads, reintroducing `OracleDiverged` fail-closed semantics and aligning perf `DosEconomics` expectations.
+- perf(pool): load fee-state words via a single sload and coalesce settle writes, trimming quote/preview reads without touching feature-flag defaults.
 - perf(pool): cache feature flags as a single word, tighten AOMQ/fee toggles, and lazily read Pyth to shave quote/swap gas while keeping preview paths view-only.
 - fix(rfq): mark inline assembly blocks memory-safe to restore 0.8.24 builds, extend tests for domain caching and ERC1271 fast-path parity.
 - test: add gating scenarios ensuring Pyth adapters are skipped when HyperCore is fresh, preview freshness stays pure, and debug emission obeys flags.

@@ -5,6 +5,7 @@ This package orchestrates deterministic quoting runs across HyperEVM DEXs and ro
 ## Key Features
 - Automated registry management for chains, tokens, and adapter docs with verification timestamps.
 - Resilient adapter interface supporting official SDKs, HTTP quote endpoints, and on-chain quoters.
+- Direct Algebra (Kittenswap) and HyperSwap adapters that hit native quoters on HyperEVM to capture venue-specific mid prices, fees, and slippage.
 - First-class Hypertrade aggregator integration providing executable quotes, route splits, and fee metadata.
 - Quote plans spanning $1 to $10,000 notionals with log-bucket fill-in and both trade directions.
 - Deterministic CSV/JSONL emitters plus structured run logs for downstream analytics.
@@ -18,7 +19,7 @@ This package orchestrates deterministic quoting runs across HyperEVM DEXs and ro
 4. Execute the evaluator: `pnpm start -- --run live` (or use `tsx evaluate_hype.ts` during development).
 5. Inspect artifacts in `metrics/hype-metrics`, and append run summaries to `README.md` as needed.
 
-> Quick iteration tip: set `FAST_QUOTE_PLAN=1` (or `FAST_MODE=1`) to reduce the quote ladder to `[1, 10, 100, 1000]` during local development.
+> Quick iteration tip: set `FAST_QUOTE_PLAN=1` (or `FAST_MODE=1`) to reduce the quote ladder to `[1, 10, 100, 1000]` during local development. Direct DEX adapters still require `HYPE_RPC_URL` to be populated so on-chain quoters have a provider.
 
 ## Testing
 - `pnpm unit` for deterministic math/config tests.

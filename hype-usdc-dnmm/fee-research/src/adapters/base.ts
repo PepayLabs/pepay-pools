@@ -6,6 +6,10 @@ export abstract class BaseAdapter {
   abstract resolveTokens(direction: QuoteDirection): Promise<TokenPair>;
   abstract docs(): Promise<AdapterDocsMeta>;
 
+  integrationKind(): 'dex_adapter' | 'aggregator_http' | 'node_sdk' | 'http_quote' {
+    return 'dex_adapter';
+  }
+
   async midPrice(_direction: QuoteDirection): Promise<number | null> {
     return null;
   }
@@ -22,6 +26,7 @@ export abstract class BaseAdapter {
       docs_url: (await this.docs()).official_docs_url,
       success: false,
       failure_reason: 'quote_not_implemented',
+      mid_price_out_per_in: null,
     };
   }
 }

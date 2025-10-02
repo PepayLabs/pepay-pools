@@ -5,53 +5,53 @@
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": "https://api.hyperliquid.xyz/info",
-    "last_checked_at": "2025-10-02T16:00:00.000Z",
-    "notes": "Hyperliquid docs describe REST market data endpoints; execution requires router interaction on HyperEVM."
+    "last_checked_at": "2025-10-02T14:55:00.000Z",
+    "notes": "Gitbook documents Hyperliquid REST market data and HyperEVM routing expectations."
   },
   {
     "name": "Project X",
-    "official_docs_url": "https://prjx.com",
+    "official_docs_url": null,
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T16:00:00.000Z",
-    "notes": "Public liquidity launch coverage confirms Project X DEX availability on HyperEVM; direct API references still pending."
+    "last_checked_at": "2025-10-02T14:55:00.000Z",
+    "notes": "No official API docs located; tracking LI.FI launch announcement for integration context."
   },
   {
     "name": "HyperSwap",
-    "official_docs_url": "https://docs.hyperswap.exchange/hyperswap",
+    "official_docs_url": "https://docs.hyperswap.exchange/",
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T16:00:00.000Z",
-    "notes": "Gitbook documents router contracts, WHYPE token address, and pool deployment details."
+    "last_checked_at": "2025-10-02T14:55:00.000Z",
+    "notes": "Documentation covers router contracts, WHYPE token primitives, and pool deployment."
   },
   {
     "name": "Hybra",
-    "official_docs_url": "https://hybra.finance",
+    "official_docs_url": null,
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T16:00:00.000Z",
-    "notes": "Foundation site outlines AMM architecture but lacks published SDK; follow on social channels for router updates."
+    "last_checked_at": "2025-10-02T14:55:00.000Z",
+    "notes": "Only high-level protocol summaries surfaced (e.g., DefiLlama entry); awaiting technical API publication."
   },
   {
     "name": "Upheaval Finance",
-    "official_docs_url": "https://upheaval.vote",
+    "official_docs_url": null,
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T16:00:00.000Z",
-    "notes": "Governance portal hosts roadmap for Upheaval AMM; technical API docs not yet released."
+    "last_checked_at": "2025-10-02T14:55:00.000Z",
+    "notes": "Governance/audit announcements confirm roadmap, but no public router or SDK references yet."
   },
   {
     "name": "Kittenswap Finance",
-    "official_docs_url": "https://github.com/hyperliquid-family/kittenswap",
+    "official_docs_url": "https://docs.kittenswap.finance/",
     "sdk_package_name": null,
-    "sdk_repo_url": null,
+    "sdk_repo_url": "https://github.com/hyperliquid-family/kittenswap",
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T16:00:00.000Z",
-    "notes": "Repository provides router ABI and deployment scripts; REST quote endpoint pending."
+    "last_checked_at": "2025-10-02T14:55:00.000Z",
+    "notes": "Docs and repository provide algebra router ABIs and deployment scripts for HyperEVM."
   },
   {
     "name": "Curve Finance",
@@ -59,26 +59,26 @@
     "sdk_package_name": "curve-js",
     "sdk_repo_url": "https://github.com/curvefi/curve-js",
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T16:00:00.000Z",
-    "notes": "curve-js SDK supports multi-chain pool queries; HTTP pricing available via Curve Router API."
+    "last_checked_at": "2025-10-02T14:55:00.000Z",
+    "notes": "curve-js supports multi-chain pool queries; Router API available for HTTP quoting."
   },
   {
     "name": "Gliquid",
-    "official_docs_url": "https://gliquid.com",
+    "official_docs_url": "https://gliquid.xyz",
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T16:00:00.000Z",
-    "notes": "Project site confirms HyperEVM deployment in progress; awaiting router specification."
+    "last_checked_at": "2025-10-02T14:55:00.000Z",
+    "notes": "Launch posts outline HyperEVM AMM rollout; technical endpoints still private."
   },
   {
     "name": "Drip.Trade",
-    "official_docs_url": "https://drip.trade",
+    "official_docs_url": "https://docs.drip.trade/api",
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T16:00:00.000Z",
-    "notes": "Analytics dashboards track DRIP pairs but no public router docs yet."
+    "last_checked_at": "2025-10-02T14:55:00.000Z",
+    "notes": "API docs describe quote and analytics endpoints for DRIP pairs."
   },
   {
     "name": "HyperBrick",
@@ -86,8 +86,8 @@
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T16:00:00.000Z",
-    "notes": "Gitbook lists pool factories and admin addresses; quote path TBD."
+    "last_checked_at": "2025-10-02T14:55:00.000Z",
+    "notes": "Gitbook lists pool factories, router addresses, and deployment guides."
   },
   {
     "name": "HX Finance",
@@ -95,8 +95,8 @@
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T16:00:00.000Z",
-    "notes": "Hyperliquid Pro announcement confirms HX Finance launch; awaiting API documentation."
+    "last_checked_at": "2025-10-02T14:55:00.000Z",
+    "notes": "Product site covers HX launch features; SDK or router docs pending publication."
   },
   {
     "name": "Hypertrade",
@@ -104,43 +104,43 @@
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": "https://core.ht.xyz/api/v1/trade/getSwapInfo",
-    "last_checked_at": "2025-10-02T16:00:00.000Z",
-    "notes": "Aggregator API returns executable calldata and route splits for HyperEVM swaps."
+    "last_checked_at": "2025-10-02T14:55:00.000Z",
+    "notes": "REST endpoint returns cross-DEX route splits, calldata, and fee data for HyperEVM swaps."
   },
   {
     "name": "1inch",
-    "official_docs_url": "https://docs.1inch.io/",
+    "official_docs_url": "https://1inch.dev/classic-swap-api",
     "sdk_package_name": "@1inch/fusion-sdk",
     "sdk_repo_url": "https://github.com/1inch/fusion-sdk",
     "http_quote_base_url": "https://api.1inch.dev/swap",
-    "last_checked_at": "2025-10-02T16:00:00.000Z",
-    "notes": "Use Swap API v6 for quotes; requires API key via dashboard."
+    "last_checked_at": "2025-10-02T14:55:00.000Z",
+    "notes": "Classic Swap API v6 exposes /quote and /swap endpoints; API key recommended for production."
   },
   {
     "name": "0x",
-    "official_docs_url": "https://docs.0x.org/introduction/introduction-to-0x",
+    "official_docs_url": "https://0x.org/docs/0x-swap-api/introduction",
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": "https://api.0x.org/swap/v1/quote",
-    "last_checked_at": "2025-10-02T16:00:00.000Z",
-    "notes": "Public Swap API v1 returns price and gas estimates; API key optional for rate limits."
+    "last_checked_at": "2025-10-02T14:55:00.000Z",
+    "notes": "Swap API v1 returns executable calldata with gas estimates; API key optional."
   },
   {
     "name": "Odos",
-    "official_docs_url": "https://docs.odos.xyz/",
+    "official_docs_url": "https://docs.odos.xyz/build/quickstart/sor",
     "sdk_package_name": "@odos-xyz/sdk",
     "sdk_repo_url": "https://github.com/Odos-API",
     "http_quote_base_url": "https://api.odos.xyz/",
-    "last_checked_at": "2025-10-02T16:00:00.000Z",
-    "notes": "SOR API supports POST /sor/quote for multi-hop aggregation."
+    "last_checked_at": "2025-10-02T14:55:00.000Z",
+    "notes": "Smart Order Router (SOR) API supports POST /sor/quote for route discovery."
   },
   {
     "name": "ParaSwap",
-    "official_docs_url": "https://docs.paraswap.network/",
+    "official_docs_url": "https://developers.velora.xyz/api/get-rate-for-a-token-pair",
     "sdk_package_name": "@paraswap/sdk",
     "sdk_repo_url": "https://github.com/paraswap/paraswap-sdk",
     "http_quote_base_url": "https://apiv5.paraswap.io/prices",
-    "last_checked_at": "2025-10-02T16:00:00.000Z",
-    "notes": "Price API returns transaction data and price impact; requires optional API key for higher throughput."
+    "last_checked_at": "2025-10-02T14:55:00.000Z",
+    "notes": "Price API delivers best route quotes and calldata; higher throughput available with API key."
   }
 ]

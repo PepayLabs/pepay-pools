@@ -38,6 +38,10 @@ export class AggregatorAdapter extends BaseAdapter {
     return meta;
   }
 
+  override integrationKind(): 'aggregator_http' {
+    return 'aggregator_http';
+  }
+
   override async supports(chain_id: number): Promise<boolean> {
     const supported = SUPPORTED_CHAINS[this.aggregatorName]?.includes(chain_id) ?? false;
     return supported;

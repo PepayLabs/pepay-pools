@@ -61,6 +61,7 @@ export interface QuoteResult {
   docs_url: string | null;
   success: boolean;
   failure_reason?: string;
+  mid_price_out_per_in?: number | null;
 }
 
 export interface AdapterDocsMeta {
@@ -76,6 +77,7 @@ export interface DexAdapter {
   resolveTokens(direction: QuoteDirection): Promise<TokenPair>;
   quote(params: QuoteParams): Promise<QuoteResult>;
   docs(): Promise<AdapterDocsMeta>;
+  midPrice?(direction: QuoteDirection): Promise<number | null>;
 }
 
 export interface QuotePlan {

@@ -56,7 +56,7 @@ export class MetricsWriter {
 
   addRow(row: MetricsRow, raw: Record<string, unknown>): void {
     this.rows.push(row);
-    this.jsonlRecords.push(raw);
+    this.jsonlRecords.push(sanitize(raw));
   }
 
   async flush(runId: string): Promise<void> {
@@ -77,4 +77,19 @@ export class MetricsWriter {
 
     logger.info({ csvPath, jsonlPath, rows: this.rows.length }, 'Metrics flushed');
   }
+}
+
+function sanitize(value: unknown): unknown {
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitize(item));
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, val]) => [key, sanitize(val)])
+    );
+  }
+  return value;
 }

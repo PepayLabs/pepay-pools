@@ -6,6 +6,10 @@ export abstract class BaseAdapter {
   abstract resolveTokens(direction: QuoteDirection): Promise<TokenPair>;
   abstract docs(): Promise<AdapterDocsMeta>;
 
+  async midPrice(_direction: QuoteDirection): Promise<number | null> {
+    return null;
+  }
+
   async quote(_params: QuoteParams): Promise<QuoteResult> {
     return {
       amount_out_tokens: '0',

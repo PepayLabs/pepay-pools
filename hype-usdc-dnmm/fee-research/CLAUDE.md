@@ -35,3 +35,4 @@
 
 ## Change Log
 - 2025-10-02: Bootstrapped HyperEVM quoting scaffold, registry files, and Vitest harness.
+- 2025-10-02: Added Hypertrade aggregator integration, automated metrics flush, and sample run artifacts.

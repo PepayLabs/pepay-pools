@@ -5,6 +5,7 @@ This package orchestrates deterministic quoting runs across HyperEVM DEXs and ro
 ## Key Features
 - Automated registry management for chains, tokens, and adapter docs with verification timestamps.
 - Resilient adapter interface supporting official SDKs, HTTP quote endpoints, and on-chain quoters.
+- First-class Hypertrade aggregator integration providing executable quotes, route splits, and fee metadata.
 - Quote plans spanning $1 to $10,000 notionals with log-bucket fill-in and both trade directions.
 - Deterministic CSV/JSONL emitters plus structured run logs for downstream analytics.
 - Built-in retry, rate limiting, and error capture so partial failures do not halt the run.
@@ -31,3 +32,4 @@ This package orchestrates deterministic quoting runs across HyperEVM DEXs and ro
 - Confirm router + quoter contracts for speculative DEX listings (Project X, Hybra, Gliquid, etc.).
 - Backfill trusted token verification references beyond explorer lookups.
 - Capture gas estimations via `eth_estimateGas` once HyperEVM RPC access is provisioned.
+- Extend adapter coverage for non-aggregator DEXes once official docs or ABIs land.

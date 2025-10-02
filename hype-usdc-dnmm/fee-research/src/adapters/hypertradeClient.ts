@@ -29,6 +29,7 @@ interface HypertradeSplit {
 
 interface CachedQuote {
   amountInWei: bigint;
+  dexWhitelistKey: string;
   totalOutTokens: string;
   totalOutWei: bigint;
   feeBps: number | null;
@@ -81,8 +82,8 @@ export class HypertradeClient {
     return this.instance;
   }
 
-  private cacheKey(direction: QuoteDirection, amountInWei: bigint): string {
-    return `${direction}|${amountInWei.toString()}`;
+  private cacheKey(direction: QuoteDirection, amountInWei: bigint, dexWhitelistKey: string): string {
+    return `${direction}|${amountInWei.toString()}|${dexWhitelistKey}`;
   }
 
   async quote(params: {
@@ -90,8 +91,10 @@ export class HypertradeClient {
     amountInWei: bigint;
     tokens: TokenPair;
     slippageToleranceBps: number;
+    dexWhitelist?: string[];
   }): Promise<CachedQuote> {
-    const key = this.cacheKey(params.direction, params.amountInWei);
+    const dexWhitelistKey = params.dexWhitelist && params.dexWhitelist.length > 0 ? params.dexWhitelist.map((dex) => dex.toLowerCase()).sort().join(',') : 'all';
+    const key = this.cacheKey(params.direction, params.amountInWei, dexWhitelistKey);
     if (this.cache.has(key)) {
       return this.cache.get(key)!;
     }
@@ -100,13 +103,17 @@ export class HypertradeClient {
     const inputTokenAddress = params.tokens.in.address;
     const outputTokenAddress = params.tokens.out.address;
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       inputAmount: params.amountInWei.toString(),
       slippage: slippagePercent,
       inputTokenAddress,
       outputTokenAddress,
       enableHyperCore: false,
     };
+
+    if (params.dexWhitelist && params.dexWhitelist.length > 0) {
+      payload.dexWhitelist = params.dexWhitelist;
+    }
 
     const start = performance.now();
     let response: HypertradeQuoteResponse;
@@ -164,6 +171,7 @@ export class HypertradeClient {
 
     const cached: CachedQuote = {
       amountInWei: params.amountInWei,
+      dexWhitelistKey,
       totalOutTokens,
       totalOutWei,
       feeBps,

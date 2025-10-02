@@ -5,8 +5,8 @@
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": "https://api.hyperliquid.xyz/info",
-    "last_checked_at": "2025-10-02T14:55:00.000Z",
-    "notes": "Gitbook documents Hyperliquid REST market data and HyperEVM routing expectations."
+    "last_checked_at": "2025-10-02T18:24:21.000Z",
+    "notes": "Using /info spotMeta + l2Book to simulate order-book fills for HYPE/USDC; adapter works without Hypertrade and records depth used per quote."
   },
   {
     "name": "Project X",
@@ -14,8 +14,8 @@
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T14:55:00.000Z",
-    "notes": "No official API docs located; tracking LI.FI launch announcement for integration context."
+    "last_checked_at": "2025-10-02T18:11:12.000Z",
+    "notes": "No public API yet; Hypertrade leg filter provides quote coverage when liquidity routes through Project X pools."
   },
   {
     "name": "HyperSwap",
@@ -23,8 +23,8 @@
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T14:55:00.000Z",
-    "notes": "Documentation covers router contracts, WHYPE token primitives, and pool deployment."
+    "last_checked_at": "2025-10-02T18:11:12.000Z",
+    "notes": "Docs outline router + quoter; TypeScript adapter uses QUOTER_V2 directly for WHYPE/USDC trades."
   },
   {
     "name": "Hybra",
@@ -32,8 +32,8 @@
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T14:55:00.000Z",
-    "notes": "Only high-level protocol summaries surfaced (e.g., DefiLlama entry); awaiting technical API publication."
+    "last_checked_at": "2025-10-02T18:11:12.000Z",
+    "notes": "Protocol teasers but no API docs; adapter relies on Hypertrade-provided Hybra legs until official quoter is exposed."
   },
   {
     "name": "Upheaval Finance",
@@ -41,8 +41,8 @@
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T14:55:00.000Z",
-    "notes": "Governance/audit announcements confirm roadmap, but no public router or SDK references yet."
+    "last_checked_at": "2025-10-02T18:11:12.000Z",
+    "notes": "Governance posts confirm AMM launch; Hypertrade leg isolation supplies interim WHYPE/USDC quotes pending router ABI release."
   },
   {
     "name": "Kittenswap Finance",
@@ -50,8 +50,8 @@
     "sdk_package_name": null,
     "sdk_repo_url": "https://github.com/hyperliquid-family/kittenswap",
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T14:55:00.000Z",
-    "notes": "Docs and repository provide algebra router ABIs and deployment scripts for HyperEVM."
+    "last_checked_at": "2025-10-02T18:11:12.000Z",
+    "notes": "Docs + GitHub repo supply Algebra pools; adapter now calls native Quoter for deterministic WHYPE/USDC quotes."
   },
   {
     "name": "Curve Finance",
@@ -59,8 +59,8 @@
     "sdk_package_name": "curve-js",
     "sdk_repo_url": "https://github.com/curvefi/curve-js",
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T14:55:00.000Z",
-    "notes": "curve-js supports multi-chain pool queries; Router API available for HTTP quoting."
+    "last_checked_at": "2025-10-02T18:11:12.000Z",
+    "notes": "Curve docs reference Router + curve-js; adapter currently filters Hypertrade legs tagged curve while curve-js integration is staged."
   },
   {
     "name": "Gliquid",
@@ -68,8 +68,8 @@
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T14:55:00.000Z",
-    "notes": "Launch posts outline HyperEVM AMM rollout; technical endpoints still private."
+    "last_checked_at": "2025-10-02T18:11:12.000Z",
+    "notes": "Launch blog references HyperEVM pools; Hypertrade leg filter covers Gliquid liquidity until ABI/HTTP docs are published."
   },
   {
     "name": "Drip.Trade",
@@ -77,8 +77,8 @@
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T14:55:00.000Z",
-    "notes": "API docs describe quote and analytics endpoints for DRIP pairs."
+    "last_checked_at": "2025-10-02T18:11:12.000Z",
+    "notes": "API site lists quote schema; adapter temporarily leverages Hypertrade legs tagged drip.trade while direct REST authentication is finalized."
   },
   {
     "name": "HyperBrick",
@@ -86,8 +86,8 @@
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T14:55:00.000Z",
-    "notes": "Gitbook lists pool factories, router addresses, and deployment guides."
+    "last_checked_at": "2025-10-02T18:11:12.000Z",
+    "notes": "Gitbook lists router addresses; Hypertrade leg isolation supplies quotes until quoter ABI verified."
   },
   {
     "name": "HX Finance",
@@ -95,8 +95,8 @@
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": null,
-    "last_checked_at": "2025-10-02T14:55:00.000Z",
-    "notes": "Product site covers HX launch features; SDK or router docs pending publication."
+    "last_checked_at": "2025-10-02T18:11:12.000Z",
+    "notes": "Site previews HX pools but omits API; Hypertrade leg filter used pending SDK release."
   },
   {
     "name": "Hypertrade",
@@ -104,8 +104,8 @@
     "sdk_package_name": null,
     "sdk_repo_url": null,
     "http_quote_base_url": "https://core.ht.xyz/api/v1/trade/getSwapInfo",
-    "last_checked_at": "2025-10-02T14:55:00.000Z",
-    "notes": "REST endpoint returns cross-DEX route splits, calldata, and fee data for HyperEVM swaps."
+    "last_checked_at": "2025-10-02T18:11:12.000Z",
+    "notes": "Docs describe POST /trade/getSwapInfo; client now supports dexWhitelist to target single DEX legs for research staging."
   },
   {
     "name": "1inch",

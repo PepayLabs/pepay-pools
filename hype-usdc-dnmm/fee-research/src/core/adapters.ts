@@ -1,11 +1,15 @@
 import { AggregatorAdapter } from '../adapters/aggregatorAdapter.js';
 import { HypertradeAdapter } from '../adapters/hypertradeAdapter.js';
+import { KittenswapAdapter } from '../adapters/kittenswapAdapter.js';
+import { HyperswapAdapter } from '../adapters/hyperswapAdapter.js';
 import { UniswapLikeAdapter } from '../adapters/uniswapLikeAdapter.js';
 import { BaseAdapter } from '../adapters/base.js';
 
 export function buildAdapters(): BaseAdapter[] {
   return [
     new HypertradeAdapter(),
+    new KittenswapAdapter(),
+    new HyperswapAdapter(),
     new AggregatorAdapter('1inch'),
     new AggregatorAdapter('0x'),
     new AggregatorAdapter('Odos'),

@@ -103,7 +103,7 @@
     "official_docs_url": "https://docs.ht.xyz/api",
     "sdk_package_name": null,
     "sdk_repo_url": null,
-    "http_quote_base_url": "https://api.ht.xyz/api/v1/simulation",
+    "http_quote_base_url": "https://core.ht.xyz/api/v1/trade/getSwapInfo",
     "last_checked_at": "2025-10-02T14:55:00.000Z",
     "notes": "REST endpoint returns cross-DEX route splits, calldata, and fee data for HyperEVM swaps."
   },
@@ -142,5 +142,14 @@
     "http_quote_base_url": "https://apiv5.paraswap.io/prices",
     "last_checked_at": "2025-10-02T14:55:00.000Z",
     "notes": "Price API delivers best route quotes and calldata; higher throughput available with API key."
+  },
+  {
+    "name": "Ramses v3",
+    "official_docs_url": "https://docs.ramses.exchange/",
+    "sdk_package_name": null,
+    "sdk_repo_url": null,
+    "http_quote_base_url": null,
+    "last_checked_at": "2025-10-02T16:50:00.000Z",
+    "notes": "Ramses v3 AMM docs covering pool/router configuration; integrated through Hypertrade legs."
   }
 ]

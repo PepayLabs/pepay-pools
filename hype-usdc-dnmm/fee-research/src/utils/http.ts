@@ -10,7 +10,7 @@ export interface HttpRequest {
 }
 
 export async function httpRequest<T>(req: HttpRequest): Promise<T> {
-  const { url, method = 'GET', headers = {}, body, timeoutMs = 15000 } = req;
+  const { url, method = 'GET', headers = {}, body, timeoutMs = 10000 } = req;
 
   return pRetry(
     async () => {

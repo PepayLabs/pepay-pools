@@ -37,7 +37,7 @@ interface CachedQuote {
   routeSummary: string | null;
 }
 
-const BASE_URL = 'https://api.ht.xyz/api/v1';
+const BASE_URL = 'https://core.ht.xyz/api/v1';
 
 function normalizeAddress(addr: string): string {
   return addr.toLowerCase();
@@ -105,16 +105,14 @@ export class HypertradeClient {
       slippage: slippagePercent,
       inputTokenAddress,
       outputTokenAddress,
-      chainId: params.tokens.in.chain_id,
       enableHyperCore: false,
-      userAddress: '0x0000000000000000000000000000000000000000',
     };
 
     const start = performance.now();
     let response: HypertradeQuoteResponse;
     try {
       response = await httpRequest<HypertradeQuoteResponse>({
-        url: `${BASE_URL}/simulation`,
+        url: `${BASE_URL}/trade/getSwapInfo`,
         method: 'POST',
         body: payload,
       });

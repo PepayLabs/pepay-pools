@@ -25,6 +25,29 @@ interface RunSummary {
 
 const RUN_LOG_PATH = path.resolve(process.cwd(), 'metrics/hype-metrics/run-logs.jsonl');
 
+const HYPERTRADE_LEG_ALIASES: Record<string, { name: string; aliases?: string[] }> = {
+  'prjx-v3': { name: 'Project X' },
+  'prjx': { name: 'Project X' },
+  'kittenswap_algebra': { name: 'Kittenswap Finance' },
+  'kittenswap': { name: 'Kittenswap Finance' },
+  'gliquid': { name: 'Gliquid' },
+  'hyperswap-v3': { name: 'HyperSwap' },
+  'hyperswap': { name: 'HyperSwap' },
+  'hybraswap-v3': { name: 'Hybra' },
+  'hybraswap': { name: 'Hybra' },
+  'ramses-v3': { name: 'Ramses v3' },
+  'curve-finance': { name: 'Curve Finance' },
+  'curve': { name: 'Curve Finance' },
+  'upheaval-v3': { name: 'Upheaval Finance' },
+  'upheaval': { name: 'Upheaval Finance' },
+  'hyperliquid': { name: 'Hyperliquid' },
+};
+
+function canonicalDexName(rawDex: string): string {
+  const key = rawDex.toLowerCase();
+  return HYPERTRADE_LEG_ALIASES[key]?.name ?? rawDex;
+}
+
 async function logRun(summary: RunSummary) {
   await fs.mkdir(path.dirname(RUN_LOG_PATH), { recursive: true });
   await fs.appendFile(RUN_LOG_PATH, JSON.stringify(summary) + '\n', 'utf-8');
@@ -300,7 +323,8 @@ export async function runEvaluation(): Promise<void> {
           for (const leg of quote.legs) {
             const portion = Number(leg.portion);
             const portionSafe = Number.isFinite(portion) ? Math.max(portion, 0) : 0;
-            const legDocs = dexDocs.find((d) => d.name.toLowerCase() === leg.dex.toLowerCase());
+            const canonicalName = canonicalDexName(leg.dex);
+            const legDocs = dexDocs.find((d) => d.name.toLowerCase() === canonicalName.toLowerCase());
             const legDocsUrl = legDocs?.official_docs_url ?? legDocs?.http_quote_base_url ?? null;
             const amountInTokensLeg = amountInTokensNumber * portionSafe;
             const amountInUsdLeg = amountUsd * portionSafe;
@@ -319,7 +343,7 @@ export async function runEvaluation(): Promise<void> {
               {
                 run_id: runId,
                 timestamp_iso: timestamp,
-                dex: leg.dex,
+                dex: canonicalName,
                 integration_kind: 'dex_via_hypertrade',
                 docs_url: legDocsUrl,
                 chain_id: chain.chain_id,
@@ -345,7 +369,7 @@ export async function runEvaluation(): Promise<void> {
                 gas_cost_native: null,
                 native_usd: null,
                 gas_cost_usd: null,
-                route_summary: leg.pool_address ? `${leg.dex} pool ${leg.pool_address}` : leg.dex,
+                route_summary: leg.pool_address ? `${canonicalName} pool ${leg.pool_address}` : canonicalName,
                 sdk_or_api_version: quote.sdk_or_api_version,
                 quote_latency_ms: latency,
                 success: true,
@@ -354,7 +378,7 @@ export async function runEvaluation(): Promise<void> {
               {
                 run_id: runId,
                 timestamp_iso: timestamp,
-                adapter: leg.dex,
+                adapter: canonicalName,
                 direction,
                 amount_usd: amountInUsdLeg,
                 leg,

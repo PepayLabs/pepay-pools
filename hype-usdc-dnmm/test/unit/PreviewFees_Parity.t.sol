@@ -5,6 +5,7 @@ import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {FeePolicy} from "../../contracts/lib/FeePolicy.sol";
 import {FixedPointMath} from "../../contracts/lib/FixedPointMath.sol";
+import {Inventory} from "../../contracts/lib/Inventory.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 
 contract PreviewFeesParityTest is BaseTest {
@@ -14,7 +15,7 @@ contract PreviewFeesParityTest is BaseTest {
 
     function setUp() public {
         setUpBase();
-        (, , , , uint256 baseScaleLocal, uint256 quoteScaleLocal) = pool.tokens();
+        (,,,, uint256 baseScaleLocal, uint256 quoteScaleLocal) = pool.tokens();
         baseScale = baseScaleLocal;
         quoteScale = quoteScaleLocal;
 
@@ -59,9 +60,9 @@ contract PreviewFeesParityTest is BaseTest {
         pool.updateParams(IDnmPool.ParamKind.Maker, abi.encode(makerCfg));
 
         DnmPool.AomqConfig memory aomqCfg = defaultAomqConfig();
-        aomqCfg.minQuoteNotional = 50_000000; // 50 quote units
-        aomqCfg.emergencySpreadBps = 120;
-        aomqCfg.floorEpsilonBps = 200;
+        aomqCfg.minQuoteNotional = 35_000000; // 35 quote units
+        aomqCfg.emergencySpreadBps = 150;
+        aomqCfg.floorEpsilonBps = 300;
         vm.prank(gov);
         pool.updateParams(IDnmPool.ParamKind.Aomq, abi.encode(aomqCfg));
 
@@ -75,14 +76,40 @@ contract PreviewFeesParityTest is BaseTest {
 
         // Nudge oracle to create mild divergence but below hard threshold.
         updateSpot(1e18, 4, true);
-        updateBidAsk(999e15, 1_001e15, 200, true);
-        updatePyth(1_012e18, 1e18, 1, 1, 5, 5);
+        updateBidAsk(998_500_000_000_000_000, 1_001_500_000_000_000_000, 60, true);
+        updatePyth(1_003_000_000_000_000_000, 1_000_000_000_000_000_000, 1, 1, 5, 5);
 
         // Make inventory slightly imbalanced so tilt + AOMQ have effect.
         vm.prank(alice);
         pool.swapExactIn(20_000 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
         vm.prank(bob);
         pool.swapExactIn(1_000_000000, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
+
+        // Trim quote reserves near the inventory floor to guarantee AOMQ clamps for large ladders.
+        usdc.transfer(address(pool), 500_000000);
+        pool.sync();
+        (, uint128 quoteReserveBefore) = pool.reserves();
+        uint256 targetQuoteReserves = 150_000000;
+        if (quoteReserveBefore > targetQuoteReserves) {
+            uint256 burnAmount = uint256(quoteReserveBefore) - targetQuoteReserves;
+            vm.prank(address(pool));
+            usdc.transfer(address(0xdead), burnAmount);
+            pool.sync();
+        }
+        (, uint128 quoteReserve) = pool.reserves();
+        uint16 floorBps;
+        (, floorBps,,,,,) = pool.inventoryConfig();
+        uint256 floorAmount = Inventory.floorAmount(uint256(quoteReserve), floorBps);
+        uint256 availableQuote = uint256(quoteReserve) - floorAmount;
+        uint256 s0QuoteUnits = FixedPointMath.mulDivDown(uint256(makerCfg.s0Notional), quoteScale, WAD);
+        if (s0QuoteUnits == 0) {
+            s0QuoteUnits = uint256(makerCfg.s0Notional);
+        }
+        uint256 epsilonWindow = FixedPointMath.mulDivDown(s0QuoteUnits, aomqCfg.floorEpsilonBps, BPS);
+        if (epsilonWindow == 0) {
+            epsilonWindow = 1;
+        }
+        assertLe(availableQuote, epsilonWindow, "near-floor slack");
 
         vm.warp(block.timestamp + 20);
         // Capture a fresh snapshot.
@@ -131,22 +158,11 @@ contract PreviewFeesParityTest is BaseTest {
     function _previewFeesWithFlags()
         internal
         view
-        returns (
-            uint256[] memory askFees,
-            uint256[] memory bidFees,
-            bool[] memory askClamped,
-            bool[] memory bidClamped
-        )
+        returns (uint256[] memory askFees, uint256[] memory bidFees, bool[] memory askClamped, bool[] memory bidClamped)
     {
         uint64 snapshotTsLocal;
         uint96 snapshotMidLocal;
-        (,
-            askFees,
-            bidFees,
-            askClamped,
-            bidClamped,
-            snapshotTsLocal,
-            snapshotMidLocal) = pool.previewLadder(0);
+        (, askFees, bidFees, askClamped, bidClamped, snapshotTsLocal, snapshotMidLocal) = pool.previewLadder(0);
 
         assertLe(snapshotTsLocal, uint64(block.timestamp), "snapshot timestamp future");
         assertGt(snapshotMidLocal, 0, "snapshot mid unset");

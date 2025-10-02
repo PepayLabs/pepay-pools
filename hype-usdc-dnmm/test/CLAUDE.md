@@ -34,6 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-02: Recalibrated `PreviewFees_Parity` (30 bps divergence, near-floor reserve trim) and the stale oracle fallback suite to assert `ForcedPeek`/`ForcedRead` semantics; refreshed gas snapshots and perf harness to lock `quote_hc` at 127k.
 - 2025-10-02: Updated AOMQ/preview integrations (`Scenario_AOMQ`, `Scenario_Preview_AOMQ`, `ForkParity`) to assert activation events + clamp flags, adopted `Errors.MidUnset` for zero-mid fail-closed paths, and tuned near-floor fixtures for the lower min-notional / higher epsilon config.
 - 2025-10-02: Added `Rebates_FloorPreserve` (F09), `DnmPool_GovernanceTimelock` (F11), `ReadOracle_MidUnset_Coverage`, `Preview_ViewPurity`, and `OracleWatcher_PauseHandler` suites exercising rebates, timelock queue/execute/cancel, fail-closed oracle paths, view purity, and autopause wiring.
 - 2025-10-01: Added `Scenario_AOMQ` integration coverage (soft divergence activation, oracle-hard fault guard, floor-adjacent micro quotes, BBO spread enforcement) validating the new F07 pipeline end-to-end.

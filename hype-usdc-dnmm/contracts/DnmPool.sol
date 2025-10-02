@@ -178,6 +178,21 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 targetQuoteNotional;
     }
 
+    struct PipelineGates {
+        bool sizeFee;
+        bool invTilt;
+        bool rebates;
+        bool bboFloor;
+        bool aomq;
+    }
+
+    struct FeePipelineParams {
+        uint16 capBps;
+        uint16 gammaSizeLinBps;
+        uint16 gammaSizeQuadBps;
+        uint16 sizeFeeCapBps;
+    }
+
     TokenConfig public tokenConfig;
     Reserves public reserves;
     InventoryConfig public inventoryConfig;
@@ -233,6 +248,12 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     uint8 private constant SNAPSHOT_FLAG_AOMQ_ASK = 1 << 2;
     uint8 private constant SNAPSHOT_FLAG_AOMQ_BID = 1 << 3;
 
+    uint256 private constant MASK_16 = 0xFFFF;
+    uint256 private constant FEE_CAP_OFFSET = 80;
+    uint256 private constant FEE_GAMMA_LIN_OFFSET = 144;
+    uint256 private constant FEE_GAMMA_QUAD_OFFSET = 160;
+    uint256 private constant FEE_SIZE_CAP_OFFSET = 176;
+
     uint256 private constant FLAG_BLEND_ON = 1 << 0;
     uint256 private constant FLAG_PARITY_CI_ON = 1 << 8;
     uint256 private constant FLAG_DEBUG_EMIT = 1 << 16;
@@ -269,12 +290,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     event RecenterCooldownSet(uint32 oldCooldown, uint32 newCooldown);
     event TokenFeeUnsupported(address indexed user, bool isBaseIn, uint256 expectedAmountIn, uint256 receivedAmountIn);
     event PreviewSnapshotRefreshed(
-        address indexed caller,
-        uint64 timestamp,
-        uint64 blockNumber,
-        uint96 midWad,
-        uint32 divergenceBps,
-        uint8 flags
+        address indexed caller, uint64 timestamp, uint64 blockNumber, uint96 midWad, uint32 divergenceBps, uint8 flags
     );
     event ConfidenceDebug(
         uint256 confSpreadBps,
@@ -344,12 +360,12 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         if (aomqConfig_.emergencySpreadBps > BPS) revert Errors.InvalidConfig();
         if (aomqConfig_.floorEpsilonBps > BPS) revert Errors.InvalidConfig();
         if (oracleConfig_.sigmaEwmaLambdaBps > BPS) revert Errors.InvalidConfig();
-        if (oracleConfig_.divergenceSoftBps != 0 && oracleConfig_.divergenceSoftBps < oracleConfig_.divergenceAcceptBps) {
+        if (oracleConfig_.divergenceSoftBps != 0 && oracleConfig_.divergenceSoftBps < oracleConfig_.divergenceAcceptBps)
+        {
             revert Errors.InvalidConfig();
         }
-        uint16 ctorSoft = oracleConfig_.divergenceSoftBps != 0
-            ? oracleConfig_.divergenceSoftBps
-            : oracleConfig_.divergenceAcceptBps;
+        uint16 ctorSoft =
+            oracleConfig_.divergenceSoftBps != 0 ? oracleConfig_.divergenceSoftBps : oracleConfig_.divergenceAcceptBps;
         if (oracleConfig_.divergenceHardBps != 0 && ctorSoft != 0 && oracleConfig_.divergenceHardBps < ctorSoft) {
             revert Errors.InvalidConfig();
         }
@@ -357,8 +373,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         if (ctorSoft > oracleConfig_.divergenceAcceptBps) {
             ctorMaxDelta = ctorSoft - oracleConfig_.divergenceAcceptBps;
         }
-        uint256 ctorMaxHaircut = uint256(oracleConfig_.haircutMinBps)
-            + uint256(oracleConfig_.haircutSlopeBps) * ctorMaxDelta;
+        uint256 ctorMaxHaircut =
+            uint256(oracleConfig_.haircutMinBps) + uint256(oracleConfig_.haircutSlopeBps) * ctorMaxDelta;
         if (ctorMaxHaircut >= BPS) revert Errors.InvalidConfig();
         if (previewConfig_.maxAgeSec > 0 && previewConfig_.snapshotCooldownSec > previewConfig_.maxAgeSec) {
             revert Errors.InvalidConfig();
@@ -544,11 +560,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         return _aggregatorDiscountBps[executor];
     }
 
-    function getSoftDivergenceState()
-        external
-        view
-        returns (bool active, uint16 lastDeltaBps, uint8 healthyStreak)
-    {
+    function getSoftDivergenceState() external view returns (bool active, uint16 lastDeltaBps, uint8 healthyStreak) {
         SoftDivergenceState memory state = softDivergenceState;
         return (state.active, state.lastDeltaBps, state.healthyStreak);
     }
@@ -757,10 +769,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         InventoryConfig storage invCfg = inventoryConfig;
         uint128 oldTarget = invCfg.targetBaseXstar;
         uint256 baseline = oldTarget == 0 ? 1 : oldTarget;
-        uint256 deviationBps = FixedPointMath.toBps(
-            FixedPointMath.absDiff(uint256(newTarget), uint256(oldTarget)),
-            baseline
-        );
+        uint256 deviationBps =
+            FixedPointMath.toBps(FixedPointMath.absDiff(uint256(newTarget), uint256(oldTarget)), baseline);
         if (deviationBps < invCfg.recenterThresholdPct) revert Errors.RecenterThreshold();
 
         invCfg.targetBaseXstar = newTarget;
@@ -841,6 +851,13 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         if (block.timestamp < lastMidTimestamp) revert Errors.InvalidTimestamp();
 
         uint256 flagsWord = _featureFlagsWord();
+        bool sizeFeeEnabled = _flagEnabled(flagsWord, FLAG_ENABLE_SIZE_FEE);
+        bool invTiltEnabled = _flagEnabled(flagsWord, FLAG_ENABLE_INV_TILT);
+        bool rebatesEnabled = _flagEnabled(flagsWord, FLAG_ENABLE_REBATES);
+        bool bboFloorEnabled = _flagEnabled(flagsWord, FLAG_ENABLE_BBO_FLOOR);
+        bool aomqEnabled = _flagEnabled(flagsWord, FLAG_ENABLE_AOMQ);
+        bool debugEmit = _flagEnabled(flagsWord, FLAG_DEBUG_EMIT);
+
         OracleConfig memory oracleCfg = oracleConfig;
         OracleOutcome memory outcome = _readOracle(mode, oracleData, flagsWord, oracleCfg);
 
@@ -853,9 +870,25 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         );
 
         uint256 feeCfgPacked = feeConfigPacked;
-        FeePolicy.FeeConfig memory feeCfg = FeePolicy.unpack(feeCfgPacked);
-        MakerConfig memory makerCfg = makerConfig;
-        AomqConfig memory aomqCfg = aomqConfig;
+        FeePipelineParams memory feeParams = _buildFeePipelineParams(feeCfgPacked, sizeFeeEnabled);
+
+        MakerConfig memory makerCfg;
+        if (sizeFeeEnabled || bboFloorEnabled || aomqEnabled) {
+            makerCfg = makerConfig;
+        }
+
+        AomqConfig memory aomqCfg;
+        if (aomqEnabled) {
+            aomqCfg = aomqConfig;
+        }
+
+        PipelineGates memory gates = PipelineGates({
+            sizeFee: sizeFeeEnabled,
+            invTilt: invTiltEnabled,
+            rebates: rebatesEnabled,
+            bboFloor: bboFloorEnabled,
+            aomq: aomqEnabled
+        });
 
         uint16 baseFeeBps;
         if (shouldSettleFee) {
@@ -873,24 +906,25 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             amountIn,
             baseFeeBps,
             outcome,
-            flagsWord,
-            feeCfg,
+            feeParams,
             invCfg,
             invTokens,
             baseReservesLocal,
             quoteReservesLocal,
             makerCfg,
-            aomqCfg
+            aomqCfg,
+            gates
         );
 
-        if (_flagEnabled(flagsWord, FLAG_DEBUG_EMIT)) {
-            uint256 feeBaseComponent = feeCfg.baseBps;
-            uint256 feeVolComponent = feeCfg.alphaConfDenominator == 0
+        if (debugEmit) {
+            FeePolicy.FeeConfig memory debugCfg = FeePolicy.unpack(feeCfgPacked);
+            uint256 feeBaseComponent = debugCfg.baseBps;
+            uint256 feeVolComponent = debugCfg.alphaConfDenominator == 0
                 ? 0
-                : FixedPointMath.mulDivDown(outcome.confBps, feeCfg.alphaConfNumerator, feeCfg.alphaConfDenominator);
-            uint256 feeInvComponent = feeCfg.betaInvDevDenominator == 0
+                : FixedPointMath.mulDivDown(outcome.confBps, debugCfg.alphaConfNumerator, debugCfg.alphaConfDenominator);
+            uint256 feeInvComponent = debugCfg.betaInvDevDenominator == 0
                 ? 0
-                : FixedPointMath.mulDivDown(invDevBps, feeCfg.betaInvDevNumerator, feeCfg.betaInvDevDenominator);
+                : FixedPointMath.mulDivDown(invDevBps, debugCfg.betaInvDevNumerator, debugCfg.betaInvDevDenominator);
 
             emit ConfidenceDebug(
                 outcome.confSpreadBps,
@@ -929,7 +963,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
                 appliedAmountIn,
                 quoteNotional,
                 aomqDecision.spreadFloorBps,
-                feeCfg.capBps
+                feeParams.capBps
             );
         } else {
             _deactivateAomqState(isBaseIn);
@@ -1134,20 +1168,38 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         )
     {
         uint256 flagsWord = _featureFlagsWord();
+        bool sizeFeeEnabled = _flagEnabled(flagsWord, FLAG_ENABLE_SIZE_FEE);
+        bool invTiltEnabled = _flagEnabled(flagsWord, FLAG_ENABLE_INV_TILT);
+        bool rebatesEnabled = _flagEnabled(flagsWord, FLAG_ENABLE_REBATES);
+        bool bboFloorEnabled = _flagEnabled(flagsWord, FLAG_ENABLE_BBO_FLOOR);
+        bool aomqEnabled = _flagEnabled(flagsWord, FLAG_ENABLE_AOMQ);
+
         InventoryConfig memory invCfg = inventoryConfig;
-        MakerConfig memory makerCfg = makerConfig;
-        AomqConfig memory aomqCfg = aomqConfig;
         Inventory.Tokens memory invTokens = _inventoryTokens();
         uint256 baseReservesLocal = uint256(reserves.baseReserves);
         uint256 quoteReservesLocal = uint256(reserves.quoteReserves);
-        FeePolicy.FeeConfig memory feeCfg = FeePolicy.unpack(feeConfigPacked);
+        FeePipelineParams memory feeParams = _buildFeePipelineParams(feeConfigPacked, sizeFeeEnabled);
+
+        MakerConfig memory makerCfg;
+        if (sizeFeeEnabled || bboFloorEnabled || aomqEnabled) {
+            makerCfg = makerConfig;
+        }
+
+        AomqConfig memory aomqCfg;
+        if (aomqEnabled) {
+            aomqCfg = aomqConfig;
+        }
+
+        PipelineGates memory gates = PipelineGates({
+            sizeFee: sizeFeeEnabled,
+            invTilt: invTiltEnabled,
+            rebates: rebatesEnabled,
+            bboFloor: bboFloorEnabled,
+            aomq: aomqEnabled
+        });
 
         uint256 invDevBps = Inventory.deviationBps(
-            baseReservesLocal,
-            quoteReservesLocal,
-            invCfg.targetBaseXstar,
-            outcome.mid,
-            invTokens
+            baseReservesLocal, quoteReservesLocal, invCfg.targetBaseXstar, outcome.mid, invTokens
         );
 
         FeePolicy.FeeState memory state = _loadFeeState();
@@ -1173,14 +1225,14 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
                 baseAmount,
                 baseFeeBps,
                 outcome,
-                flagsWord,
-                feeCfg,
+                feeParams,
                 invCfg,
                 invTokens,
                 baseReservesLocal,
                 quoteReservesLocal,
                 makerCfg,
-                aomqCfg
+                aomqCfg,
+                gates
             );
             askFeeBps[i] = askFee;
             askClamped[i] = askDecision.triggered && askDecision.clamp;
@@ -1192,14 +1244,14 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
                 quoteAmount,
                 baseFeeBps,
                 outcome,
-                flagsWord,
-                feeCfg,
+                feeParams,
                 invCfg,
                 invTokens,
                 baseReservesLocal,
                 quoteReservesLocal,
                 makerCfg,
-                aomqCfg
+                aomqCfg,
+                gates
             );
             bidFeeBps[i] = bidFee;
             bidClamped[i] = bidDecision.triggered && bidDecision.clamp;
@@ -1237,9 +1289,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
                 s0QuoteUnits = uint256(makerCfg.s0Notional);
             }
 
-            uint256 slackQuoteNotional = isBaseIn
-                ? availableQuote
-                : FixedPointMath.mulDivDown(availableBase, outcome.mid, invTokens.baseScale);
+            uint256 slackQuoteNotional =
+                isBaseIn ? availableQuote : FixedPointMath.mulDivDown(availableBase, outcome.mid, invTokens.baseScale);
 
             if (slackQuoteNotional > 0 && s0QuoteUnits > 0) {
                 uint256 threshold = FixedPointMath.mulDivDown(s0QuoteUnits, aomqCfg.floorEpsilonBps, BPS);
@@ -1309,7 +1360,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
                 return decision;
             }
 
-            uint256 targetBase = nearFloor ? availableBase : FixedPointMath.mulDivDown(minQuote, invTokens.baseScale, outcome.mid);
+            uint256 targetBase =
+                nearFloor ? availableBase : FixedPointMath.mulDivDown(minQuote, invTokens.baseScale, outcome.mid);
             if (targetBase == 0) {
                 decision.triggered = false;
                 decision.trigger = bytes32(0);
@@ -1350,12 +1402,11 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         return FixedPointMath.mulDivUp(baseWad, invTokens.baseScale, ONE);
     }
 
-    function _netQuoteFromBase(
-        uint256 amountIn,
-        uint256 mid,
-        uint16 feeBps,
-        Inventory.Tokens memory invTokens
-    ) internal pure returns (uint256) {
+    function _netQuoteFromBase(uint256 amountIn, uint256 mid, uint16 feeBps, Inventory.Tokens memory invTokens)
+        internal
+        pure
+        returns (uint256)
+    {
         if (amountIn == 0 || mid == 0) return 0;
         uint256 amountInWad = FixedPointMath.mulDivDown(amountIn, ONE, invTokens.baseScale);
         if (amountInWad == 0) return 0;
@@ -1372,7 +1423,9 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 amountIn,
         bool isBaseIn,
         uint256 mid,
-        FeePolicy.FeeConfig memory feeCfg,
+        uint16 gammaSizeLinBps,
+        uint16 gammaSizeQuadBps,
+        uint16 sizeFeeCapBps,
         uint128 s0Notional
     ) internal view returns (uint16) {
         if (s0Notional == 0) return 0;
@@ -1394,18 +1447,16 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 u = FixedPointMath.mulDivDown(tradeNotionalWad, ONE, s0NotionalWad);
         if (u == 0) return 0;
 
-        uint256 sizeFeeLin = feeCfg.gammaSizeLinBps == 0
-            ? 0
-            : FixedPointMath.mulDivDown(u, feeCfg.gammaSizeLinBps, ONE);
+        uint256 sizeFeeLin = gammaSizeLinBps == 0 ? 0 : FixedPointMath.mulDivDown(u, gammaSizeLinBps, ONE);
         uint256 sizeFeeQuad;
-        if (feeCfg.gammaSizeQuadBps > 0) {
+        if (gammaSizeQuadBps > 0) {
             uint256 uSquared = FixedPointMath.mulDivDown(u, u, ONE);
-            sizeFeeQuad = FixedPointMath.mulDivDown(uSquared, feeCfg.gammaSizeQuadBps, ONE);
+            sizeFeeQuad = FixedPointMath.mulDivDown(uSquared, gammaSizeQuadBps, ONE);
         }
 
         uint256 sizeFee = sizeFeeLin + sizeFeeQuad;
-        if (sizeFee > feeCfg.sizeFeeCapBps) {
-            sizeFee = feeCfg.sizeFeeCapBps;
+        if (sizeFee > sizeFeeCapBps) {
+            sizeFee = sizeFeeCapBps;
         }
         if (sizeFee > type(uint16).max) {
             sizeFee = type(uint16).max;
@@ -1586,6 +1637,19 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
     }
 
+    function _buildFeePipelineParams(uint256 packed, bool sizeFeeEnabled)
+        internal
+        pure
+        returns (FeePipelineParams memory params)
+    {
+        params.capBps = uint16((packed >> FEE_CAP_OFFSET) & MASK_16);
+        if (sizeFeeEnabled) {
+            params.gammaSizeLinBps = uint16((packed >> FEE_GAMMA_LIN_OFFSET) & MASK_16);
+            params.gammaSizeQuadBps = uint16((packed >> FEE_GAMMA_QUAD_OFFSET) & MASK_16);
+            params.sizeFeeCapBps = uint16((packed >> FEE_SIZE_CAP_OFFSET) & MASK_16);
+        }
+    }
+
     function _flagEnabled(uint256 flags, uint256 mask) internal pure returns (bool) {
         return flags & mask != 0;
     }
@@ -1615,11 +1679,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         return (true, mid, age, conf);
     }
 
-    function _peekPyth()
-        internal
-        view
-        returns (bool fetched, uint256 mid, uint256 age, uint256 conf)
-    {
+    function _peekPyth() internal view returns (bool fetched, uint256 mid, uint256 age, uint256 conf) {
         if (address(ORACLE_PYTH_) == address(0)) {
             return (false, 0, type(uint256).max, 0);
         }
@@ -1638,34 +1698,35 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         uint256 amountIn,
         uint16 baseFeeBps,
         OracleOutcome memory outcome,
-        uint256 flagsWord,
-        FeePolicy.FeeConfig memory feeCfg,
+        FeePipelineParams memory feeParams,
         InventoryConfig memory invCfg,
         Inventory.Tokens memory invTokens,
         uint256 baseReservesLocal,
         uint256 quoteReservesLocal,
         MakerConfig memory makerCfg,
-        AomqConfig memory aomqCfg
-    ) internal view returns (uint16 feeBps, uint256 workingAmountIn, AomqDecision memory aomqDecision)
-    {
+        AomqConfig memory aomqCfg,
+        PipelineGates memory gates
+    ) internal view returns (uint16 feeBps, uint256 workingAmountIn, AomqDecision memory aomqDecision) {
         feeBps = baseFeeBps;
         workingAmountIn = amountIn;
 
-        bool sizeFeeEnabled = _flagEnabled(flagsWord, FLAG_ENABLE_SIZE_FEE);
-        bool invTiltEnabled = _flagEnabled(flagsWord, FLAG_ENABLE_INV_TILT);
-        bool rebatesEnabled = _flagEnabled(flagsWord, FLAG_ENABLE_REBATES);
-        bool bboFloorEnabled = _flagEnabled(flagsWord, FLAG_ENABLE_BBO_FLOOR);
-        bool aomqEnabled = _flagEnabled(flagsWord, FLAG_ENABLE_AOMQ);
-
-        if (sizeFeeEnabled && feeCfg.sizeFeeCapBps > 0 && makerCfg.s0Notional > 0) {
-            uint16 sizeFeeBps = _computeSizeFeeBps(workingAmountIn, isBaseIn, outcome.mid, feeCfg, makerCfg.s0Notional);
+        if (gates.sizeFee && feeParams.sizeFeeCapBps > 0 && makerCfg.s0Notional > 0) {
+            uint16 sizeFeeBps = _computeSizeFeeBps(
+                workingAmountIn,
+                isBaseIn,
+                outcome.mid,
+                feeParams.gammaSizeLinBps,
+                feeParams.gammaSizeQuadBps,
+                feeParams.sizeFeeCapBps,
+                makerCfg.s0Notional
+            );
             if (sizeFeeBps > 0) {
                 uint256 updated = uint256(feeBps) + sizeFeeBps;
-                feeBps = updated > feeCfg.capBps ? feeCfg.capBps : uint16(updated);
+                feeBps = updated > feeParams.capBps ? feeParams.capBps : uint16(updated);
             }
         }
 
-        if (invTiltEnabled) {
+        if (gates.invTilt) {
             int256 tiltAdj = _computeInventoryTiltBps(
                 isBaseIn,
                 outcome.mid,
@@ -1679,7 +1740,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             if (tiltAdj != 0) {
                 if (tiltAdj > 0) {
                     uint256 increased = uint256(feeBps) + uint256(tiltAdj);
-                    feeBps = increased > feeCfg.capBps ? feeCfg.capBps : uint16(increased);
+                    feeBps = increased > feeParams.capBps ? feeParams.capBps : uint16(increased);
                 } else {
                     uint256 decrease = uint256(-tiltAdj);
                     feeBps = decrease >= feeBps ? 0 : uint16(uint256(feeBps) - decrease);
@@ -1689,10 +1750,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
         if (outcome.divergenceHaircutBps > 0) {
             uint256 adjusted = uint256(feeBps) + outcome.divergenceHaircutBps;
-            feeBps = adjusted > feeCfg.capBps ? feeCfg.capBps : uint16(adjusted);
+            feeBps = adjusted > feeParams.capBps ? feeParams.capBps : uint16(adjusted);
         }
 
-        if (rebatesEnabled) {
+        if (gates.rebates) {
             uint16 discountBps = _aggregatorDiscountBps[msg.sender];
             if (discountBps > 0) {
                 if (discountBps >= feeBps) {
@@ -1703,17 +1764,17 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             }
         }
 
-        if (bboFloorEnabled) {
+        if (gates.bboFloor) {
             uint16 floorBps = _computeBboFloor(outcome.spreadBps, makerCfg);
-            if (floorBps > feeCfg.capBps) {
-                floorBps = feeCfg.capBps;
+            if (floorBps > feeParams.capBps) {
+                floorBps = feeParams.capBps;
             }
             if (feeBps < floorBps) {
                 feeBps = floorBps;
             }
         }
 
-        if (!aomqEnabled || aomqCfg.minQuoteNotional == 0) {
+        if (!gates.aomq || aomqCfg.minQuoteNotional == 0) {
             aomqDecision.targetAmountIn = workingAmountIn;
             return (feeBps, workingAmountIn, aomqDecision);
         }
@@ -1731,7 +1792,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
                 quoteReservesLocal,
                 feeBps,
                 makerCfg,
-                bboFloorEnabled
+                gates.bboFloor
             );
 
             if (decision.clamp && decision.targetAmountIn < workingAmountIn && iter == 0) {
@@ -1757,7 +1818,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
                 }
 
                 if (decision.spreadFloorBps > feeBps) {
-                    feeBps = decision.spreadFloorBps > feeCfg.capBps ? feeCfg.capBps : decision.spreadFloorBps;
+                    feeBps = decision.spreadFloorBps > feeParams.capBps ? feeParams.capBps : decision.spreadFloorBps;
                 }
             } else if (!aomqClampActivated && !aomqDecision.triggered) {
                 aomqDecision = decision;
@@ -1773,8 +1834,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
                 if (recalculated > 0 && recalculated < workingAmountIn) {
                     workingAmountIn = recalculated;
                 }
-                uint256 simulatedQuote =
-                    _netQuoteFromBase(workingAmountIn, outcome.mid, feeBps, invTokens);
+                uint256 simulatedQuote = _netQuoteFromBase(workingAmountIn, outcome.mid, feeBps, invTokens);
                 if (simulatedQuote < aomqDecision.targetQuoteNotional) {
                     uint256 deficit = aomqDecision.targetQuoteNotional - simulatedQuote;
                     uint256 extraBase = _baseInForQuoteNotional(deficit, outcome.mid, feeBps, invTokens);
@@ -1812,7 +1872,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         snap.blockNumber = uint64(block.number);
         snap.sigmaBps = outcome.sigmaBps > type(uint32).max ? uint32(type(uint32).max) : uint32(outcome.sigmaBps);
         snap.confBps = outcome.confBps > type(uint32).max ? uint32(type(uint32).max) : uint32(outcome.confBps);
-        snap.divergenceBps = outcome.divergenceBps > type(uint32).max ? uint32(type(uint32).max) : uint32(outcome.divergenceBps);
+        snap.divergenceBps =
+            outcome.divergenceBps > type(uint32).max ? uint32(type(uint32).max) : uint32(outcome.divergenceBps);
         snap.spreadBps = outcome.spreadBps > type(uint32).max ? uint32(type(uint32).max) : uint32(outcome.spreadBps);
         snap.divergenceHaircutBps = outcome.divergenceHaircutBps;
         snap.midWad = outcome.mid > type(uint96).max ? type(uint96).max : uint96(outcome.mid);
@@ -1831,7 +1892,9 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         _previewSnapshot = snap;
         _lastSnapshotRefreshAt = snap.timestamp;
 
-        emit PreviewSnapshotRefreshed(caller, snap.timestamp, snap.blockNumber, snap.midWad, snap.divergenceBps, snap.flags);
+        emit PreviewSnapshotRefreshed(
+            caller, snap.timestamp, snap.blockNumber, snap.midWad, snap.divergenceBps, snap.flags
+        );
     }
 
     function _getFreshSpotPrice() internal view returns (uint256 mid) {
@@ -1856,12 +1919,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         return block.timestamp >= uint256(lastAt) + cooldown;
     }
 
-    function _readOracle(
-        OracleMode mode,
-        bytes calldata oracleData,
-        uint256 flagsWord,
-        OracleConfig memory cfg
-    ) internal returns (OracleOutcome memory outcome) {
+    function _readOracle(OracleMode mode, bytes calldata oracleData, uint256 flagsWord, OracleConfig memory cfg)
+        internal
+        returns (OracleOutcome memory outcome)
+    {
         // AUDIT:HCABI-002 adapters now fail-closed; surface reverts instead of success flags
         IOracleAdapterHC.MidResult memory midRes = ORACLE_HC_.readMidAndAge();
         IOracleAdapterHC.BidAskResult memory baRes = ORACLE_HC_.readBidAsk();
@@ -1875,11 +1936,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         bool spotMode = mode == OracleMode.Spot;
 
         bool needsPythConfidence = !spotMode && blendOn && cfg.confWeightPythBps > 0;
-        bool needsPythDivergence = softDivEnabled
-            || cfg.divergenceBps > 0
-            || cfg.divergenceAcceptBps > 0
-            || cfg.divergenceSoftBps > 0
-            || cfg.divergenceHardBps > 0;
+        bool needsPythDivergence = softDivEnabled || cfg.divergenceBps > 0 || cfg.divergenceAcceptBps > 0
+            || cfg.divergenceSoftBps > 0 || cfg.divergenceHardBps > 0;
 
         PythCache memory pyth;
         pyth.age = type(uint256).max;
@@ -1915,9 +1973,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         if (outcome.mid == 0 && address(ORACLE_PYTH_) != address(0)) {
-            (bool fetched, uint256 mid, uint256 age, uint256 conf) = oracleData.length > 0
-                ? _readPyth(oracleData)
-                : _peekPyth();
+            (bool fetched, uint256 mid, uint256 age, uint256 conf) =
+                oracleData.length > 0 ? _readPyth(oracleData) : _peekPyth();
             if (fetched) {
                 pyth.fetched = true;
                 pyth.mid = mid;
@@ -1948,9 +2005,8 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         spreadAvailable = spreadAvailable && (outcome.reason != REASON_PYTH);
 
         if ((needsPythConfidence || needsPythDivergence) && !pyth.fetched && address(ORACLE_PYTH_) != address(0)) {
-            (bool fetched, uint256 mid, uint256 age, uint256 conf) = oracleData.length > 0
-                ? _readPyth(oracleData)
-                : _peekPyth();
+            (bool fetched, uint256 mid, uint256 age, uint256 conf) =
+                oracleData.length > 0 ? _readPyth(oracleData) : _peekPyth();
             if (fetched) {
                 pyth.fetched = true;
                 pyth.mid = mid;
@@ -1963,57 +2019,51 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         (outcome.confBps, outcome.confSpreadBps, outcome.confSigmaBps, outcome.confPythBps, outcome.sigmaBps) =
-            _computeConfidence(
-                cfg,
-                blendOn,
-                mode,
-                outcome.mid,
-                outcome.spreadBps,
-                spreadAvailable,
-                pyth.fresh,
-                pyth.conf,
-                outcome.reason == REASON_PYTH
-            );
+        _computeConfidence(
+            cfg,
+            blendOn,
+            mode,
+            outcome.mid,
+            outcome.spreadBps,
+            spreadAvailable,
+            pyth.fresh,
+            pyth.conf,
+            outcome.reason == REASON_PYTH
+        );
 
         if (!outcome.usedFallback && pyth.fresh) {
             uint256 divergenceBps = OracleUtils.computeDivergenceBps(outcome.mid, pyth.mid);
             outcome.divergenceBps = divergenceBps;
 
-        if (softDivEnabled) {
-            (uint16 acceptBps, uint16 softBps, uint16 hardBps) = _resolveDivergenceThresholds(cfg);
-            if (debugEmit && hardBps > 0) {
-                emit OracleDivergenceChecked(pyth.mid, outcome.mid, divergenceBps, hardBps);
+            if (softDivEnabled) {
+                (uint16 acceptBps, uint16 softBps, uint16 hardBps) = _resolveDivergenceThresholds(cfg);
+                if (debugEmit && hardBps > 0) {
+                    emit OracleDivergenceChecked(pyth.mid, outcome.mid, divergenceBps, hardBps);
+                }
+                (uint16 appliedHaircut, bool activeAfter) = _processSoftDivergence(
+                    divergenceBps, acceptBps, softBps, hardBps, cfg.haircutMinBps, cfg.haircutSlopeBps
+                );
+                outcome.divergenceHaircutBps = appliedHaircut;
+                outcome.softDivergenceActive = activeAfter;
+                if (appliedHaircut > 0 && outcome.reason == REASON_NONE) {
+                    outcome.reason = REASON_HAIRCUT;
+                }
+            } else if (cfg.divergenceBps > 0 && divergenceBps > cfg.divergenceBps) {
+                if (debugEmit) {
+                    emit OracleDivergenceChecked(pyth.mid, outcome.mid, divergenceBps, cfg.divergenceBps);
+                }
+                revert Errors.OracleDiverged(divergenceBps, cfg.divergenceBps);
             }
-            (uint16 appliedHaircut, bool activeAfter) = _processSoftDivergence(
-                divergenceBps,
-                acceptBps,
-                softBps,
-                hardBps,
-                cfg.haircutMinBps,
-                cfg.haircutSlopeBps
-            );
-            outcome.divergenceHaircutBps = appliedHaircut;
-            outcome.softDivergenceActive = activeAfter;
-            if (appliedHaircut > 0 && outcome.reason == REASON_NONE) {
-                outcome.reason = REASON_HAIRCUT;
-            }
-        } else if (cfg.divergenceBps > 0 && divergenceBps > cfg.divergenceBps) {
-            if (debugEmit) {
-                emit OracleDivergenceChecked(pyth.mid, outcome.mid, divergenceBps, cfg.divergenceBps);
-            }
-            revert Errors.OracleDiverged(divergenceBps, cfg.divergenceBps);
-        }
         }
 
         return outcome;
     }
 
-    function _readOracleView(
-        OracleMode mode,
-        bytes calldata oracleData,
-        uint256 flagsWord,
-        OracleConfig memory cfg
-    ) internal view returns (OracleOutcome memory outcome) {
+    function _readOracleView(OracleMode mode, bytes calldata oracleData, uint256 flagsWord, OracleConfig memory cfg)
+        internal
+        view
+        returns (OracleOutcome memory outcome)
+    {
         oracleData;
         IOracleAdapterHC.MidResult memory midRes = ORACLE_HC_.readMidAndAge();
         IOracleAdapterHC.BidAskResult memory baRes = ORACLE_HC_.readBidAsk();
@@ -2027,11 +2077,10 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
         bool needsPythConfidence = !spotMode && blendOn && cfg.confWeightPythBps > 0;
         bool needsPythDivergence = !spotMode
-            && (softDivEnabled
-                || cfg.divergenceBps > 0
-                || cfg.divergenceAcceptBps > 0
-                || cfg.divergenceSoftBps > 0
-                || cfg.divergenceHardBps > 0);
+            && (
+                softDivEnabled || cfg.divergenceBps > 0 || cfg.divergenceAcceptBps > 0 || cfg.divergenceSoftBps > 0
+                    || cfg.divergenceHardBps > 0
+            );
 
         PythCache memory pyth;
         pyth.age = type(uint256).max;
@@ -2111,17 +2160,17 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         }
 
         (outcome.confBps, outcome.confSpreadBps, outcome.confSigmaBps, outcome.confPythBps, outcome.sigmaBps) =
-            _computeConfidencePreview(
-                cfg,
-                blendOn,
-                mode,
-                outcome.mid,
-                outcome.spreadBps,
-                spreadAvailable,
-                pyth.fresh,
-                pyth.conf,
-                outcome.reason == REASON_PYTH
-            );
+        _computeConfidencePreview(
+            cfg,
+            blendOn,
+            mode,
+            outcome.mid,
+            outcome.spreadBps,
+            spreadAvailable,
+            pyth.fresh,
+            pyth.conf,
+            outcome.reason == REASON_PYTH
+        );
 
         if (!outcome.usedFallback && pyth.fresh) {
             uint256 divergenceBps = OracleUtils.computeDivergenceBps(outcome.mid, pyth.mid);
@@ -2130,12 +2179,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             if (softDivEnabled) {
                 (uint16 acceptBps, uint16 softBps, uint16 hardBps) = _resolveDivergenceThresholds(cfg);
                 (uint16 haircutBps, bool activeAfter) = _previewSoftDivergence(
-                    divergenceBps,
-                    acceptBps,
-                    softBps,
-                    hardBps,
-                    cfg.haircutMinBps,
-                    cfg.haircutSlopeBps
+                    divergenceBps, acceptBps, softBps, hardBps, cfg.haircutMinBps, cfg.haircutSlopeBps
                 );
                 outcome.divergenceHaircutBps = haircutBps;
                 outcome.softDivergenceActive = activeAfter;

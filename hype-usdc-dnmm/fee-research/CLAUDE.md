@@ -36,3 +36,4 @@
 ## Change Log
 - 2025-10-02: Bootstrapped HyperEVM quoting scaffold, registry files, and Vitest harness.
 - 2025-10-02: Added Hypertrade aggregator integration, concurrency-safe run pipeline, and fresh run artifacts.
+- 2025-10-02: Mapped Hypertrade legs to per-DEX adapters (HyperSwap, Hybra, Kittenswap, Gliquid) with rate-limited execution and consolidated metrics logging.

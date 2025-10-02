@@ -62,6 +62,7 @@ export interface QuoteResult {
   success: boolean;
   failure_reason?: string;
   mid_price_out_per_in?: number | null;
+  legs?: QuoteLeg[];
 }
 
 export interface AdapterDocsMeta {
@@ -94,6 +95,15 @@ export interface RunConfig {
   tokens: TokenPair;
   directions: QuoteDirection[];
   amounts_usd: number[];
+}
+
+export interface QuoteLeg {
+  dex: string;
+  pool_address: string | null;
+  portion: string;
+  fee_bps: number | null;
+  amount_out_tokens: string;
+  amount_out_wei: bigint;
 }
 
 export const DexDocsSchema = z.array(

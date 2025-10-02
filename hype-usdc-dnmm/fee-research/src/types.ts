@@ -73,6 +73,7 @@ export interface AdapterDocsMeta {
 
 export interface DexAdapter {
   name(): string;
+  integrationKind(): 'dex_adapter' | 'aggregator_http' | 'node_sdk' | 'http_quote';
   supports(chain_id: number): Promise<boolean>;
   resolveTokens(direction: QuoteDirection): Promise<TokenPair>;
   quote(params: QuoteParams): Promise<QuoteResult>;

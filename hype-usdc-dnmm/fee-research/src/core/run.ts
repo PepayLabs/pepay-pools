@@ -8,10 +8,10 @@ import { findToken } from '../registries/tokens.js';
 import { logger } from '../utils/logger.js';
 import { MetricsWriter } from './metricsWriter.js';
 import { QuoteDirection } from '../types.js';
-import { AggregatorAdapter } from '../adapters/aggregatorAdapter.js';
 import { computeEffectivePriceInPerOut, computeEffectivePriceUsdPerOut, computePriceImpactBps } from '../utils/math.js';
 import { ethers } from 'ethers';
 import { performance } from 'perf_hooks';
+import { createRateLimitedQueue } from '../utils/concurrency.js';
 
 interface RunSummary {
   run_id: string;
@@ -111,185 +111,194 @@ export async function runEvaluation(): Promise<void> {
       }
     }
 
+    const enqueue = createRateLimitedQueue(6);
+    const tasks: Promise<void>[] = [];
+
     for (const direction of plan.directions) {
       for (const amountUsd of plan.amounts_usd) {
-        const tokens = direction === 'USDC->HYPE' ? tokenIn : tokenOut;
-        const counter = direction === 'USDC->HYPE' ? tokenOut : tokenIn;
-        let amountIn;
-        try {
-          const conversionMid = direction === 'HYPE->USDC' ? midCache['HYPE->USDC'] : midCache['USDC->HYPE'];
-          amountIn = amountInForDirection(direction, amountUsd, tokens.decimals, conversionMid);
-        } catch (error) {
-          adaptersFailures[adapter.name()] = adaptersFailures[adapter.name()] ?? [];
-          adaptersFailures[adapter.name()].push((error as Error).message);
-          metricsWriter.addRow(
-            {
-              run_id: runId,
-              timestamp_iso: timestamp,
-              dex: adapter.name(),
-              integration_kind: adapter instanceof AggregatorAdapter ? 'aggregator_http' : 'dex_adapter',
-              docs_url: null,
-              chain_id: chain.chain_id,
-              chain_name: chain.name,
-              direction,
-              token_in_symbol: tokens.symbol,
-              token_in_address: tokens.address,
-              decimals_in: tokens.decimals,
-              token_out_symbol: counter.symbol,
-              token_out_address: counter.address,
-              decimals_out: counter.decimals,
-              amount_in_tokens: '0',
-              amount_in_usd: amountUsd,
-              amount_out_tokens: null,
-              amount_out_usd: null,
-              mid_price_out_per_in: null,
-              effective_price_in_per_out: null,
-              effective_price_usd_per_out: null,
-              price_impact_bps: null,
-              fee_bps: null,
-              gas_estimate: null,
-              gas_price: null,
-              gas_cost_native: null,
-              native_usd: null,
-              gas_cost_usd: null,
-              route_summary: null,
-              sdk_or_api_version: null,
-              quote_latency_ms: 0,
-              success: false,
-              failure_reason: (error as Error).message,
-            },
-            {
-              run_id: runId,
-              timestamp_iso: timestamp,
-              adapter: adapter.name(),
-              direction,
-              amount_usd: amountUsd,
-              request: null,
-              response: { error: (error as Error).message },
+        tasks.push(
+          enqueue(async () => {
+            const tokens = direction === 'USDC->HYPE' ? tokenIn : tokenOut;
+            const counter = direction === 'USDC->HYPE' ? tokenOut : tokenIn;
+            const integrationKind = adapter.integrationKind();
+            let amountIn;
+            try {
+              const conversionMid = direction === 'HYPE->USDC' ? midCache['HYPE->USDC'] : midCache['USDC->HYPE'];
+              amountIn = amountInForDirection(direction, amountUsd, tokens.decimals, conversionMid);
+            } catch (error) {
+              adaptersFailures[adapter.name()] = adaptersFailures[adapter.name()] ?? [];
+              adaptersFailures[adapter.name()].push((error as Error).message);
+              metricsWriter.addRow(
+                {
+                  run_id: runId,
+                  timestamp_iso: timestamp,
+                  dex: adapter.name(),
+                  integration_kind: integrationKind,
+                  docs_url: null,
+                  chain_id: chain.chain_id,
+                  chain_name: chain.name,
+                  direction,
+                  token_in_symbol: tokens.symbol,
+                  token_in_address: tokens.address,
+                  decimals_in: tokens.decimals,
+                  token_out_symbol: counter.symbol,
+                  token_out_address: counter.address,
+                  decimals_out: counter.decimals,
+                  amount_in_tokens: '0',
+                  amount_in_usd: amountUsd,
+                  amount_out_tokens: null,
+                  amount_out_usd: null,
+                  mid_price_out_per_in: null,
+                  effective_price_in_per_out: null,
+                  effective_price_usd_per_out: null,
+                  price_impact_bps: null,
+                  fee_bps: null,
+                  gas_estimate: null,
+                  gas_price: null,
+                  gas_cost_native: null,
+                  native_usd: null,
+                  gas_cost_usd: null,
+                  route_summary: null,
+                  sdk_or_api_version: null,
+                  quote_latency_ms: 0,
+                  success: false,
+                  failure_reason: (error as Error).message,
+                },
+                {
+                  run_id: runId,
+                  timestamp_iso: timestamp,
+                  adapter: adapter.name(),
+                  direction,
+                  amount_usd: amountUsd,
+                  request: null,
+                  response: { error: (error as Error).message },
+                }
+              );
+              rows += 1;
+              return;
             }
-          );
-          rows += 1;
-          continue;
-        }
-        const start = performance.now();
-        let quote;
-        try {
-          quote = await adapter.quote({
-            direction,
-            amount_in_tokens: amountIn.tokens,
-            amount_in_wei: amountIn.wei,
-            chain_id: chain.chain_id,
-            slippage_tolerance_bps: plan.slippage_tolerance_bps,
-          });
-        } catch (error) {
-          const reason = (error as Error).message;
-          quote = {
-            amount_out_tokens: '0',
-            amount_out_wei: 0n,
-            route_summary: null,
-            fee_bps: null,
-            gas_estimate: null,
-            sdk_or_api_version: null,
-            latency_ms: performance.now() - start,
-            docs_url: null,
-            success: false,
-            failure_reason: reason,
-            mid_price_out_per_in: midCache[direction],
-          };
-        }
 
-        const latency = quote.latency_ms ?? performance.now() - start;
+            const start = performance.now();
+            let quote;
+            try {
+              quote = await adapter.quote({
+                direction,
+                amount_in_tokens: amountIn.tokens,
+                amount_in_wei: amountIn.wei,
+                chain_id: chain.chain_id,
+                slippage_tolerance_bps: plan.slippage_tolerance_bps,
+              });
+            } catch (error) {
+              const reason = (error as Error).message;
+              quote = {
+                amount_out_tokens: '0',
+                amount_out_wei: 0n,
+                route_summary: null,
+                fee_bps: null,
+                gas_estimate: null,
+                sdk_or_api_version: null,
+                latency_ms: performance.now() - start,
+                docs_url: null,
+                success: false,
+                failure_reason: reason,
+                mid_price_out_per_in: midCache[direction],
+              };
+            }
 
-        const amountInTokensNumber = parseFloat(amountIn.tokens);
-        const amountOutTokensNumber = quote.success && quote.amount_out_tokens
-          ? parseFloat(quote.amount_out_tokens)
-          : 0;
-        const directionMid = quote.mid_price_out_per_in ?? midCache[direction];
-        const idealOutAtMid = directionMid && quote.success ? amountInTokensNumber * directionMid : null;
-        const priceImpact = directionMid && quote.success && idealOutAtMid
-          ? computePriceImpactBps({
-              amountInTokens: amountInTokensNumber,
-              amountOutTokens: amountOutTokensNumber,
-              idealOutTokens: idealOutAtMid,
-            })
-          : null;
-        const effectivePrice = quote.success
-          ? computeEffectivePriceInPerOut(amountInTokensNumber, amountOutTokensNumber)
-          : null;
-        const effectiveUsdPrice = quote.success
-          ? computeEffectivePriceUsdPerOut(amountUsd, 0, amountOutTokensNumber)
-          : null;
-        let amountOutUsd: number | null = null;
-        if (quote.success) {
-          if (direction === 'USDC->HYPE') {
-            const hypeUsd = midCache['HYPE->USDC'];
-            amountOutUsd = hypeUsd ? amountOutTokensNumber * hypeUsd : null;
-          } else {
-            amountOutUsd = amountOutTokensNumber;
-          }
-        }
+            const latency = quote.latency_ms ?? performance.now() - start;
 
-        if (!quote.success) {
-          adaptersFailures[adapter.name()] = adaptersFailures[adapter.name()] ?? [];
-          adaptersFailures[adapter.name()].push(quote.failure_reason ?? 'unknown_failure');
-        } else {
-          if (!adaptersWithSuccess.includes(adapter.name())) {
-            adaptersWithSuccess.push(adapter.name());
-          }
-        }
+            const amountInTokensNumber = parseFloat(amountIn.tokens);
+            const amountOutTokensNumber = quote.success && quote.amount_out_tokens
+              ? parseFloat(quote.amount_out_tokens)
+              : 0;
+            const directionMid = quote.mid_price_out_per_in ?? midCache[direction];
+            const idealOutAtMid = directionMid && quote.success ? amountInTokensNumber * directionMid : null;
+            const priceImpact = directionMid && quote.success && idealOutAtMid
+              ? computePriceImpactBps({
+                  amountInTokens: amountInTokensNumber,
+                  amountOutTokens: amountOutTokensNumber,
+                  idealOutTokens: idealOutAtMid,
+                })
+              : null;
+            const effectivePrice = quote.success
+              ? computeEffectivePriceInPerOut(amountInTokensNumber, amountOutTokensNumber)
+              : null;
+            const effectiveUsdPrice = quote.success
+              ? computeEffectivePriceUsdPerOut(amountUsd, 0, amountOutTokensNumber)
+              : null;
+            let amountOutUsd: number | null = null;
+            if (quote.success) {
+              if (direction === 'USDC->HYPE') {
+                const hypeUsd = midCache['HYPE->USDC'];
+                amountOutUsd = hypeUsd ? amountOutTokensNumber * hypeUsd : null;
+              } else {
+                amountOutUsd = amountOutTokensNumber;
+              }
+            }
 
-        metricsWriter.addRow(
-          {
-            run_id: runId,
-            timestamp_iso: timestamp,
-            dex: adapter.name(),
-            integration_kind: adapter instanceof AggregatorAdapter ? 'aggregator_http' : 'dex_adapter',
-            docs_url: quote.docs_url ?? null,
-            chain_id: chain.chain_id,
-            chain_name: chain.name,
-            direction,
-            token_in_symbol: tokens.symbol,
-            token_in_address: tokens.address,
-            decimals_in: tokens.decimals,
-            token_out_symbol: counter.symbol,
-            token_out_address: counter.address,
-            decimals_out: counter.decimals,
-            amount_in_tokens: amountIn.tokens,
-            amount_in_usd: amountUsd,
-            amount_out_tokens: quote.success ? quote.amount_out_tokens : null,
-            amount_out_usd: amountOutUsd,
-            mid_price_out_per_in: directionMid ?? null,
-            effective_price_in_per_out: effectivePrice,
-            effective_price_usd_per_out: effectiveUsdPrice,
-            price_impact_bps: priceImpact,
-            fee_bps: quote.fee_bps,
-            gas_estimate: quote.gas_estimate ? quote.gas_estimate.toString() : null,
-            gas_price: null,
-            gas_cost_native: null,
-            native_usd: null,
-            gas_cost_usd: null,
-            route_summary: quote.route_summary,
-            sdk_or_api_version: quote.sdk_or_api_version,
-            quote_latency_ms: latency,
-            success: quote.success,
-            failure_reason: quote.failure_reason ?? null,
-          },
-          {
-            run_id: runId,
-            timestamp_iso: timestamp,
-            adapter: adapter.name(),
-            direction,
-            amount_usd: amountUsd,
-            request: {
-              amount_in_tokens: amountIn.tokens,
-              chain_id: chain.chain_id,
-            },
-            response: quote,
-          }
+            if (!quote.success) {
+              adaptersFailures[adapter.name()] = adaptersFailures[adapter.name()] ?? [];
+              adaptersFailures[adapter.name()].push(quote.failure_reason ?? 'unknown_failure');
+            } else if (!adaptersWithSuccess.includes(adapter.name())) {
+              adaptersWithSuccess.push(adapter.name());
+            }
+
+            metricsWriter.addRow(
+              {
+                run_id: runId,
+                timestamp_iso: timestamp,
+                dex: adapter.name(),
+                integration_kind: integrationKind,
+                docs_url: quote.docs_url ?? null,
+                chain_id: chain.chain_id,
+                chain_name: chain.name,
+                direction,
+                token_in_symbol: tokens.symbol,
+                token_in_address: tokens.address,
+                decimals_in: tokens.decimals,
+                token_out_symbol: counter.symbol,
+                token_out_address: counter.address,
+                decimals_out: counter.decimals,
+                amount_in_tokens: amountIn.tokens,
+                amount_in_usd: amountUsd,
+                amount_out_tokens: quote.success ? quote.amount_out_tokens : null,
+                amount_out_usd: amountOutUsd,
+                mid_price_out_per_in: directionMid ?? null,
+                effective_price_in_per_out: effectivePrice,
+                effective_price_usd_per_out: effectiveUsdPrice,
+                price_impact_bps: priceImpact,
+                fee_bps: quote.fee_bps,
+                gas_estimate: quote.gas_estimate ? quote.gas_estimate.toString() : null,
+                gas_price: null,
+                gas_cost_native: null,
+                native_usd: null,
+                gas_cost_usd: null,
+                route_summary: quote.route_summary,
+                sdk_or_api_version: quote.sdk_or_api_version,
+                quote_latency_ms: latency,
+                success: quote.success,
+                failure_reason: quote.failure_reason ?? null,
+              },
+              {
+                run_id: runId,
+                timestamp_iso: timestamp,
+                adapter: adapter.name(),
+                direction,
+                amount_usd: amountUsd,
+                request: {
+                  amount_in_tokens: amountIn.tokens,
+                  chain_id: chain.chain_id,
+                },
+                response: quote,
+              }
+            );
+            rows += 1;
+          })
         );
-        rows += 1;
       }
     }
+
+    await Promise.all(tasks);
   }
 
   await metricsWriter.flush(runId);

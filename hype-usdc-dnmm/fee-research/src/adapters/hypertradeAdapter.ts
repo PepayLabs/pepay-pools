@@ -5,6 +5,7 @@ import { loadDexDocs } from '../registries/dexDocs.js';
 import { httpRequest } from '../utils/http.js';
 import { ethers } from 'ethers';
 import { logger } from '../utils/logger.js';
+import { performance } from 'perf_hooks';
 
 interface HypertradeQuoteResponse {
   body: {
@@ -61,6 +62,10 @@ export class HypertradeAdapter extends BaseAdapter {
   override async midPrice(direction: QuoteDirection): Promise<number | null> {
     const tokens = await this.resolveTokens(direction);
     return this.getMidPrice(direction, tokens);
+  }
+
+  override integrationKind(): 'aggregator_http' {
+    return 'aggregator_http';
   }
 
   override async supports(chain_id: number): Promise<boolean> {

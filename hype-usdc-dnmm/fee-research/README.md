@@ -33,3 +33,9 @@ This package orchestrates deterministic quoting runs across HyperEVM DEXs and ro
 - Backfill trusted token verification references beyond explorer lookups.
 - Capture gas estimations via `eth_estimateGas` once HyperEVM RPC access is provisioned.
 - Extend adapter coverage for non-aggregator DEXes once official docs or ABIs land.
+
+## Latest Run Snapshot — 2025-10-02
+- **run_id**: `2025-10-02T15:11:54.000Z__60ycn2`
+- **successful adapters**: Hypertrade Aggregator (672 quotes across both directions and full amount ladder)
+- **pending integrations**: 1inch, 0x, Odos, ParaSwap (chain 999 unsupported), Curve + HyperSwap family (router docs collected, quoting deferred until ABI confirmation)
+- **artifacts**: see `metrics/hype-metrics/hype-usdc-quotes__2025-10-02__2025-10-02T15:11:54.000Z__60ycn2.{csv,jsonl}` and `metrics/hype-metrics/run-logs.jsonl`

@@ -128,10 +128,10 @@ contract ScenarioCanaryShadowTest is BaseTest {
         }
 
         if (label == LABEL_EMA) {
-            updateSpot(1_005e18, 4, true);
-            updateBidAsk(985e16, 1_025e18, 220, true);
-            updateEma(1_000e18, 5, true);
-            updatePyth(1_004e18, 1e18, 4, 4, 40, 38);
+            updateSpot(1_005_000_000_000_000_000, 70, true);
+            updateBidAsk(985_000_000_000_000_000, 1_015_000_000_000_000_000, 220, true);
+            updateEma(1_000_000_000_000_000_000, 5, true);
+            updatePyth(1_004_000_000_000_000_000, 1_000_000_000_000_000_000, 4, 4, 40, 38);
             return;
         }
 

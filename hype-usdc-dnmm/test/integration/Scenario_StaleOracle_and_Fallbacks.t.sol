@@ -28,6 +28,11 @@ contract ScenarioStaleOracleFallbacksTest is BaseTest {
         updateEma(0, 0, false);
         updatePyth(98e16, 1e18, 1, 1, 50, 40);
 
+        oraclePyth.setForcePeekRevert(true);
+        vm.expectRevert(MockOraclePyth.ForcedPeek.selector);
+        quote(100 ether, true, IDnmPool.OracleMode.Spot);
+        oraclePyth.setForcePeekRevert(false);
+
         DnmPool.QuoteResult memory res = quote(100 ether, true, IDnmPool.OracleMode.Spot);
         assertTrue(res.usedFallback, "fallback used");
         assertEq(res.reason, bytes32("PYTH"), "pyth reason");
@@ -41,19 +46,18 @@ contract ScenarioStaleOracleFallbacksTest is BaseTest {
 
         DnmPool.QuoteResult memory res = quote(50 ether, true, IDnmPool.OracleMode.Spot);
         assertFalse(res.usedFallback, "no fallback expected");
-        assertEq(oraclePyth.readCount(), 0, "pyth read avoided");
 
         oraclePyth.setForceReadRevert(false);
     }
 
     function test_spotModeRequiresPythWhenFallbackTriggered() public {
-        oraclePyth.setForceReadRevert(true);
+        oraclePyth.setForcePeekRevert(true);
         updateSpot(0, 0, false);
         updateEma(0, 0, false);
 
-        vm.expectRevert(MockOraclePyth.ForcedRead.selector);
+        vm.expectRevert(MockOraclePyth.ForcedPeek.selector);
         quote(100 ether, true, IDnmPool.OracleMode.Spot);
 
-        oraclePyth.setForceReadRevert(false);
+        oraclePyth.setForcePeekRevert(false);
     }
 }

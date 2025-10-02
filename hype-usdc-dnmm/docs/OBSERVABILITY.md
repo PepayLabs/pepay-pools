@@ -40,7 +40,7 @@
 
 ## Dashboards
 - **Liquidity Health** – Track inventory deviation, floor breaches, partial percentages.
-- **Oracle Health** – Monitor fallback usage, divergence rejects (`Errors.OracleDiverged()`).
+- **Oracle Health** – Monitor fallback usage, divergence rejects (`Errors.OracleDiverged()`), and surface `pyth_peek_failures_total` whenever adapters revert (e.g. `ForcedPeek`) so operators know spot-mode fallbacks have lost their safety net.
 - **Canary Shadow** – Track `canary_deltas.csv` median vs ε and ensure divergence rejections line up with observer deltas.
 - **Fee Dynamics** – Graph fee_bps vs time; overlay α/β contributions derived from oracle + inventory inputs.
 - **Revenue** – Aggregate LP fees per period (amountIn × fee_bps/BPS).

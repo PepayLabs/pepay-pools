@@ -1,62 +1,45 @@
 import { Contract } from 'ethers';
 import { IDNM_POOL_ABI } from './abis.js';
-import { ProviderManager } from './providers.js';
 import {
+  ChainBackedConfig,
+  ChainClient,
   FeatureFlagsState,
   FeeConfigState,
   InventoryConfigState,
   MakerConfigState,
   OracleConfigState,
+  PoolClientAdapter,
   PoolConfig,
   PoolState,
   PoolTokens,
   RegimeFlag,
   RegimeFlags,
   REGIME_BIT_VALUES,
-  ShadowBotConfig
+  PreviewLadderSnapshot,
+  QuotePreviewResult
 } from './types.js';
 
 const BPS = 10_000n;
-
-interface PreviewLadderRow {
-  sizeWad: bigint;
-  askFeeBps: number;
-  bidFeeBps: number;
-  askClamped: boolean;
-  bidClamped: boolean;
-}
-
-export interface PreviewLadderSnapshot {
-  rows: PreviewLadderRow[];
-  snapshotTimestamp: number;
-  snapshotMidWad: bigint;
-}
-
-export interface QuotePreviewResult {
-  amountOut: bigint;
-  midUsed: bigint;
-  feeBpsUsed: number;
-  partialFillAmountIn: bigint;
-  usedFallback: boolean;
-  reason: string;
-}
-
-export class PoolClient {
+export class LivePoolClient implements PoolClientAdapter {
   private readonly contract: Contract;
   private tokensCache?: PoolTokens;
   private configCache?: PoolConfig;
 
   constructor(
-    private readonly runtime: ShadowBotConfig,
-    private readonly providers: ProviderManager,
+    private readonly runtime: ChainBackedConfig,
+    private readonly chainClient: ChainClient,
     contractOverride?: Contract
   ) {
-    this.contract = contractOverride ?? new Contract(runtime.poolAddress, IDNM_POOL_ABI, providers.rpc);
+    const provider = chainClient.getRpcProvider();
+    if (!provider) {
+      throw new Error('LivePoolClient requires an RPC provider');
+    }
+    this.contract = contractOverride ?? new Contract(runtime.poolAddress, IDNM_POOL_ABI, provider);
   }
 
   async getTokens(force = false): Promise<PoolTokens> {
     if (!force && this.tokensCache) return this.tokensCache;
-    const result = await this.providers.request('tokens', () => this.contract.tokens());
+    const result = await this.chainClient.request('tokens', () => this.contract.tokens());
     const tokens: PoolTokens = {
       base: result.baseToken as string,
       quote: result.quoteToken as string,
@@ -73,11 +56,11 @@ export class PoolClient {
     if (!force && this.configCache) return this.configCache;
 
     const [oracleRaw, inventoryRaw, feeRaw, makerRaw, flagsRaw] = await Promise.all([
-      this.providers.request('oracleConfig', () => this.contract.oracleConfig()),
-      this.providers.request('inventoryConfig', () => this.contract.inventoryConfig()),
-      this.providers.request('feeConfig', () => this.contract.feeConfig()),
-      this.providers.request('makerConfig', () => this.contract.makerConfig()),
-      this.providers.request('featureFlags', () => this.contract.featureFlags())
+      this.chainClient.request('oracleConfig', () => this.contract.oracleConfig()),
+      this.chainClient.request('inventoryConfig', () => this.contract.inventoryConfig()),
+      this.chainClient.request('feeConfig', () => this.contract.feeConfig()),
+      this.chainClient.request('makerConfig', () => this.contract.makerConfig()),
+      this.chainClient.request('featureFlags', () => this.contract.featureFlags())
     ]);
 
     const oracleConfig: OracleConfigState = {
@@ -155,9 +138,9 @@ export class PoolClient {
 
   async getState(): Promise<PoolState> {
     const [reservesRaw, lastMidRaw, snapshotAgeRaw] = await Promise.all([
-      this.providers.request('reserves', () => this.contract.reserves()),
-      this.providers.request('lastMid', () => this.contract.lastMid()),
-      this.providers.request('previewSnapshotAge', () => this.contract.previewSnapshotAge())
+      this.chainClient.request('reserves', () => this.contract.reserves()),
+      this.chainClient.request('lastMid', () => this.contract.lastMid()),
+      this.chainClient.request('previewSnapshotAge', () => this.contract.previewSnapshotAge())
     ]);
 
     const state: PoolState = {
@@ -172,11 +155,11 @@ export class PoolClient {
   }
 
   async getPreviewLadder(s0BaseWad: bigint): Promise<PreviewLadderSnapshot> {
-    const result = await this.providers.request('previewLadder', () =>
+    const result = await this.chainClient.request('previewLadder', () =>
       this.contract.getFunction('previewLadder').staticCall(s0BaseWad)
     );
 
-    const rows: PreviewLadderRow[] = [];
+    const rows: PreviewLadderSnapshot['rows'] = [];
     const sizes: bigint[] = Array.from(result.sizesBaseWad ?? result[0] ?? []);
     const askFees: bigint[] = Array.from(result.askFeeBps ?? result[1] ?? []);
     const bidFees: bigint[] = Array.from(result.bidFeeBps ?? result[2] ?? []);
@@ -201,7 +184,7 @@ export class PoolClient {
   }
 
   async previewFees(sizes: readonly bigint[]): Promise<{ ask: number[]; bid: number[] }> {
-    const result = await this.providers.request('previewFees', () =>
+    const result = await this.chainClient.request('previewFees', () =>
       this.contract.getFunction('previewFees').staticCall(sizes)
     );
     const askFees: number[] = Array.from(result.askFeeBps ?? result[0] ?? []).map((value) => Number(value));
@@ -211,7 +194,7 @@ export class PoolClient {
 
   async quoteExactIn(amountIn: bigint, isBaseIn: boolean, oracleMode: number, oracleData: string): Promise<QuotePreviewResult> {
     const func = this.contract.getFunction('quoteSwapExactIn');
-    const result = await this.providers.request('quoteSwapExactIn', () =>
+    const result = await this.chainClient.request('quoteSwapExactIn', () =>
       func.staticCall(amountIn, isBaseIn, oracleMode, oracleData)
     );
 

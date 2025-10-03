@@ -53,6 +53,19 @@
 | `dnmm_two_sided_uptime_pct < 98.5` during 15 min window | Review latest CSV probes for `clamp_flags`; rebalance inventory or widen caps. | Confirm keepers are refreshing previews and no on-chain clamp toggles are stuck. |
 | Rising `dnmm_preview_stale_reverts_total` | Refresh snapshot manually and check `previewConfig()` parameters. | Reduce `INTERVAL_MS` or enable preview fresh mode if staleness is systemic. |
 
+#### Mock-mode Drills
+
+Use `MODE=mock` to reproduce alert conditions before actioning fixes. Flip `SCENARIO` and inspect the emitted metrics/CSV to validate playbooks:
+
+| Alert | Mock Scenario | Operator tweak |
+| --- | --- | --- |
+| `dnmm_delta_bps` breach / AOMQ clamps | `SCENARIO=aomq_on` | Observe fallback + emergency spread response; adjust fee soft band or fallback policy before shipping to prod. |
+| Rising precompile errors | `SCENARIO=stale_pyth` (optionally set `SCENARIO_FILE` to extend staleness) | Validate fallback dashboards, ensure alerts fire without RPC access. |
+| Near-floor liquidity warnings | `SCENARIO=near_floor` | Confirm partial fills, ladder clamp flags, and two-sided uptime degrade; test inventory recentering response. |
+| Soft divergence haircuts | `SCENARIO=delta_soft` | Measure histogram shifts and `dnmm_quotes_total{result="fallback"}` uptick prior to policy changes. |
+
+For bespoke incidents, craft a JSON override (`SCENARIO_FILE=metrics/hype-metrics/input/scenario.json`) with `timeline[]` entries or `random_walk` parameters, then run `MODE=mock npm run start` to capture CSV/metrics for the post-mortem appendix.
+
 ## 7. Timelock Operations
 1. If enabling the timelock, queue `updateParams(ParamKind.Governance, abi.encode({timelockDelaySec: <seconds>}))` while delay is `0`.
 2. For sensitive changes (`Oracle`, `Fee`, `Inventory`, `Maker`, `Feature`, `Aomq`):

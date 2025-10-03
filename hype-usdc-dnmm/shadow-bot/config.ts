@@ -5,9 +5,12 @@ import { parseUnits } from 'ethers';
 import {
   AddressBookEntry,
   AddressBookFile,
+  ChainBackedConfig,
   HistogramBuckets,
+  MockShadowBotConfig,
   ShadowBotConfig,
-  ShadowBotLabels
+  ShadowBotLabels,
+  ShadowBotMode
 } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -33,6 +36,12 @@ const DEFAULT_HISTOGRAM_BUCKETS: HistogramBuckets = {
   feeBps: [5, 10, 15, 20, 30, 40, 60, 80, 100, 150],
   totalBps: [5, 10, 15, 20, 30, 40, 60, 80, 100, 150, 200]
 };
+const DEFAULT_MODE: ShadowBotMode = 'mock';
+const DEFAULT_SCENARIO = 'calm';
+const DEFAULT_FORK_OUTPUT_PATH = path.resolve(
+  __dirname,
+  '../metrics/hype-metrics/output/deploy-mocks.json'
+);
 
 function must(envName: string): string {
   const value = process.env[envName];
@@ -166,6 +175,83 @@ function deriveHistogramBuckets(): HistogramBuckets {
   }
 }
 
+function parseMode(): ShadowBotMode {
+  const raw = (process.env.MODE ?? DEFAULT_MODE).toLowerCase();
+  if (raw === 'live' || raw === 'fork' || raw === 'mock') {
+    return raw;
+  }
+  throw new Error(`Unsupported MODE '${raw}'. Expected one of live | fork | mock.`);
+}
+
+interface ForkDeployJson {
+  readonly chainId?: number;
+  readonly poolAddress?: string;
+  readonly hypeAddress?: string;
+  readonly usdcAddress?: string;
+  readonly pythAddress?: string;
+  readonly hcPxPrecompile?: string;
+  readonly hcBboPrecompile?: string;
+  readonly hcPxKey?: number;
+  readonly hcBboKey?: number;
+  readonly baseDecimals?: number;
+  readonly quoteDecimals?: number;
+  readonly wsUrl?: string;
+}
+
+function toMaybeString(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value.trim();
+  }
+  return undefined;
+}
+
+function toMaybeNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number.parseInt(value.trim(), 10);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
+}
+
+function normalizeForkDeploy(raw: unknown): ForkDeployJson {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('fork deploy JSON is malformed');
+  }
+  const candidate = raw as Record<string, unknown>;
+  return {
+    chainId: toMaybeNumber(candidate.chainId ?? candidate.chain_id),
+    poolAddress: toMaybeString(candidate.poolAddress ?? candidate.pool ?? candidate.pool_addr),
+    hypeAddress: toMaybeString(candidate.hypeAddress ?? candidate.hype ?? candidate.hype_addr),
+    usdcAddress: toMaybeString(candidate.usdcAddress ?? candidate.usdc ?? candidate.usdc_addr),
+    pythAddress: toMaybeString(candidate.pythAddress ?? candidate.pyth ?? candidate.pyth_addr),
+    hcPxPrecompile: toMaybeString(candidate.hcPxPrecompile ?? candidate.hcPx ?? candidate.hc_px_precompile),
+    hcBboPrecompile: toMaybeString(candidate.hcBboPrecompile ?? candidate.hcBbo ?? candidate.hc_bbo_precompile),
+    hcPxKey: toMaybeNumber(candidate.hcPxKey ?? candidate.hc_px_key),
+    hcBboKey: toMaybeNumber(candidate.hcBboKey ?? candidate.hc_bbo_key),
+    baseDecimals: toMaybeNumber(candidate.baseDecimals ?? candidate.base_decimals),
+    quoteDecimals: toMaybeNumber(candidate.quoteDecimals ?? candidate.quote_decimals),
+    wsUrl: toMaybeString(candidate.wsUrl ?? candidate.ws_url)
+  };
+}
+
+async function readForkDeployJson(filePath?: string): Promise<ForkDeployJson | undefined> {
+  const resolved = filePath ?? DEFAULT_FORK_OUTPUT_PATH;
+  try {
+    const content = await fs.readFile(resolved, 'utf8');
+    return normalizeForkDeploy(JSON.parse(content));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
 function resolveAddressBookEntry(
   addressBook: AddressBookFile | undefined,
   chainId: number | undefined,
@@ -190,38 +276,7 @@ function resolveAddressBookEntry(
 }
 
 export async function loadConfig(): Promise<ShadowBotConfig> {
-  const addressBookPath = getOptional('ADDRESS_BOOK_JSON') ?? DEFAULT_ADDRESS_BOOK;
-  const addressBook = await readAddressBook(addressBookPath);
-
-  const explicitChainId = getOptional('CHAIN_ID');
-  const chainId = explicitChainId ? Number.parseInt(explicitChainId, 10) : addressBook?.defaultChainId;
-  if (explicitChainId && Number.isNaN(chainId)) {
-    throw new Error('CHAIN_ID must be numeric');
-  }
-
-  const envPoolAddress = getOptional('POOL_ADDR') ?? getOptional('DNMM_POOL_ADDRESS');
-  const detectedEntry = resolveAddressBookEntry(addressBook, chainId ?? undefined, envPoolAddress);
-
-  const rpcUrl = must('RPC_URL');
-  const wsUrl = getOptional('WS_URL') ?? detectedEntry?.wsUrl;
-
-  const poolAddress = ensureHex(envPoolAddress ?? detectedEntry?.poolAddress, 'POOL_ADDR');
-  const pythAddress = getOptional('PYTH_ADDR') ?? detectedEntry?.pyth;
-  const hcPxPrecompile = ensureHex(getOptional('HC_PX_PRECOMPILE') ?? detectedEntry?.hcPx ?? '0x0000000000000000000000000000000000000807', 'HC_PX_PRECOMPILE');
-  const hcBboPrecompile = ensureHex(getOptional('HC_BBO_PRECOMPILE') ?? detectedEntry?.hcBbo ?? '0x000000000000000000000000000000000000080e', 'HC_BBO_PRECOMPILE');
-  const hcPxKey = parseIntEnv('HC_PX_KEY', 107);
-  const hcBboKey = parseIntEnv('HC_BBO_KEY', hcPxKey);
-  const hcMarketType = (getOptional('HC_MARKET_TYPE') ?? 'spot').toLowerCase() === 'perp' ? 'perp' : 'spot';
-  const hcSizeDecimals = parseIntEnv('HC_SIZE_DECIMALS', 2);
-  const hcPxMultiplier = hcMarketType === 'spot'
-    ? 10n ** BigInt(10 + hcSizeDecimals)
-    : 10n ** BigInt(12 + hcSizeDecimals);
-
-  const baseTokenAddress = ensureHex(getOptional('HYPE_ADDR') ?? detectedEntry?.baseToken, 'HYPE_ADDR');
-  const quoteTokenAddress = ensureHex(getOptional('USDC_ADDR') ?? detectedEntry?.quoteToken, 'USDC_ADDR');
-
-  const baseDecimals = parseIntEnv('BASE_DECIMALS', detectedEntry?.baseDecimals ?? 18);
-  const quoteDecimals = parseIntEnv('QUOTE_DECIMALS', detectedEntry?.quoteDecimals ?? 6);
+  const mode = parseMode();
 
   const baseSymbol = getOptional('BASE_SYMBOL') ?? DEFAULT_BASE_SYMBOL;
   const quoteSymbol = getOptional('QUOTE_SYMBOL') ?? DEFAULT_QUOTE_SYMBOL;
@@ -231,20 +286,134 @@ export async function loadConfig(): Promise<ShadowBotConfig> {
   const { grid: sizeGrid, source: sizesSource } = deriveSizeGrid();
   const intervalMs = parseIntEnv('INTERVAL_MS', DEFAULT_INTERVAL_MS);
   const snapshotMaxAgeSec = parseIntEnv('SNAPSHOT_MAX_AGE_SEC', DEFAULT_SNAPSHOT_MAX_AGE_SEC);
-  const promPort = parseIntEnv('PROM_PORT', DEFAULT_PROM_PORT);
   const histogramBuckets = deriveHistogramBuckets();
-  const gasPriceGwei = parseFloatEnv('GAS_PRICE_GWEI');
-  const nativeUsd = parseFloatEnv('NATIVE_USD');
+  const promPort = parseIntEnv('PROM_PORT', DEFAULT_PROM_PORT);
   const logLevel = parseLogLevel();
+  const csvDirectory = getOptional('CSV_DIR') ?? DEFAULT_CSV_DIR;
+  const jsonSummaryPath = getOptional('JSON_SUMMARY_PATH') ?? DEFAULT_SUMMARY_PATH;
   const samplingTimeout = parseIntEnv('SAMPLING_TIMEOUT_MS', DEFAULT_TIMEOUT_MS);
   const samplingBackoff = parseIntEnv('SAMPLING_BACKOFF_MS', DEFAULT_BACKOFF_MS);
   const samplingAttempts = parseIntEnv('SAMPLING_RETRY_ATTEMPTS', DEFAULT_RETRIES);
+  const guaranteedMinOut = {
+    calmBps: parseIntEnv('MIN_OUT_CALM_BPS', 10),
+    fallbackBps: parseIntEnv('MIN_OUT_FALLBACK_BPS', 20),
+    clampMin: parseIntEnv('MIN_OUT_CLAMP_MIN', 5),
+    clampMax: parseIntEnv('MIN_OUT_CLAMP_MAX', 25)
+  } as const;
+  const sampling = {
+    intervalLabel: `${intervalMs}ms`,
+    timeoutMs: samplingTimeout,
+    retryBackoffMs: samplingBackoff,
+    retryAttempts: samplingAttempts
+  } as const;
+  const gasPriceGwei = parseFloatEnv('GAS_PRICE_GWEI');
+  const nativeUsd = parseFloatEnv('NATIVE_USD');
   const pythPriceId = getOptional('PYTH_PRICE_ID') ?? getOptional('PYTH_PAIR_FEED_ID');
 
-  const config: ShadowBotConfig = {
+  const baseCommon = {
+    mode,
+    labels,
+    sizeGrid,
+    intervalMs,
+    snapshotMaxAgeSec,
+    histogramBuckets,
+    promPort,
+    logLevel,
+    csvDirectory,
+    jsonSummaryPath,
+    sizesSource,
+    guaranteedMinOut,
+    sampling
+  } as const;
+
+  if (mode === 'mock') {
+    const baseDecimals = parseIntEnv('BASE_DECIMALS', 18);
+    const quoteDecimals = parseIntEnv('QUOTE_DECIMALS', 6);
+    const scenarioName = (getOptional('SCENARIO') ?? DEFAULT_SCENARIO).toLowerCase();
+    const scenarioFile = getOptional('SCENARIO_FILE');
+
+    const mockConfig: MockShadowBotConfig = {
+      ...baseCommon,
+      baseDecimals,
+      quoteDecimals,
+      scenarioName,
+      scenarioFile: scenarioFile ?? undefined
+    };
+
+    return mockConfig;
+  }
+
+  const addressBookPath = getOptional('ADDRESS_BOOK_JSON') ?? DEFAULT_ADDRESS_BOOK;
+  const addressBook = await readAddressBook(addressBookPath);
+  const forkOverrides = mode === 'fork' ? await readForkDeployJson(getOptional('FORK_DEPLOY_JSON')) : undefined;
+
+  const explicitChainId = getOptional('CHAIN_ID');
+  const resolvedChainId = explicitChainId
+    ? Number.parseInt(explicitChainId, 10)
+    : forkOverrides?.chainId ?? addressBook?.defaultChainId;
+  if (explicitChainId && Number.isNaN(resolvedChainId)) {
+    throw new Error('CHAIN_ID must be numeric');
+  }
+
+  const envPoolAddress = getOptional('POOL_ADDR') ?? getOptional('DNMM_POOL_ADDRESS');
+  const detectedEntry = resolveAddressBookEntry(
+    addressBook,
+    resolvedChainId ?? undefined,
+    envPoolAddress ?? forkOverrides?.poolAddress
+  );
+
+  const rpcUrl = must('RPC_URL');
+  const wsUrl = getOptional('WS_URL') ?? forkOverrides?.wsUrl ?? detectedEntry?.wsUrl;
+
+  const poolAddress = ensureHex(
+    envPoolAddress ?? forkOverrides?.poolAddress ?? detectedEntry?.poolAddress,
+    'POOL_ADDR'
+  );
+  const pythAddress = getOptional('PYTH_ADDR') ?? forkOverrides?.pythAddress ?? detectedEntry?.pyth;
+  const hcPxPrecompile = ensureHex(
+    getOptional('HC_PX_PRECOMPILE') ?? forkOverrides?.hcPxPrecompile ?? detectedEntry?.hcPx ??
+      '0x0000000000000000000000000000000000000807',
+    'HC_PX_PRECOMPILE'
+  );
+  const hcBboPrecompile = ensureHex(
+    getOptional('HC_BBO_PRECOMPILE') ?? forkOverrides?.hcBboPrecompile ?? detectedEntry?.hcBbo ??
+      '0x000000000000000000000000000000000000080e',
+    'HC_BBO_PRECOMPILE'
+  );
+  const hcPxKeyDefault = forkOverrides?.hcPxKey ?? 107;
+  const hcPxKey = parseIntEnv('HC_PX_KEY', hcPxKeyDefault);
+  const hcBboKey = parseIntEnv('HC_BBO_KEY', forkOverrides?.hcBboKey ?? hcPxKey);
+  const hcMarketType = (getOptional('HC_MARKET_TYPE') ?? 'spot').toLowerCase() === 'perp' ? 'perp' : 'spot';
+  const hcSizeDecimals = parseIntEnv('HC_SIZE_DECIMALS', 2);
+  const hcPxMultiplier = hcMarketType === 'spot'
+    ? 10n ** BigInt(10 + hcSizeDecimals)
+    : 10n ** BigInt(12 + hcSizeDecimals);
+
+  const baseTokenAddress = ensureHex(
+    getOptional('HYPE_ADDR') ?? forkOverrides?.hypeAddress ?? detectedEntry?.baseToken,
+    'HYPE_ADDR'
+  );
+  const quoteTokenAddress = ensureHex(
+    getOptional('USDC_ADDR') ?? forkOverrides?.usdcAddress ?? detectedEntry?.quoteToken,
+    'USDC_ADDR'
+  );
+
+  const baseDecimals = parseIntEnv(
+    'BASE_DECIMALS',
+    forkOverrides?.baseDecimals ?? detectedEntry?.baseDecimals ?? 18
+  );
+  const quoteDecimals = parseIntEnv(
+    'QUOTE_DECIMALS',
+    forkOverrides?.quoteDecimals ?? detectedEntry?.quoteDecimals ?? 6
+  );
+
+  const chainConfig: ChainBackedConfig = {
+    ...baseCommon,
+    baseDecimals,
+    quoteDecimals,
     rpcUrl,
     wsUrl,
-    chainId: chainId ?? undefined,
+    chainId: resolvedChainId ?? undefined,
     poolAddress,
     pythAddress,
     hcPxPrecompile,
@@ -256,37 +425,13 @@ export async function loadConfig(): Promise<ShadowBotConfig> {
     hcPxMultiplier,
     baseTokenAddress,
     quoteTokenAddress,
-    baseDecimals,
-    quoteDecimals,
-    labels,
-    sizeGrid,
-    intervalMs,
-    snapshotMaxAgeSec,
     gasPriceGwei,
     nativeUsd,
-    histogramBuckets,
-    promPort,
-    logLevel,
-    csvDirectory: getOptional('CSV_DIR') ?? DEFAULT_CSV_DIR,
-    jsonSummaryPath: getOptional('JSON_SUMMARY_PATH') ?? DEFAULT_SUMMARY_PATH,
-    sizesSource,
-    guaranteedMinOut: {
-      calmBps: parseIntEnv('MIN_OUT_CALM_BPS', 10),
-      fallbackBps: parseIntEnv('MIN_OUT_FALLBACK_BPS', 20),
-      clampMin: parseIntEnv('MIN_OUT_CLAMP_MIN', 5),
-      clampMax: parseIntEnv('MIN_OUT_CLAMP_MAX', 25)
-    },
-    sampling: {
-      intervalLabel: `${intervalMs}ms`,
-      timeoutMs: samplingTimeout,
-      retryBackoffMs: samplingBackoff,
-      retryAttempts: samplingAttempts
-    },
     pythPriceId,
     addressBookSource: addressBook ? addressBookPath : undefined
   };
 
-  return config;
+  return chainConfig;
 }
 
 export type { ShadowBotConfig } from './types.js';

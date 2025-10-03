@@ -1,6 +1,7 @@
 # Change Log
 
 ## 2025-10-03
+- feat(shadow-bot): add mock/fork execution modes with scenario engine, fork deploy script, unified `{mode}` Prometheus label, CSV header guards, and refreshed Vitest/README/RUNBOOK guidance.
 - fix(pool): enforce HyperCore vs Pyth divergence guard for spot quotes using lightweight peek reads, reintroducing `OracleDiverged` fail-closed semantics and aligning perf `DosEconomics` expectations.
 - perf(pool): load fee-state words via a single sload and coalesce settle writes, trimming quote/preview reads without touching feature-flag defaults.
 - perf(pool): cache feature flags as a single word, tighten AOMQ/fee toggles, and lazily read Pyth to shave quote/swap gas while keeping preview paths view-only.

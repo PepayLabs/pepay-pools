@@ -67,10 +67,12 @@ interface MetricHandles {
 function withCommonLabels<T extends Record<string, string>>(config: ShadowBotConfig, labels?: T): T & {
   pair: string;
   chain: string;
+  mode: string;
 } {
   return {
     pair: config.labels.pair,
     chain: config.labels.chain,
+    mode: config.mode,
     ...(labels ?? ({} as T))
   };
 }
@@ -220,121 +222,121 @@ export class MetricsManager {
       name: 'dnmm_snapshot_age_sec',
       help: 'Age of preview snapshot used in last loop',
       registers: [this.registry],
-      labelNames: ['pair', 'chain']
+      labelNames: ['pair', 'chain', 'mode']
     });
     const regimeBits = new Gauge({
       name: 'dnmm_regime_bits',
       help: 'Bitmask of current regime (AOMQ=1, Fallback=2, NearFloor=4, SizeFee=8, InvTilt=16)',
       registers: [this.registry],
-      labelNames: ['pair', 'chain']
+      labelNames: ['pair', 'chain', 'mode']
     });
     const baseReserves = new Gauge({
       name: 'dnmm_pool_base_reserves',
       help: 'Base token reserves (raw units)',
       registers: [this.registry],
-      labelNames: ['pair', 'chain']
+      labelNames: ['pair', 'chain', 'mode']
     });
     const quoteReserves = new Gauge({
       name: 'dnmm_pool_quote_reserves',
       help: 'Quote token reserves (raw units)',
       registers: [this.registry],
-      labelNames: ['pair', 'chain']
+      labelNames: ['pair', 'chain', 'mode']
     });
     const lastMid = new Gauge({
       name: 'dnmm_last_mid_wad',
       help: 'Last mid used in WAD',
       registers: [this.registry],
-      labelNames: ['pair', 'chain']
+      labelNames: ['pair', 'chain', 'mode']
     });
     const lastRebalance = new Gauge({
       name: 'dnmm_last_rebalance_price_wad',
       help: 'Last rebalance price (WAD) if available',
       registers: [this.registry],
-      labelNames: ['pair', 'chain']
+      labelNames: ['pair', 'chain', 'mode']
     });
     const quoteLatency = new Histogram({
       name: 'dnmm_quote_latency_ms',
       help: 'Latency of preview quotes',
       buckets: this.config.histogramBuckets.quoteLatencyMs,
       registers: [this.registry],
-      labelNames: ['pair', 'chain']
+      labelNames: ['pair', 'chain', 'mode']
     });
     const deltaBps = new Histogram({
       name: 'dnmm_delta_bps',
       help: 'HC vs Pyth delta in bps',
       buckets: this.config.histogramBuckets.deltaBps,
       registers: [this.registry],
-      labelNames: ['pair', 'chain']
+      labelNames: ['pair', 'chain', 'mode']
     });
     const confBps = new Histogram({
       name: 'dnmm_conf_bps',
       help: 'Pyth confidence in bps of price',
       buckets: this.config.histogramBuckets.confBps,
       registers: [this.registry],
-      labelNames: ['pair', 'chain']
+      labelNames: ['pair', 'chain', 'mode']
     });
     const bboSpread = new Histogram({
       name: 'dnmm_bbo_spread_bps',
       help: 'HC BBO spread bps',
       buckets: this.config.histogramBuckets.bboSpreadBps,
       registers: [this.registry],
-      labelNames: ['pair', 'chain']
+      labelNames: ['pair', 'chain', 'mode']
     });
     const feeBps = new Histogram({
       name: 'dnmm_fee_bps',
       help: 'Fee bps for probe quotes',
       buckets: this.config.histogramBuckets.feeBps,
       registers: [this.registry],
-      labelNames: ['pair', 'chain', 'side', 'rung', 'regime']
+      labelNames: ['pair', 'chain', 'mode', 'side', 'rung', 'regime']
     });
     const totalBps = new Histogram({
       name: 'dnmm_total_bps',
       help: 'Total bps (fee + slippage vs chosen mid) for probe quotes',
       buckets: this.config.histogramBuckets.totalBps,
       registers: [this.registry],
-      labelNames: ['pair', 'chain', 'side', 'rung', 'regime']
+      labelNames: ['pair', 'chain', 'mode', 'side', 'rung', 'regime']
     });
     const providerCalls = new Counter({
       name: 'dnmm_provider_calls_total',
       help: 'JSON-RPC provider calls grouped by method/result',
       registers: [this.registry],
-      labelNames: ['pair', 'chain', 'method', 'result']
+      labelNames: ['pair', 'chain', 'mode', 'method', 'result']
     });
     const precompileErrors = new Counter({
       name: 'dnmm_precompile_errors_total',
       help: 'Count of HyperCore precompile read failures',
       registers: [this.registry],
-      labelNames: ['pair', 'chain']
+      labelNames: ['pair', 'chain', 'mode']
     });
     const previewStale = new Counter({
       name: 'dnmm_preview_stale_reverts_total',
       help: 'Preview stale reverts due to config',
       registers: [this.registry],
-      labelNames: ['pair', 'chain']
+      labelNames: ['pair', 'chain', 'mode']
     });
     const aomqClamps = new Counter({
       name: 'dnmm_aomq_clamps_total',
       help: 'Count of AOMQ clamp signals over lifetime',
       registers: [this.registry],
-      labelNames: ['pair', 'chain']
+      labelNames: ['pair', 'chain', 'mode']
     });
     const recenterCommits = new Counter({
       name: 'dnmm_recenter_commits_total',
       help: 'Count of TargetBaseXstarUpdated events seen',
       registers: [this.registry],
-      labelNames: ['pair', 'chain']
+      labelNames: ['pair', 'chain', 'mode']
     });
     const quotes = new Counter({
       name: 'dnmm_quotes_total',
       help: 'Quotes issued by the bot',
       registers: [this.registry],
-      labelNames: ['pair', 'chain', 'result']
+      labelNames: ['pair', 'chain', 'mode', 'result']
     });
     const twoSidedUptime = new Gauge({
       name: 'dnmm_two_sided_uptime_pct',
       help: 'Rolling 15m fraction of time both sides had >0 size available',
       registers: [this.registry],
-      labelNames: ['pair', 'chain']
+      labelNames: ['pair', 'chain', 'mode']
     });
 
     return {

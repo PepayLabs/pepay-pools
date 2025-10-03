@@ -1,5 +1,5 @@
 import { JsonRpcProvider, WebSocketProvider } from 'ethers';
-import { ProviderClients, ProviderHealthSample, ShadowBotConfig } from './types.js';
+import { ChainBackedConfig, ChainClient, ProviderHealthSample } from './types.js';
 
 type HealthCallback = (sample: ProviderHealthSample) => void;
 
@@ -23,21 +23,22 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, method: st
   }
 }
 
-export class ProviderManager implements ProviderClients {
-  readonly rpc: JsonRpcProvider;
-  readonly ws?: WebSocketProvider;
+export class LiveChainClient implements ChainClient {
+  private readonly rpc: JsonRpcProvider;
+  private readonly ws?: WebSocketProvider;
 
   private readonly retryAttempts: number;
   private readonly retryBackoffMs: number;
   private readonly timeoutMs: number;
-  private readonly onHealthSample?: HealthCallback;
 
-  constructor(config: ShadowBotConfig, onHealthSample?: HealthCallback) {
+  constructor(
+    private readonly config: ChainBackedConfig,
+    private readonly onHealthSample?: HealthCallback
+  ) {
     this.rpc = new JsonRpcProvider(config.rpcUrl, config.chainId ?? undefined);
-    this.timeoutMs = config.sampling.timeoutMs;
     this.retryAttempts = config.sampling.retryAttempts;
     this.retryBackoffMs = config.sampling.retryBackoffMs;
-    this.onHealthSample = onHealthSample;
+    this.timeoutMs = config.sampling.timeoutMs;
 
     if (config.wsUrl) {
       this.ws = new WebSocketProvider(config.wsUrl, config.chainId ?? undefined);
@@ -45,6 +46,14 @@ export class ProviderManager implements ProviderClients {
         this.publishHealth(false, 'ws', error instanceof Error ? error : new Error(String(error)));
       });
     }
+  }
+
+  getRpcProvider(): JsonRpcProvider | undefined {
+    return this.rpc;
+  }
+
+  getWebSocketProvider(): WebSocketProvider | undefined {
+    return this.ws;
   }
 
   async callContract(request: { to: string; data: string }, label: string): Promise<string> {
@@ -79,6 +88,7 @@ export class ProviderManager implements ProviderClients {
   }
 
   on(event: 'close', handler: (code: number) => void): void {
+    if (event !== 'close') return;
     this.ws?.on('close', handler);
   }
 
@@ -119,6 +129,11 @@ export class ProviderManager implements ProviderClients {
   }
 }
 
-export function createProviderManager(config: ShadowBotConfig, onHealthSample?: HealthCallback): ProviderManager {
-  return new ProviderManager(config, onHealthSample);
+export function createLiveChainClient(
+  config: ChainBackedConfig,
+  onHealthSample?: HealthCallback
+): LiveChainClient {
+  return new LiveChainClient(config, onHealthSample);
 }
+
+export type { HealthCallback };

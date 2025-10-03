@@ -1,138 +1,175 @@
 # DNMM Shadow Bot – HYPE/USDC Observer
 
-Enterprise telemetry harness for the HYPE/USDC Dynamic Nonlinear Market Maker (DNMM) on HypeEVM. The bot mirrors the full preview pipeline, streams state, and publishes a Prometheus surface for live dashboards and alerting.
+Enterprise telemetry harness for the HYPE/USDC Dynamic Nonlinear Market Maker (DNMM). The bot mirrors the on-chain preview pipeline, streams oracle/pool state, and publishes an identical Prometheus + CSV surface for dashboards regardless of mode.
+
+## Modes at a Glance
+
+| `MODE` | Purpose | Backing | Notes |
+| --- | --- | --- | --- |
+| `live` | Monitor production DNMM deployment | Real RPC / WebSocket providers | Requires full address config or address-book entry. |
+| `fork` | Exercise a local anvil/Foundry fork | RPC to fork node + mocks | Run `forge script script/DeployMocks.s.sol --rpc-url http://127.0.0.1:8545` to seed mock contracts and addresses. |
+| `mock` *(default)* | Pure TypeScript simulation for dashboards & drills | Scenario engine + deterministic clock | No chain required. Scenario regime toggles expose edge cases safely. |
+
+Set `MODE` via environment variables (`MODE=mock` when omitted). All modes share identical CSV schema, JSON summary, and Prometheus labels (now `{pair, chain, mode, …}`).
 
 ## Quick Start
 
 ```bash
-# install dependencies
 npm install
 
-# run once with local .env
+# Mock mode (default) – CALM scenario
 npm run start
 
-# run tests
+# Fork mode – assumes DeployMocks.s.sol already ran
+MODE=fork RPC_URL=http://127.0.0.1:8545 npm run start
+
+# Live mode – supply production addresses + RPC
+MODE=live RPC_URL=https://mainnet.rpc ... npm run start
+
+# Run the test suite
 npm run test
 ```
 
-The entrypoint `shadow-bot.ts` loads configuration from environment variables (see next section), opens JSON-RPC + optional WebSocket providers, and executes the loop every `INTERVAL_MS` milliseconds. Each loop performs:
+To deploy fork mocks:
 
-1. Read HyperCore price/BBO precompiles and optional Pyth feed.
-2. Pull DNMM pool state and config (fee, inventory, maker, flags).
-3. Replay preview paths for both sides across the configured size grid.
-4. Emit Prometheus metrics, append CSV traces under `metrics/hype-metrics/`, and refresh the JSON summary payload.
+```bash
+# in ./hype-usdc-dnmm
+anvil --chain-id 31337 --fork-url $MAINNET_RPC &
+forge script script/DeployMocks.s.sol --rpc-url http://127.0.0.1:8545 --broadcast
+```
+
+The script prints JSON with pool/token/oracle addresses and writes `metrics/hype-metrics/output/deploy-mocks.json`. `loadConfig()` consumes that file when `MODE=fork`.
 
 ## Configuration
 
-| Variable | Required | Default | Description |
-| --- | --- | --- | --- |
-| `RPC_URL` | ✅ | – | HTTPS RPC endpoint for HypeEVM reads. |
-| `WS_URL` | optional | – | WebSocket endpoint for event subscriptions (TargetBaseXstarUpdated, AomqActivated). |
-| `POOL_ADDR` | ✅ | – | Deployed `DnmPool` address. |
-| `PYTH_ADDR` | optional | – | Pyth contract address used for `getPriceUnsafe` checks. |
-| `PYTH_PRICE_ID` | optional | – | 32-byte feed id (use HYPE/USDC composite). |
-| `HC_PX_PRECOMPILE` | optional | `0x…0807` | HyperCore oraclePx precompile. |
-| `HC_BBO_PRECOMPILE` | optional | `0x…080e` | HyperCore BBO precompile. |
-| `HC_PX_KEY` | optional | `107` | Market index for oraclePx lookup. |
-| `HC_BBO_KEY` | optional | `HC_PX_KEY` | Market index for BBO lookup. |
-| `HC_MARKET_TYPE` | optional | `spot` | `spot` or `perp`; controls price scaling. |
-| `HC_SIZE_DECIMALS` | optional | `2` | HyperCore size decimals (used for scaling multiplier). |
-| `BASE_DECIMALS` / `QUOTE_DECIMALS` | optional | 18 / 6 | Token decimals override. |
-| `HYPE_ADDR` / `USDC_ADDR` | optional | – | Token addresses (falls back to address-book when present). |
-| `SIZES_WAD` | optional | `0.1,0.5,1,2,5,10` | Comma-separated base sizes in WAD for probes. |
-| `INTERVAL_MS` | optional | `5000` | Loop cadence. |
-| `SNAPSHOT_MAX_AGE_SEC` | optional | `30` | Alert threshold for preview staleness. |
-| `PROM_PORT` | optional | `9464` | Prometheus HTTP port. |
-| `GAS_PRICE_GWEI` | optional | – | Used for gas normalization metrics (future work placeholder). |
-| `LOG_LEVEL` | optional | `info` | `info` or `debug`. |
-| `CSV_DIR` | optional | `../metrics/hype-metrics` | Override CSV output directory. |
-| `JSON_SUMMARY_PATH` | optional | `../metrics/hype-metrics/shadow_summary.json` | Summary JSON location. |
+### Common variables
 
-Optional: provide `ADDRESS_BOOK_JSON` (defaults to `shadow-bot/address-book.json`). When present, the book can preload addresses, decimals, and WS endpoints per environment.
+| Variable | Default | Description |
+| --- | --- | --- |
+| `MODE` | `mock` | Operation mode (`live`, `fork`, `mock`). |
+| `INTERVAL_MS` | `5000` | Loop cadence. |
+| `SIZES_WAD` | `0.1,0.5,1,2,5,10` | Comma list of base sizes in WAD for probes. |
+| `CSV_DIR` | `../metrics/hype-metrics` | CSV output directory. |
+| `JSON_SUMMARY_PATH` | `../metrics/hype-metrics/shadow_summary.json` | Summary JSON path. |
+| `PROM_PORT` | `9464` | Prometheus HTTP port. |
+| `LOG_LEVEL` | `info` | `info` or `debug`. |
+| `MIN_OUT_CALM_BPS` / `MIN_OUT_FALLBACK_BPS` | `10` / `20` | Guaranteed min-out policy (clamped by `MIN_OUT_CLAMP_MIN/MAX`). |
+| `BASE_DECIMALS` / `QUOTE_DECIMALS` | `18` / `6` | Token decimals (mock mode requires these; live/fork can infer). |
+| `ADDRESS_BOOK_JSON` | `shadow-bot/address-book.json` | Optional address presets per chain. |
+
+### Live & Fork specific
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `RPC_URL` | – | HTTPS RPC endpoint (required). |
+| `WS_URL` | – | WebSocket endpoint for on-chain events (optional). |
+| `POOL_ADDR` | – | DNMM pool address (can be supplied by deploy JSON in fork mode). |
+| `HYPE_ADDR` / `USDC_ADDR` | – | Token addresses. |
+| `PYTH_ADDR` | – | Pyth adapter contract. |
+| `PYTH_PRICE_ID` | – | Pyth feed id for HYPE/USDC. |
+| `HC_PX_PRECOMPILE` | `0x000…0807` | HyperCore price precompile (or mock oracle when forking). |
+| `HC_BBO_PRECOMPILE` | `0x000…080e` | HyperCore BBO precompile. |
+| `HC_PX_KEY` | `107` | HyperCore market key. |
+| `HC_BBO_KEY` | `HC_PX_KEY` | HyperCore BBO key. |
+| `HC_MARKET_TYPE` | `spot` | `spot` or `perp`; controls scaling. |
+| `HC_SIZE_DECIMALS` | `2` | HyperCore size decimals. |
+| `CHAIN_ID` | address-book/default | Optional explicit chain id. |
+| `FORK_DEPLOY_JSON` | `metrics/hype-metrics/output/deploy-mocks.json` | Overrides addresses when `MODE=fork`. |
+
+### Mock-only knobs
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `SCENARIO` | `calm` | Built-in scenario (`calm`, `delta_soft`, `delta_hard`, `stale_pyth`, `near_floor`, `aomq_on`, `rebalance_jump`, `custom`). Case-insensitive. |
+| `SCENARIO_FILE` | – | JSON file with custom timeline / random-walk overrides (see `metrics/hype-metrics/input/scenario.json` schema). |
+
+## Scenario Engine
+
+Mock mode feeds probes with deterministic regimes:
+
+- **CALM** – HC≈Pyth, tight spreads, low confidence.
+- **DELTA_SOFT** – divergence in soft band introduces haircuts.
+- **DELTA_HARD** – delta breaches hard band triggering AOMQ.
+- **STALE_PYTH** – Pyth marked stale to exercise fallback logic.
+- **NEAR_FLOOR** – inventory close to floor produces partial fills.
+- **AOMQ_ON** – assert emergency spread + clamp bits.
+- **REBALANCE_JUMP** – mid jump to verify auto-recenter instrumentation.
+
+Use `SCENARIO_FILE` to blend timelines (`timeline[{t_sec,...}]`) or enable `random_walk` parameters for stress drills.
 
 ## Loop Outputs
 
-### Prometheus Metrics
+### Prometheus metrics
 
-The registry is exposed at `http://0.0.0.0:${PROM_PORT}/metrics` with common labels `{pair="HYPE/USDC", chain="HypeEVM"}`.
+Exposed at `http://0.0.0.0:${PROM_PORT}/metrics` with common labels `{pair, chain, mode}`. Key series:
 
-| Metric | Type | Labels | Description |
+| Metric | Type | Extra labels | Notes |
 | --- | --- | --- | --- |
-| `dnmm_snapshot_age_sec` | gauge | – | Age of the preview snapshot reported by the pool. |
-| `dnmm_regime_bits` | gauge | – | Bitmask of current regime (1=AOMQ, 2=Fallback, 4=NearFloor, 8=SizeFee, 16=InvTilt). |
-| `dnmm_pool_base_reserves` / `dnmm_pool_quote_reserves` | gauge | – | Raw reserves from `reserves()`. |
-| `dnmm_last_mid_wad` | gauge | – | Latest mid in WAD units. |
-| `dnmm_last_rebalance_price_wad` | gauge | – | Updated on `TargetBaseXstarUpdated` events. |
-| `dnmm_delta_bps` | histogram | – | HC vs Pyth delta in basis points. |
-| `dnmm_conf_bps` | histogram | – | Pyth confidence interval in bps. |
-| `dnmm_bbo_spread_bps` | histogram | – | HyperCore BBO spread in bps. |
-| `dnmm_quote_latency_ms` | histogram | – | Latency of preview quote calls. |
-| `dnmm_fee_bps` | histogram | `side`, `rung`, `regime` | Fee component per probe. |
-| `dnmm_total_bps` | histogram | `side`, `rung`, `regime` | Fee + slippage per probe. |
-| `dnmm_two_sided_uptime_pct` | gauge | – | Rolling 15 minute proportion of loops with both sides liquid. |
-| `dnmm_recenter_commits_total` | counter | – | Total `TargetBaseXstarUpdated` events observed. |
-| `dnmm_aomq_clamps_total` | counter | – | Lifetime `AomqActivated` events plus probe-level clamps. |
-| `dnmm_precompile_errors_total` | counter | – | HyperCore read failures. |
-| `dnmm_preview_stale_reverts_total` | counter | – | Preview calls rejected for stale snapshots. |
-| `dnmm_quotes_total` | counter | `result` | Per probe result (`ok`, `fallback`, `error`). |
-| `dnmm_provider_calls_total` | counter | `method`, `result` | JSON-RPC health instrumentation. |
+| `dnmm_snapshot_age_sec` | gauge | – | Preview snapshot age. |
+| `dnmm_regime_bits` | gauge | – | Bitmask (1=AOMQ, 2=Fallback, 4=NearFloor, 8=SizeFee, 16=InvTilt). |
+| `dnmm_pool_base_reserves`, `dnmm_pool_quote_reserves` | gauge | – | Raw reserves. |
+| `dnmm_last_mid_wad`, `dnmm_last_rebalance_price_wad` | gauge | – | Last mid + event-driven rebalance price. |
+| `dnmm_delta_bps`, `dnmm_conf_bps`, `dnmm_bbo_spread_bps` | histogram | – | Oracle deltas, confidence, spreads. |
+| `dnmm_quote_latency_ms` | histogram | – | Quote latency. |
+| `dnmm_fee_bps`, `dnmm_total_bps` | histogram | `side,rung,regime` | Fee and total cost per probe rung. |
+| `dnmm_quotes_total` | counter | `result` | Probe outcomes (`ok`, `fallback`, `error`). |
+| `dnmm_provider_calls_total` | counter | `method,result` | JSON-RPC health instrumentation. |
+| `dnmm_precompile_errors_total`, `dnmm_preview_stale_reverts_total`, `dnmm_aomq_clamps_total`, `dnmm_recenter_commits_total` | counter | – | Error/alert counters. |
+| `dnmm_two_sided_uptime_pct` | gauge | – | Rolling 15m two-sided liquidity success rate. |
 
-### CSV & JSON Artifacts
+### CSV & JSON artifacts
 
-- `metrics/hype-metrics/dnmm_shadow_<YYYYMMDD>.csv` – per probe row with columns
-  `ts,size_wad,side,ask_fee_bps,bid_fee_bps,total_bps,clamp_flags,risk_bits,min_out_bps,mid_hc,mid_pyth,conf_bps,bbo_spread_bps,success,status_detail,latency_ms`.
-- `metrics/hype-metrics/shadow_summary.json` – latest loop snapshot containing oracle readings, pool state, and probe summaries (numbers stored as decimal strings for BigInt compatibility).
+- `metrics/hype-metrics/dnmm_shadow_<YYYYMMDD>.csv` — per-probe rows with header `ts,size_wad,side,ask_fee_bps,bid_fee_bps,total_bps,clamp_flags,risk_bits,min_out_bps,mid_hc,mid_pyth,conf_bps,bbo_spread_bps,success,status_detail,latency_ms`.
+- `metrics/hype-metrics/shadow_summary.json` — latest loop snapshot (BigInt fields emitted as decimal strings).
 
-CSV files rotate daily, headers are emitted once per file, and directories are created on demand.
+CSV rotation writes headers once per day and logs (without throwing) on filesystem errors.
 
-## Synthetic Probes
+## Probe Pipeline Recap
 
-The bot replays preview flows for both directions:
+Each loop executes synthetic probes for every size rung and side:
 
-- `base_in` – user sells HYPE (base) for USDC. Input amount equals the rung size. Expected output uses HyperCore/Pyth mid.
-- `quote_in` – user buys HYPE with USDC. Quote notionals are derived from mid price so the expected base out matches the rung size.
+1. Select a mid reference (HC → Pyth → pool fallback).
+2. Call `quoteSwapExactIn` (live/fork) or mock preview (mock mode).
+3. Decode fee/slippage, clamp flags, and regime bits.
+4. Record metrics, append CSV rows, and update JSON summary.
 
-For each probe the bot records:
-
-- Fee, slippage, and total bps vs mid reference.
-- Clamp flags (AOMQ, Fallback) decoded from `QuoteResult.reason` or fallback usage.
-- Regime bits derived from feature flags, inventory proximity to floor, and fallback/AOMQ activation.
-- Latency, success/error taxonomy, and minimum output guard computed from the configured policy (10 bps calm, 20 bps fallback/AOMQ, clamped to [5,25]).
+Guaranteed min-out policy applies 10 bps in calm conditions, 20 bps when fallback/AOMQ bits are set, clamped to `[5,25]`.
 
 ## Testing
 
-Vitest covers core modules with deterministic fixtures:
+Vitest targets the modular architecture:
 
-- `poolClient.spec.ts` – getters decode the on-chain structs and regime/min-out logic behaves as expected.
-- `oracleReader.spec.ts` – HyperCore precompile decoding and Pyth integration with scaling.
-- `probes.spec.ts` – synthetic probes capture clamp flags, risk bits, and latency metadata.
-- `metrics.spec.ts` – exported Prometheus surface avoids NaNs and respects label sets.
-- `csvWriter.spec.ts` – ensures CSV rotation writes the header once and appends properly formatted rows.
+- `config.spec.ts` — default configuration behaviour and mode parsing.
+- `fork.spec.ts` — verifies fork-mode JSON overrides for pool/token/oracle addresses.
+- `mockOracle.spec.ts` — scenario-driven oracle snapshots.
+- `mockPool.spec.ts` — mock pool previews, regime bits, and min-out policy.
+- `probes.spec.ts` — synthetic probes across CALM/AOMQ regimes.
+- `metrics.spec.ts` — Prometheus registry enforces `{mode}` label.
+- `csvWriter.spec.ts` — daily rotation guards header duplication and tolerates filesystem hiccups.
 
-Run tests with `npm run test`. The suite uses mocked providers and contracts; no live RPC is required.
+Run `npm run test`; all suites use mocks and require no chain connectivity.
 
-## Operations Guide
+## Operations Checklist
 
-- **Metrics scrape**: point Prometheus at `http://<host>:${PROM_PORT}/metrics`.
-- **Alerting hints**:
-  - `dnmm_snapshot_age_sec > SNAPSHOT_MAX_AGE_SEC` → refresh preview snapshots (`previewConfig()` parameters, call `refreshPreviewSnapshot`).
-  - `increase(dnmm_precompile_errors_total[5m]) > 0` → inspect HyperCore precompile availability or chain congestion.
-  - `dnmm_delta_bps{quantile="0.95"}` above `oracle.divergenceSoftBps` → investigate oracle divergence and potential fallback usage.
-  - `dnmm_two_sided_uptime_pct < 98.5` → inventory near floor or clamps active; consider widening caps or pausing routing.
-- **Graceful shutdown**: the process traps `SIGINT`/`SIGTERM`, waits for the current loop to finish, closes event subscriptions, and stops the metrics HTTP server.
+- **Live alerts**
+  - `dnmm_snapshot_age_sec` > `SNAPSHOT_MAX_AGE_SEC` → trigger pool snapshot refresh workflow.
+  - `increase(dnmm_aomq_clamps_total[5m]) > 0` or `dnmm_regime_bits & 1 == 1` → check fallback policy and HyperCore divergence.
+  - `dnmm_two_sided_uptime_pct` < target → inspect inventory floor proximity (`NearFloor` bit) and size-fee clamps.
+- **Fork diagnostics** – run DeployMocks, export metrics, and validate dashboards before shipping config changes.
+- **Mock drills** – iterate `SCENARIO` values or supply JSON timelines to reproduce incidents without RPC dependencies.
 
 ## Troubleshooting
 
-| Symptom | Mitigation |
+| Symptom | Action |
 | --- | --- |
-| `dnmm_precompile_errors_total` rising | Validate `HC_PX_PRECOMPILE`, key indices, and RPC health. |
-| `dnmm_preview_stale_reverts_total` rising | Snapshot older than `SNAPSHOT_MAX_AGE_SEC`; call `refreshPreviewSnapshot` or lower interval. |
-| CSV missing rows | Ensure `CSV_DIR` is writable and the parent directory exists; check logs for filesystem errors. |
-| No WebSocket events | Provide `WS_URL`; without it, counters fall back to probe-observed clamps only. |
-| Tests fail with module resolution errors | Run `npm install` from the `shadow-bot` folder to ensure `node_modules` exists. |
+| `Missing required env` on start | Ensure `MODE`-specific variables are present (see tables above). |
+| `dnmm_precompile_errors_total` ticking up | Confirm HyperCore contract addresses/keys, RPC health, and fork mocks. |
+| CSV directory empty | Check `CSV_DIR` permissions; errors are logged as `csv.append.failed`. |
+| Prometheus scrape empty | Verify the process is listening on `PROM_PORT` and not firewalled. |
 
-## Coverage Roadmap
+## Further Work
 
-- Wire `GAS_PRICE_GWEI` and `NATIVE_USD` into cost-normalized metrics.
-- Surface preview ladder snapshots (sigma/conf) once exposed on-chain.
-- Expand address book for multiple HypeEVM environments.
+- Surface size ladder previews in mock mode for large rung coverage.
+- Extend scenario engine with scripted AOMQ off ramp and EMA fallback sequencing.
+- Add CLI to snapshot/export historical probe distributions for offline analysis.
+

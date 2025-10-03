@@ -1,7 +1,7 @@
-import { PoolClient } from './poolClient.js';
 import {
   ErrorReason,
   OracleSnapshot,
+  PoolClientAdapter,
   PoolConfig,
   PoolState,
   ProbeQuote,
@@ -13,7 +13,7 @@ const ONE = 10n ** 18n;
 const ORACLE_MODE_SPOT = 0;
 
 interface ProbeContext {
-  readonly poolClient: PoolClient;
+  readonly poolClient: PoolClientAdapter;
   readonly poolState: PoolState;
   readonly poolConfig: PoolConfig;
   readonly oracle: OracleSnapshot;
@@ -44,7 +44,7 @@ export async function runSyntheticProbes(context: ProbeContext): Promise<ProbeQu
 }
 
 interface ProbeSingleInput {
-  readonly poolClient: PoolClient;
+  readonly poolClient: PoolClientAdapter;
   readonly poolState: PoolState;
   readonly poolConfig: PoolConfig;
   readonly oracle: OracleSnapshot;

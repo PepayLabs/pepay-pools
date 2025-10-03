@@ -22,6 +22,11 @@ const HEADER = [
   'latency_ms'
 ].join(',');
 
+interface CsvLogger {
+  error(message: string, meta?: Record<string, unknown>): void;
+  debug?(message: string, meta?: Record<string, unknown>): void;
+}
+
 async function ensureDir(directory: string): Promise<void> {
   await fs.mkdir(directory, { recursive: true });
 }
@@ -74,37 +79,63 @@ export class CsvWriter {
   private currentFile?: string;
   private headerWritten = false;
 
-  constructor(private readonly config: ShadowBotConfig) {}
+  constructor(
+    private readonly config: ShadowBotConfig,
+    private readonly logger: CsvLogger = { error: () => {} }
+  ) {}
+
+  private async ensureHeaderState(filePath: string): Promise<void> {
+    try {
+      const existing = await fs.readFile(filePath, 'utf8');
+      this.headerWritten = existing.startsWith(HEADER);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        this.headerWritten = false;
+        return;
+      }
+      throw error;
+    }
+  }
 
   async appendRows(rows: CsvRowInput[]): Promise<void> {
     if (rows.length === 0) return;
-    await ensureDir(this.config.csvDirectory);
-    const dateKey = toDateKey(rows[0].timestampMs);
-    const filePath = path.join(this.config.csvDirectory, `dnmm_shadow_${dateKey}.csv`);
-    if (this.currentFile !== filePath) {
-      this.currentFile = filePath;
-      this.headerWritten = false;
-    }
+    try {
+      await ensureDir(this.config.csvDirectory);
+      const dateKey = toDateKey(rows[0].timestampMs);
+      const filePath = path.join(this.config.csvDirectory, `dnmm_shadow_${dateKey}.csv`);
+      if (this.currentFile !== filePath) {
+        this.currentFile = filePath;
+        await this.ensureHeaderState(filePath);
+      }
 
-    const lines = rows.map(formatRow);
-    const payload = `${this.headerWritten ? '' : `${HEADER}\n`}${lines.join('\n')}\n`;
-    await fs.appendFile(filePath, payload, 'utf8');
-    this.headerWritten = true;
+      const lines = rows.map(formatRow);
+      const payload = `${this.headerWritten ? '' : `${HEADER}\n`}${lines.join('\n')}\n`;
+      await fs.appendFile(filePath, payload, 'utf8');
+      this.headerWritten = true;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.logger.error('csv.append.failed', { detail });
+    }
   }
 
   async writeSummary(summary: LoopArtifacts): Promise<void> {
-    await ensureDir(path.dirname(this.config.jsonSummaryPath));
-    await fs.writeFile(this.config.jsonSummaryPath, JSON.stringify(summary, (_key, value) => {
-      if (typeof value === 'bigint') {
-        return value.toString();
-      }
-      return value;
-    }, 2));
+    try {
+      await ensureDir(path.dirname(this.config.jsonSummaryPath));
+      await fs.writeFile(this.config.jsonSummaryPath, JSON.stringify(summary, (_key, value) => {
+        if (typeof value === 'bigint') {
+          return value.toString();
+        }
+        return value;
+      }, 2));
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.logger.error('csv.summary.failed', { detail });
+    }
   }
 }
 
-export function createCsvWriter(config: ShadowBotConfig): CsvWriter {
-  return new CsvWriter(config);
+export function createCsvWriter(config: ShadowBotConfig, logger?: CsvLogger): CsvWriter {
+  return new CsvWriter(config, logger);
 }
 
 export function buildCsvRows(probes: ProbeQuote[], timestampMs: number, meta: {

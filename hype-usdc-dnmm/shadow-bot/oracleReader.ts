@@ -1,12 +1,13 @@
 import { AbiCoder, Contract } from 'ethers';
 import { PYTH_ABI } from './abis.js';
-import { ProviderManager } from './providers.js';
 import {
+  ChainBackedConfig,
+  ChainClient,
   ErrorReason,
   HcOracleSample,
+  OracleReaderAdapter,
   OracleSnapshot,
-  PythOracleSample,
-  ShadowBotConfig
+  PythOracleSample
 } from './types.js';
 
 const coder = AbiCoder.defaultAbiCoder();
@@ -66,18 +67,22 @@ function toError(reason: ErrorReason, error: unknown): { status: 'error'; reason
   };
 }
 
-export class OracleReader {
+export class LiveOracleReader implements OracleReaderAdapter {
   private readonly pyth?: Contract;
 
   constructor(
-    private readonly config: ShadowBotConfig,
-    private readonly providers: ProviderManager,
+    private readonly config: ChainBackedConfig,
+    private readonly chainClient: ChainClient,
     pythOverride?: Contract
   ) {
     if (pythOverride) {
       this.pyth = pythOverride;
     } else if (config.pythAddress && config.pythPriceId) {
-      this.pyth = new Contract(config.pythAddress, PYTH_ABI, providers.rpc);
+      const provider = chainClient.getRpcProvider();
+      if (!provider) {
+        throw new Error('LiveOracleReader requires an RPC provider');
+      }
+      this.pyth = new Contract(config.pythAddress, PYTH_ABI, provider);
     }
   }
 
@@ -95,7 +100,7 @@ export class OracleReader {
 
   private async readHyperCore(): Promise<HcOracleSample> {
     try {
-      const midHex = await this.providers.callContract({
+      const midHex = await this.chainClient.callContract({
         to: this.config.hcPxPrecompile,
         data: encodeKey(this.config.hcPxKey)
       }, 'hc.mid');
@@ -108,7 +113,7 @@ export class OracleReader {
       let detail: string | undefined;
 
       try {
-        const bboHex = await this.providers.callContract({
+        const bboHex = await this.chainClient.callContract({
           to: this.config.hcBboPrecompile,
           data: encodeKey(this.config.hcBboKey)
         }, 'hc.bbo');
@@ -145,7 +150,7 @@ export class OracleReader {
 
     try {
       const fn = this.pyth.getFunction('getPriceUnsafe');
-      const tuple = await this.providers.request('pyth.getPriceUnsafe', () =>
+      const tuple = await this.chainClient.request('pyth.getPriceUnsafe', () =>
         fn.staticCall(this.config.pythPriceId!)
       );
       const price = BigInt(tuple.price ?? tuple[0]);

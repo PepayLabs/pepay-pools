@@ -1,3 +1,5 @@
+export type ShadowBotMode = 'live' | 'fork' | 'mock';
+
 export type ErrorReason =
   | 'OK'
   | 'PrecompileError'
@@ -37,7 +39,40 @@ export interface HistogramBuckets {
   readonly totalBps: number[];
 }
 
-export interface ShadowBotConfig {
+interface GuaranteedMinOutConfig {
+  readonly calmBps: number;
+  readonly fallbackBps: number;
+  readonly clampMin: number;
+  readonly clampMax: number;
+}
+
+interface SamplingConfig {
+  readonly intervalLabel: string;
+  readonly timeoutMs: number;
+  readonly retryBackoffMs: number;
+  readonly retryAttempts: number;
+}
+
+export interface BaseShadowBotConfig {
+  readonly mode: ShadowBotMode;
+  readonly labels: ShadowBotLabels;
+  readonly sizeGrid: bigint[];
+  readonly intervalMs: number;
+  readonly snapshotMaxAgeSec: number;
+  readonly histogramBuckets: HistogramBuckets;
+  readonly promPort: number;
+  readonly logLevel: 'info' | 'debug';
+  readonly csvDirectory: string;
+  readonly jsonSummaryPath: string;
+  readonly sizesSource: string;
+  readonly guaranteedMinOut: GuaranteedMinOutConfig;
+  readonly sampling: SamplingConfig;
+  readonly baseDecimals: number;
+  readonly quoteDecimals: number;
+}
+
+export interface ChainBackedConfig extends BaseShadowBotConfig {
+  readonly mode: 'live' | 'fork';
   readonly rpcUrl: string;
   readonly wsUrl?: string;
   readonly chainId?: number;
@@ -52,35 +87,22 @@ export interface ShadowBotConfig {
   readonly hcPxMultiplier: bigint;
   readonly baseTokenAddress: string;
   readonly quoteTokenAddress: string;
-  readonly baseDecimals: number;
-  readonly quoteDecimals: number;
-  readonly labels: ShadowBotLabels;
-  readonly sizeGrid: bigint[];
-  readonly intervalMs: number;
-  readonly snapshotMaxAgeSec: number;
   readonly gasPriceGwei?: number;
   readonly nativeUsd?: number;
-  readonly histogramBuckets: HistogramBuckets;
-  readonly promPort: number;
-  readonly logLevel: 'info' | 'debug';
-  readonly csvDirectory: string;
-  readonly jsonSummaryPath: string;
-  readonly sizesSource: string;
-  readonly guaranteedMinOut: {
-    readonly calmBps: number;
-    readonly fallbackBps: number;
-    readonly clampMin: number;
-    readonly clampMax: number;
-  };
-  readonly sampling: {
-    readonly intervalLabel: string;
-    readonly timeoutMs: number;
-    readonly retryBackoffMs: number;
-    readonly retryAttempts: number;
-  };
   readonly pythPriceId?: string;
   readonly addressBookSource?: string;
 }
+
+export interface MockShadowBotConfig extends BaseShadowBotConfig {
+  readonly mode: 'mock';
+  readonly scenarioName: string;
+  readonly scenarioFile?: string;
+}
+
+export type ShadowBotConfig = ChainBackedConfig | MockShadowBotConfig;
+
+export const isChainBackedConfig = (config: ShadowBotConfig): config is ChainBackedConfig =>
+  config.mode === 'live' || config.mode === 'fork';
 
 export interface HcOracleSample {
   readonly status: 'ok' | 'error';
@@ -132,6 +154,29 @@ export interface PoolState {
   readonly snapshotAgeSec?: number;
   readonly snapshotTimestamp?: number;
   readonly sigmaBps?: number;
+}
+
+export interface PreviewLadderRow {
+  readonly sizeWad: bigint;
+  readonly askFeeBps: number;
+  readonly bidFeeBps: number;
+  readonly askClamped: boolean;
+  readonly bidClamped: boolean;
+}
+
+export interface PreviewLadderSnapshot {
+  readonly rows: PreviewLadderRow[];
+  readonly snapshotTimestamp: number;
+  readonly snapshotMidWad: bigint;
+}
+
+export interface QuotePreviewResult {
+  readonly amountOut: bigint;
+  readonly midUsed: bigint;
+  readonly feeBpsUsed: number;
+  readonly partialFillAmountIn: bigint;
+  readonly usedFallback: boolean;
+  readonly reason: string;
 }
 
 export interface OracleConfigState {
@@ -274,6 +319,22 @@ export interface QuotePipelineResult {
   readonly riskFlags: RegimeFlag[];
 }
 
+export interface PoolClientAdapter {
+  getTokens(force?: boolean): Promise<PoolTokens>;
+  getConfig(force?: boolean): Promise<PoolConfig>;
+  getState(): Promise<PoolState>;
+  getPreviewLadder?(s0BaseWad: bigint): Promise<PreviewLadderSnapshot>;
+  previewFees?(sizes: readonly bigint[]): Promise<{ ask: number[]; bid: number[] }>;
+  quoteExactIn(amountIn: bigint, isBaseIn: boolean, oracleMode: number, oracleData: string): Promise<QuotePreviewResult>;
+  computeRegimeFlags(params: {
+    poolState: PoolState;
+    config: PoolConfig;
+    usedFallback: boolean;
+    clampFlags: RegimeFlag[];
+  }): RegimeFlags;
+  computeGuaranteedMinOutBps(flags: RegimeFlags): number;
+}
+
 export interface AddressBookEntry {
   readonly chainId: number;
   readonly poolAddress: string;
@@ -292,9 +353,16 @@ export interface AddressBookFile {
   readonly deployments: Record<string, AddressBookEntry>;
 }
 
-export interface ProviderClients {
-  readonly rpc: import('ethers').JsonRpcProvider;
-  readonly ws?: import('ethers').WebSocketProvider;
+export interface ChainClient {
+  callContract(request: { to: string; data: string }, label: string): Promise<string>;
+  request<T>(label: string, fn: () => Promise<T>): Promise<T>;
+  getBlockNumber(label?: string): Promise<number>;
+  getBlockTimestamp(label?: string): Promise<number>;
+  getGasPrice(label?: string): Promise<bigint>;
+  getRpcProvider(): import('ethers').JsonRpcProvider | undefined;
+  getWebSocketProvider(): import('ethers').WebSocketProvider | undefined;
+  on(event: 'close', handler: (code: number) => void): void;
+  close(): Promise<void>;
 }
 
 export interface EventSubscription {
@@ -330,4 +398,8 @@ export interface LoopArtifacts {
   readonly preview?: PreviewSnapshotInfo;
   readonly probes: ProbeQuote[];
   readonly timestampMs: number;
+}
+
+export interface OracleReaderAdapter {
+  sample(): Promise<OracleSnapshot>;
 }

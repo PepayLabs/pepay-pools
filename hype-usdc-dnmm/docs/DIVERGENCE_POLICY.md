@@ -1,49 +1,48 @@
+---
+title: "Divergence Policy"
+version: "8e6f14e"
+last_updated: "2025-10-03"
+---
+
 # Divergence Policy
 
-The pool only honours HyperCore spot quotes when a fresh Pyth reference price is available and the two sources agree within the configured tolerance.
+## Table of Contents
+- [Thresholds](#thresholds)
+- [Haircut Computation](#haircut-computation)
+- [Hysteresis & Healthy Frames](#hysteresis--healthy-frames)
+- [Preview & RFQ Interaction](#preview--rfq-interaction)
+- [Events & Telemetry](#events--telemetry)
+- [Tests](#tests)
 
-## Freshness Requirements
-- `OracleConfig.maxAgeSec` gates both HyperCore and Pyth sources.
-- HyperCore mids with `ageSec == type(uint256).max` (unknown age) are treated as stale.
-- Pyth results must succeed **and** have `max(ageSecHype, ageSecUsdc) <= maxAgeSec`.
-- If Pyth is stale or unavailable we fall back to existing guards (EMA/Pyth-only legs) and skip the divergence check entirely.
+## Thresholds
+- **Accept (`divergenceAcceptBps` = 30 bps):** Swaps proceed with no haircut; soft divergence state remains inactive.
+- **Soft (`divergenceSoftBps` = 50 bps):** Enables F03 haircuts when flag `enableSoftDivergence` true (`contracts/DnmPool.sol:1939`).
+- **Hard (`divergenceHardBps` = 75 bps):** Triggers `Errors.DivergenceHard` and fails closed (`contracts/DnmPool.sol:2210`).
+- Default thresholds sourced from `config/parameters_default.json`.
 
-## Symmetric Divergence Calculation
-Given HyperCore mid `hc` and Pyth mid `pyth` (both 1e18 fixed-point):
+## Haircut Computation
+- Haircut = `haircutMinBps + haircutSlopeBps * max(0, deltaBps - acceptBps)`.
+- Config defaults: `haircutMinBps = 3`, `haircutSlopeBps = 1` (bps per extra bps beyond accept).
+- Implemented in `_processSoftDivergence` and `_previewSoftDivergence` (`contracts/DnmPool.sol:2324-2385`).
+- Applied fee increase flows through `_applyFeePipeline` as add-on bps.
 
-- Let `hi = max(hc, pyth)` and `lo = min(hc, pyth)`.
-- Compute `deltaBps = floor(((hi - lo) * 10_000) / hi)`.
-- Compare `deltaBps` against the configured bands:
-  - `OracleConfig.divergenceAcceptBps`: below this value the pool behaves normally.
-  - `OracleConfig.divergenceSoftBps`: between accept and soft we charge an additional haircut fee.
-  - `OracleConfig.divergenceHardBps`: above this value the pool hard-rejects (or defers to AOMQ when enabled).
+## Hysteresis & Healthy Frames
+- `SoftDivergenceState` tracks `healthyStreak`; requires consecutive frames under accept threshold before clearing (`contracts/DnmPool.sol:2332-2369`).
+- Recenter logic checks `softDivergenceActive` and defers auto recenter until state is healthy (`contracts/DnmPool.sol:1549`).
+- Preview snapshots mark soft state in `snap.flags` for downstream parity checks (`contracts/DnmPool.sol:1882`).
 
-This symmetric normalisation ensures we measure deviation relative to the larger price, avoiding asymmetric false positives when one feed drifts slightly above parity while still giving operators a graded response window.
+## Preview & RFQ Interaction
+- Preview path reuses `_previewSoftDivergence` to ensure ladder fees match swap path (`contracts/DnmPool.sol:2176-2196`).
+- RFQ strict mode rejects quotes when delta exceeds accept threshold; TTLs should account for divergence-induced fallbacks.
+- `PreviewSnapshotStale` may increase when soft divergence persists; monitor `dnmm_preview_stale_reverts_total`.
 
-## Fail-Closed Behaviour
-- **Soft band (`accept < delta ≤ soft`)**: the pool emits `DivergenceHaircut(deltaBps, extraFeeBps)` and adds `haircutMinBps + haircutSlopeBps × (delta - accept)` to the fee (capped at `FeeConfig.capBps`).
-- **Hard band (`delta > hard`)**: the pool emits `DivergenceRejected(deltaBps)` and reverts with `Errors.DivergenceHard(deltaBps, hardBps)` (future upgrades can route this into AOMQ micro-quotes instead of a hard fail).
-- **Legacy behaviour**: when `enableSoftDivergence` is `false`, the historical `divergenceBps` guard remains in force and reverts with `Errors.OracleDiverged(deltaBps, divergenceBps)`.
-- **All feeds dark/zero**: if HyperCore spot, EMA fallback, and Pyth reports all fail-or-zero simultaneously, the pool now reverts with `Errors.MidUnset()` instead of `Errors.OracleStale()`, signalling that no mid-price could be sourced (not merely that data was old).
-- Reverts occur from `_readOracle`, so **quotes and swaps both fail** before touching inventory or fee state.
-- HyperCore fallback paths (EMA, Pyth substitution) bypass the check by design—fail-closed semantics remain intact for degraded oracle regimes.
+## Events & Telemetry
+Event | Meaning | Metrics
+--- | --- | ---
+`OracleDivergenceChecked` (`contracts/DnmPool.sol:307`) | Logged on every Pyth compare to record delta and bound. | `dnmm_delta_bps`, `dnmm_conf_bps`
+`DivergenceHaircut` (`contracts/DnmPool.sol:308`) | Soft haircut applied with magnitude. | `dnmm_fee_bps`
+`DivergenceRejected` (`contracts/DnmPool.sol:309`) | Hard divergence triggered; swap reverted. | `dnmm_quotes_total{result="error"}`
 
-## Hysteresis & State
-
-- The pool tracks a lightweight `SoftDivergenceState` (exposed via `getSoftDivergenceState()`) to avoid flapping when feeds oscillate around the accept threshold.
-- Three consecutive healthy samples (`delta ≤ accept`) are required before the state toggles back to “inactive”; until then we continue to mark the pool as in soft divergence so downstream keepers/gateways can react consistently.
-- `haircutMinBps` provides an immediate penalty the moment the soft band is entered, ensuring takers pay for skew even if the excess lasts a single block.
-
-## Debug Instrumentation
-When `FeatureFlags.debugEmit` is enabled we emit:
-```
-OracleDivergenceChecked(pythMid, hcMid, deltaBps, divergenceBps)
-```
-right before reverting. Use this to correlate on-chain rejects with observability dashboards and off-chain alerting.
-
-## Operational Considerations
-- Alerting: monitor both `DivergenceHaircut` (elevated fees) and `DivergenceRejected` (hard off) events. Auto-pause keepers should page operators once hard rejections trigger or haircuts persist.
-- Configuration hygiene: tune `divergenceAccept/Soft/Hard` to match venue behaviour—typical settings (30 / 50 / 75 bps) provide a mild haircut window before disabling the book.
-- Fee discipline: maintain `haircutMinBps + haircutSlopeBps × (soft - accept) < FeeConfig.capBps` to avoid accidental fee-cap saturation.
-- Guard rails: retain `OracleConfig.allowEmaFallback` for venues where HyperCore occasionally stalls—EMA reads remain subject to max-age enforcement and skip the divergence tripwire.
-- Guard rails: retain `OracleConfig.allowEmaFallback` for venues where HyperCore occasionally stalls—EMA reads remain subject to max-age enforcement and skip the divergence tripwire.
+## Tests
+- Unit: `test/unit/SoftDivergenceTest.t.sol:18` verifies haircut slope and reset.
+- Integration: `test/integration/Scenario_DivergenceTripwire.t.sol:22`, `test/integration/Scenario_DivergenceHistogram.t.sol:19` cover soft/hard gating and histogram output.

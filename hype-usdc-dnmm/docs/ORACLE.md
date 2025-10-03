@@ -1,28 +1,57 @@
+---
+title: "Oracle & Data Path"
+version: "8e6f14e"
+last_updated: "2025-10-03"
+---
+
 # Oracle & Data Path
 
-## HyperCore (Primary)
-- **Config**: Parameters sourced from `config/parameters_default.json` → `oracle.hypercore.*`.
-- **IDs**: Fill in `config/oracle.ids.json` (`assetIdHype`, `assetIdUsdc`, `marketIdHypeUsdc`, `precompile`).
-- **Selectors**: Placeholder function selectors exist in `OracleAdapterHC.sol`; replace with official HyperEVM ABI once published.
-- **Freshness**: `maxAgeSec` (Lifinity slots → seconds) and `stallWindowSec` enforce recency before swaps progress.
-- **Confidence Proxy**: Confidence is blended via `conf_bps = max(w_spread·spread, w_sigma·sigma, w_pyth·pyth_conf)` with weights sourced from `config/parameters_default.json`. Components are clamped by the relevant cap (`confCapBpsSpot` / `confCapBpsStrict`).
-- **Sigma EWMA**: `sigma` tracks realized volatility as an EWMA of per-block price deltas (λ ≈ 0.9). Sigma updates run at-most-once per block and seed from configured weights when `BLEND_ON` is enabled.
+## Table of Contents
+- [Overview](#overview)
+- [HyperCore Adapter](#hypercore-adapter)
+- [Pyth Adapter](#pyth-adapter)
+- [Fallback & EMA Logic](#fallback--ema-logic)
+- [Strict vs Relaxed Modes](#strict-vs-relaxed-modes)
+- [Error Reference](#error-reference)
+- [Code & Test References](#code--test-references)
 
-### Adapter Functions
-- `readMidAndAge()` – Spot mid and age (seconds) from HyperCore.
-- `readBidAsk()` – Best bid/ask plus computed spread bps.
-- `readMidEmaFallback()` – EMA mid within stall window when spot is unavailable.
+## Overview
+DNMM quotes anchor to HyperCore order-book data. Pyth feeds provide divergence checks and fallback pricing. Configuration lives under `oracle.*` in `config/parameters_default.json` and ships with zero-default feature flags.
 
-## Pyth (Fallback & Divergence)
-- **Feeds**: HYPE/USD + USDC/USD price IDs referenced in `config/oracle.ids.json`.
-- **Updates**: Supports push updates via calldata bundle (`readPythUsdMid(bytes updateData)`); also works with externally updated storage feeds.
-- **Confidence**: Returns confidence bps per asset, combined using max() in the adapter.
-- **Fallback Logic**: `_readOracle` takes Pyth mid when HyperCore fails gates and `allowEmaFallback` cannot recover. EMA wins priority when it is fresh; only if both spot and EMA are unusable does Pyth drive the swap.
-- **Strict Cap Discipline**: Whenever Pyth contributes to the blended confidence (either as the primary source or within the EWMA blend), the strict cap (`confCapBpsStrict`) is enforced regardless of the requested mode.
-- **Divergence Guard**: When HyperCore is primary and Pyth is fresh, swaps revert if absolute difference exceeds `divergenceBps`.
+## HyperCore Adapter
+- Contract: `contracts/oracle/OracleAdapterHC.sol` initializes asset IDs, market keys, and scaling factors (`:1-120`).
+- Functions: `readMidAndAge`, `readSpreadAndDepth`, `readEma` (expose age-adjusted prices and BBO data).
+- Freshness: `oracle.hypercore.maxAgeSec = 48` sec default, enforced in `_readOracle` via `_ensureFresh` (`contracts/DnmPool.sol:1976`).
+- Divergence guard: Soft/accept/hard caps (`divergenceAcceptBps = 30`, `divergenceSoftBps = 50`, `divergenceHardBps = 75`).
 
-## Operational Notes
-- Validate HyperCore precompile availability on target network; adjust gas expectations (read precompiles are typically constant).
-- Ensure Pyth fee payer account is funded for on-chain updates (if using payload submission).
-- Monitor `SwapExecuted` events for `reason = "PYTH" | "EMA"` to track fallback usage.
-- Keep `config` files in sync with chain deployments; document any deviation in `RUNBOOK.md`.
+## Pyth Adapter
+- Contract: `contracts/oracle/OracleAdapterPyth.sol` processes price/confidence pairs and rewrites to uniform scale (`:1-180`).
+- Max age defaults to 40,000 sec; set tighter bounds in production. Confidence cap `oracle.pyth.confCapBps = 100` clamps variance.
+- Used for both fallback pricing and blended confidence term.
+
+## Fallback & EMA Logic
+- `_getFreshSpotPrice` tries HyperCore spot; if stale or divergent it attempts EMA (`stallWindowSec = 10` sec) then Pyth (`contracts/DnmPool.sol:1900`).
+- EMA fallback optional: `oracle.hypercore.allowEmaFallback` default `true`.
+- When all sources fail, the pool reverts with `Errors.MidUnset()` preventing swaps/rebalances.
+
+## Strict vs Relaxed Modes
+- `OracleMode.Strict`: Used for RFQ verification & manual recenter to enforce tighter `confCapBpsStrict` and zero tolerance for fallback flags (`contracts/interfaces/IDnmPool.sol:94`).
+- `OracleMode.Relaxed`: Default for regular quotes/swaps, allowing EMA/Pyth fallbacks.
+- Strict mode additionally requires `stallWindowSec` freshness and reverts with `Errors.OracleStale()` if violated.
+
+## Error Reference
+Error | Description | Emitted From
+--- | --- | ---
+`OracleStale()` | Data older than `maxAgeSec` | `contracts/DnmPool.sol:1990`
+`OracleSpread()` | BBO spread invalid or zero | `contracts/DnmPool.sol:2015`
+`OracleDiverged(uint256 deltaBps, uint256 maxBps)` | Delta against Pyth exceeded configured limit | `contracts/DnmPool.sol:2066`
+`DivergenceHard(uint256 deltaBps, uint256 hardBps)` | Hard cap exceeded (F03) | `contracts/DnmPool.sol:2077`
+`MidUnset()` | No valid mid after fallbacks | `contracts/DnmPool.sol:2113`
+`PreviewSnapshotUnset()` | Preview requested before any snapshot persisted | `contracts/DnmPool.sol:1133`
+`PreviewSnapshotStale(uint256 ageSec, uint256 maxAgeSec)` | Snapshot older than configured max when `revertOnStalePreview` true | `contracts/DnmPool.sol:1136`
+
+## Code & Test References
+- HyperCore adapter: `contracts/oracle/OracleAdapterHC.sol:1-220`
+- Pyth adapter: `contracts/oracle/OracleAdapterPyth.sol:1-210`
+- Pool oracle integration: `contracts/DnmPool.sol:1900-2120`
+- Tests: `test/integration/Scenario_PythHygiene.t.sol:19`, `test/integration/Scenario_StaleOracle_and_Fallbacks.t.sol:20`, `test/integration/Scenario_DivergenceTripwire.t.sol:22`

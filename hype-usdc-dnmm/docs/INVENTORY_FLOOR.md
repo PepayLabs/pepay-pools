@@ -1,28 +1,45 @@
+---
+title: "Inventory Floor Guarantees"
+version: "8e6f14e"
+last_updated: "2025-10-03"
+---
+
 # Inventory Floor Guarantees
 
-Inventory floors cap how much inventory the pool is willing to sell on either side of the book. The solver now enforces the following invariants for both base-in and quote-in flows:
+## Table of Contents
+- [Overview](#overview)
+- [Floor Types](#floor-types)
+- [Partial Fill Logic](#partial-fill-logic)
+- [AOMQ Integration](#aomq-integration)
+- [Property Tests & Invariants](#property-tests--invariants)
+- [Code & Test References](#code--test-references)
 
-## Hard Floor Preservation
-- Let `floor = floorAmount(reserves, floorBps)`.
-- For every quote, the solver clamps `amountOut <= reserves - floor`.
-- Post-trade reserves are guaranteed to satisfy `reserves' >= floor` even under tiny swaps and high fee settings.
+## Overview
+Floors bound how much inventory the pool is willing to sell on either side. The solver clamps trades so reserves never drop below governance-configured thresholds, even when AOMQ or rebates are active.
 
-## Input Conservation
-When a swap would breach a floor, the solver computes the largest fill that still respects the floor and returns the remainder to the taker:
+## Floor Types
+- **Quote-side floor (`floorQuote`):** Derived from `inventory.floorBps` applied to quote reserves (`contracts/lib/Inventory.sol:16`).
+- **Base-side floor (`floorBase`):** Same `floorBps` parameter applied to base reserves during quote-in swaps (`contracts/lib/Inventory.sol:83`).
+- **Dynamic adjustments:** Governance can set asymmetric floors by overriding `inventory.floorBps` alongside targeted `targetBaseXstar` updates (`contracts/DnmPool.sol:766`).
 
-```
-requestedAmountIn = appliedAmountIn + leftoverReturned
-```
+## Partial Fill Logic
+- Solver functions `Inventory.quoteBaseIn` and `Inventory.quoteQuoteIn` return `(amountOut, appliedAmountIn, isPartial)` ensuring unused input is returned to sender (`contracts/lib/Inventory.sol:42-105`).
+- If the requested trade would breach the floor, the solver finds the maximal fill that keeps reserves ≥ floor, reverts with `Errors.FloorBreach()` when no liquidity remains.
+- Preview responses highlight partials via `QuoteResult.partial` flag (`contracts/interfaces/IDnmPool.sol:130`).
 
-No “dust” is orphaned inside the pool—unused tokens stay with the trader.
+## AOMQ Integration
+- When AOMQ is enabled (`featureFlags.enableAOMQ`), `_applyFeePipeline` can tighten spread or clamp size but still delegates to Inventory library for floor enforcement (`contracts/DnmPool.sol:1620`).
+- AOMQ decisions encode ask/bid clamps in `AomqDecision` bitflags preserved in preview snapshots (`contracts/DnmPool.sol:1880`).
+- Emergency spread widening (`aomq.emergencySpreadBps`) never bypasses floors; clamps occur before swap settlement and emit `AomqDecision` telemetry for shadow bot metrics (`test/integration/Scenario_AOMQ.t.sol:21`).
 
-## Monotonicity Around the Clamp
-- `amountIn` is monotone: increasing it can never reduce the quoted `amountOut`.
-- Once the floor is hit the solver returns the maximal fill allowed by the floor; additional size only increases the leftover that is returned.
+## Property Tests & Invariants
+- **Partial fill parity:** `Scenario_FloorPartialFill.t.sol` asserts returned remainder matches requested minus applied fill.
+- **Floor preservation:** `Scenario_Preview_AOMQ.t.sol` checks preview vs execution parity under floor constraints.
+- **Invariant harness:** `script/run_invariants.sh` shards include floor-preserving swaps; review `Scenario_FloorPartialFill.t.sol:18` for failure reproduction steps.
 
-## Rounding Discipline
-- Outputs are rounded in the conservative (downward) direction.
-- Inputs required to achieve a clamped fill are rounded up just enough to meet the target, ensuring the floor is never crossed but takers never overpay.
-
-## Test Coverage
-Property tests in `test/property/Inventory_FloorMonotonic.t.sol` fuzz reserves, fees, and prices to assert the invariants above. Unit tests cover deterministic scenarios (exact floor hits, near-floor swaps, and quote/bid symmetry).
+## Code & Test References
+- Inventory library: `contracts/lib/Inventory.sol:16-168`
+- Errors: `contracts/lib/Errors.sol:11`
+- Swap integration: `contracts/DnmPool.sol:884-1250`
+- AOMQ flags: `contracts/DnmPool.sol:1620-1880`
+- Tests: `test/integration/Scenario_FloorPartialFill.t.sol:18`, `test/integration/Scenario_AOMQ.t.sol:21`, `test/integration/Scenario_Preview_AOMQ.t.sol:21`

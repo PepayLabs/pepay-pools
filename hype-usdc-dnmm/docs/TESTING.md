@@ -1,43 +1,57 @@
-# Testing Strategy
+---
+title: "Testing Guide"
+version: "8e6f14e"
+last_updated: "2025-10-03"
+---
 
-## Tooling
-- Run all tests via the root wrapper: `terragon-forge.sh test` (ensures `--root hype-usdc-dnmm`).
-- Fuzz tests require Foundry ≥ 1.0.0 with `forge-std` installed.
+# Testing Guide
 
-## Suites
-| Path | Coverage |
-|------|----------|
-| `test/unit/FeePolicy.t.sol` | Fee surface math, caps, decay behaviour. |
-| `test/unit/Inventory.t.sol` | Partial fill solver, deviation calculations. |
-| `test/unit/DnmPool_Rebalance.t.sol` | Auto/manual recenter gating, cooldown, hysteresis streak, stale oracle guards. |
-| `test/unit/InventoryTiltTest.t.sol` | Inventory tilt incentives (base-heavy/light) and weighting by spread/conf. |
-| `test/unit/BboFloorTest.t.sol` | BBO-aware floor clamp, spread fallback, fee-cap saturation. |
-| `test/unit/ConfigSchema.t.sol` | Config schema coverage for tilt/BBO/AOMQ/preview knobs and governance bounds. |
-| `test/unit/PreviewFees_Parity.t.sol` | Snapshot-backed preview parity vs. swap math (all flags on/off, staleness checks, AOMQ clamp detection). |
-| `test/unit/DnmPool.t.sol` | Swap happy path, fallback usage, divergence revert. |
-| `test/integration/DnmPoolIntegration.t.sol` | Recenter gating, oracle fallback scenarios. |
-| `test/integration/Scenario_AOMQ.t.sol` | Soft-divergence activation, hard-fault guard, floor-adjacent partial fills under AOMQ. |
-| `test/integration/Scenario_Preview_AOMQ.t.sol` | Preview ladder parity vs swaps with AOMQ clamps + snapshot metadata sanity. |
-| `test/integration/FeeDynamics.t.sol` | Fee surface sweeps with CSV emission for base/volatility/inventory components. |
-| `test/integration/ForkParity.t.sol` | HC/EMA/Pyth parity, divergence/stale guards, parity CSVs (`mid_event_vs_precompile_mid_bps.csv`, `canary_deltas.csv`) and divergence histogram (`divergence_histogram.csv`). |
-| `test/perf/GasSnapshots.t.sol` | Deterministic gas profiling for HC/EMA/Pyth quotes, swap legs, RFQ settlement, and preview calls (writes `metrics/gas_snapshots.csv`, `gas-snapshots.txt`) with guards enforcing `quote` ≤ 130k gas, `swap` ≤ 320k gas, `previewFees` ≤ 80k gas, and `previewLadder` ≤ 250k gas. |
-| `test/perf/LoadBurst.t.sol` | Burst/load harness producing failure-rate metrics and fee decay series under stress (`metrics/load_*`). |
-| `test/unit/TupleSweep.t.sol` | Decimal matrix (Matrix G) sweeps covering getter destructuring and floor drift assertions with CSV outputs. |
-| `test/fuzz/DnmPoolFuzz.t.sol` | Randomised amount/reserve checks to enforce floor invariants. |
+## Table of Contents
+- [Overview](#overview)
+- [Test Matrix](#test-matrix)
+- [Running Tests](#running-tests)
+- [Gas Snapshots](#gas-snapshots)
+- [Preview Parity Harness](#preview-parity-harness)
+- [CI Expectations](#ci-expectations)
 
-## Adding Tests
-1. Place unit tests under `test/unit/`, integration scenarios under `test/integration/`, fuzz/property tests under `test/fuzz/`.
-2. Use mocks in `contracts/mocks/` or extend them for new oracle/token behaviours.
-3. When introducing new parameters, include regression tests to assert bounds/regression alerts.
+## Overview
+DNMM uses Foundry-based unit/integration/invariant suites plus shadow-bot simulations. Maintain parity between docs and actual tests under `test/`.
 
-## CI Guidance
-- For PRs run the smoke invariant sweep: `FOUNDRY_INVARIANT_RUNS=2000 forge test --profile ci --match-path test/invariants/Invariant_NoRunDry.t.sol` (depth 64, fail-on-revert disabled).
-- Pin the recenter gating suite: `forge test --match-contract DnmPool_Rebalance` (ensures flag gating + hysteresis stay aligned).
-- Schedule the adaptive long sweep via `script/run_invariants.sh` (samples runtime, shards the 20k run, enforces idle/output budgets). Adjust `TARGET_RUNS`, `SHARDS`, and `BUDGET_SECS` via env vars in CI.
-- Add staged jobs for `terragon-forge.sh test --match-path test/perf` to refresh gas/load CSVs with thresholds `<1%` partial fills and `≤10%` gas regression using emitted artefacts.
-- Persist `metrics/` and `gas-snapshots.txt` as build artefacts and diff against baseline in CI to highlight drift.
-- Run `script/check_parity_metrics.sh --log <path>` after long invariants to ensure `metrics/mid_event_vs_precompile_mid_bps.csv` and `metrics/canary_deltas.csv` are fresh/populated (respects `STRICT_INVARIANTS`).
-- Produce machine-readable telemetry via `script/report_invariants.sh <log>`; archive `reports/invariants_run.json` alongside CSV outputs for dashboard ingestion.
-- Surface `forge fmt`/`forge test` commands in future CI configuration, disallowing merges when metrics fail thresholds.
+## Test Matrix
+Layer | Focus | Entry Points | Notes
+--- | --- | --- | ---
+Unit | Libraries & config guards | `test/unit/*.t.sol` | Covers FeePolicy, Inventory, divergence logic, governance queue.
+Integration | Pipeline behavior end-to-end | `test/integration/*.t.sol` | Scenario-based sweeps for AOMQ, floor partial fills, oracle fallbacks.
+Invariants | Safety properties | `script/run_invariants.sh` | Executes forked invariants; ensure gas report optional.
+Shadow Bot | Observability + replay | `shadow-bot/__tests__/*.ts` | Validate metrics emitter, probes, and replay harness.
 
-Refer to `docs/OBSERVABILITY.md` for runtime metrics complementing the test suite.
+## Running Tests
+Command | Purpose
+--- | ---
+`forge test` | Full suite.
+`forge test --match-contract DnmPoolRebalanceTest` | Focus on auto/manual recenter.
+`forge test --match-contract Scenario_Preview_AOMQ` | Preview parity + AOMQ regression.
+`FOUNDRY_PROFILE=gas forge test --gas-report` | Regenerate gas report before updating docs.
+`yarn --cwd shadow-bot test` | Run shadow-bot Jest suite.
+
+## Gas Snapshots
+- Latest `gas-snapshots.txt` records:
+  - `quote_hc`: 127,134 gas (2025-10-03).
+  - `swap_base_hc`: 301,177 gas.
+  - `rfq_verify_swap`: 459,964 gas.
+- Historical baseline: `reports/gas/gas_report.json` (2025-09-23) shows headroom vs targets; refer before publishing regressions.
+- Track improvements and pending work in `reports/gas/microopt_suggestions.md`.
+
+## Preview Parity Harness
+- `Scenario_Preview_AOMQ.t.sol` asserts preview ladder equality vs executed swaps under varying flags.
+- Steps:
+  1. Persist snapshot via `refreshPreviewSnapshot`.
+  2. Call `previewLadder` for `[S0, 2S0, 5S0, 10S0]`.
+  3. Execute swaps; compare fees/amounts; ensure AOMQ clamps reported identically.
+- Failures usually indicate `preview.*` config mismatch or missing `FeePreviewInvariant` state update.
+
+## CI Expectations
+- Docs linting & link checks (see `package.json` scripts after this update).
+- `forge fmt` enforced on Solidity changes.
+- Gas report diffs posted for PRs touching hot paths.
+- Preview parity tests must pass before enabling `parityCiOn` flag.

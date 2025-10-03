@@ -1,4 +1,10 @@
 {
+  "scripts": {
+    "docs:lint": "npx markdownlint \"hype-usdc-dnmm/**/*.md\" --ignore \"**/node_modules/**\"",
+    "docs:links": "npx markdown-link-check -c .linkcheckrc hype-usdc-dnmm/docs/**/*.md hype-usdc-dnmm/RUNBOOK.md",
+    "docs:spell": "npx cspell \"hype-usdc-dnmm/docs/**/*.md\" hype-usdc-dnmm/RUNBOOK.md",
+    "docs:ci": "npm run docs:lint && npm run docs:links && npm run docs:spell"
+  },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
     "@pythnetwork/client": "^2.22.1",

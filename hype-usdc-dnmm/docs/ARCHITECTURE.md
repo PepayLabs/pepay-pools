@@ -1,99 +1,74 @@
-# System Architecture
+---
+title: "DNMM System Architecture"
+version: "8e6f14e"
+last_updated: "2025-10-03"
+---
+
+# DNMM System Architecture
+
+## Table of Contents
+- [Overview](#overview)
+- [Oracle-Anchored Pricing](#oracle-anchored-pricing)
+- [Fee & Inventory Pipeline](#fee--inventory-pipeline)
+- [Swap Execution Workflow](#swap-execution-workflow)
+- [Preview Snapshot & Determinism](#preview-snapshot--determinism)
+- [Recenter & Inventory Governance](#recenter--inventory-governance)
+- [Observer & Autopause Layer](#observer--autopause-layer)
+- [Data Flow Diagram](#data-flow-diagram)
+- [Code & Test Index](#code--test-index)
 
 ## Overview
+The HYPE/USDC DNMM stack combines HyperCore order-book data with fallback oracles and governance-managed fee policies to deliver deterministic quotes and swaps. `DnmPool` owns token reserves, price gating, fee logic, preview snapshots, and inventory recentering, while surrounding adapters feed normalized oracle data and RFQ flows.
 
-The DNMM stack mirrors Lifinity v2 semantics while adapting to HyperEVM primitives:
+## Oracle-Anchored Pricing
+- **Primary source:** HyperCore precompile via `OracleAdapterHC` (`contracts/oracle/OracleAdapterHC.sol:1`). Freshness and divergence guards originate from `oracle.hypercore.*` defaults in `config/parameters_default.json`.
+- **Fallback chain:** `_getFreshSpotPrice` walks spot → EMA → Pyth (`contracts/DnmPool.sol:1900`). Divergence soft/hard thresholds enforce haircut/reject behavior (`contracts/DnmPool.sol:2081`, `contracts/lib/Errors.sol:5`).
+- **Strict vs relaxed:** RFQ and swap paths toggle `OracleMode` (`contracts/interfaces/IDnmPool.sol:94`) to demand stricter `maxAgeSec` and confidence caps; unset mids revert with `Errors.MidUnset()`.
 
-- **`DnmPool`** – Core AMM vault controlling reserves, quoting, swap execution, fee state, inventory floors, pausing, and governance-controlled parameters.
-- **`OracleAdapterHC`** – Reads HyperCore order-book precompiles for mid/bid/ask/EMA values and exposes normalized values to the pool.
-- **`OracleAdapterPyth`** – Pulls Pyth HYPE/USD and USDC/USD feeds as fallback + divergence guard.
-- **`QuoteRFQ`** (optional) – Verifies off-chain signed quotes and settles against the pool for makers that run in low-latency environments.
+## Fee & Inventory Pipeline
+- **Pipeline entry:** `_applyFeePipeline` composes base, confidence, size, inventory, and BBO floors (`contracts/DnmPool.sol:1696`).
+- **Confidence term:** `_computeConfidenceFeeBps` blends spread/sigma/pyth weights (HyperCore caps) aligning with `fee.alphaConfNumerator` / `fee.betaInvDevNumerator` defaults (`config/parameters_default.json`).
+- **Size-aware fee:** Linear/quadratic adjustments plus caps (`contracts/lib/FeePolicy.sol:117`, `contracts/DnmPool.sol:1368`).
+- **Inventory tilt:** `_computeInventoryTiltBps` pulls deviation vs `targetBaseXstar`, weighted by spread/conf multipliers and clamped to `invTiltMaxBps` (`contracts/DnmPool.sol:1483`).
+- **BBO-aware floor:** `_computeBboFloor` enforces maker-configured minimum fee tied to observed spread (`contracts/DnmPool.sol:1467`).
 
-Supporting libraries provide fixed-point math, inventory deviation helpers, and partial-fill solving.
+## Swap Execution Workflow
+- **Quote:** `quoteSwapExactIn` triggers oracle reads, confidence aggregation, and pipeline evaluation without mutating reserves (`contracts/DnmPool.sol:421`).
+- **Swap:** `swapExactIn` reuses the quote outcome, applies rebate hooks (F09) and floor preservation clamps (`contracts/DnmPool.sol:884`, `contracts/DnmPool.sol:1620`).
+- **RFQ integration:** `QuoteRFQ.verifyAndSwap` verifies EIP-712 signed quotes, checks TTL, and dispatches to pool swap functions (`contracts/quotes/QuoteRFQ.sol:162`).
 
-## Data Flow
+## Preview Snapshot & Determinism
+- **Snapshot capture:** `_refreshPreviewSnapshot` persists mid, confidence, spread, regime flags, and fallback state (`contracts/DnmPool.sol:1880`).
+- **Preview APIs:** `previewFees` / `previewLadder` replay the pipeline against the stored snapshot for deterministic off-chain calculations (`contracts/DnmPool.sol:1288`, `contracts/DnmPool.sol:1325`).
+- **Staleness guards:** `preview.maxAgeSec` and `preview.revertOnStalePreview` defaults (zero-default posture) ensure preview staleness is opt-in; stale access reverts with `Errors.PreviewSnapshotStale`.
 
-1. **Quote request** – `quoteSwapExactIn` pulls the freshest HyperCore mid; if gates fail it walks the fallback tree (EMA → Pyth) with divergence checks.
-2. **Fee computation** – Confidence proxy and inventory deviation feed into the DNMM fee surface with exponential decay back to base.
-3. **Partial fill guard** – Before returning, the pool ensures post-trade reserves stay above floor thresholds; if not, it returns the maximal safe input amount.
-4. **Swap execution** – `swapExactIn` reuses quote math, performs ERC20 transfers, updates fee state, emits telemetry events, and enforces reentrancy + deadline checks.
-5. **Rebalancing** – Each swap calls `_checkAndRebalanceAuto` (respecting `recenterCooldownSec`) to refresh `targetBaseXstar` once drift > `recenterThresholdPct`; permissionless `rebalanceTarget()` provides a keeper fallback, and governance retains `setTargetBaseXstar` for manual overrides.
+## Recenter & Inventory Governance
+- **Manual recenter:** `setTargetBaseXstar` emits `TargetBaseXstarUpdated` and enforces timelock gating (`contracts/DnmPool.sol:766`).
+- **Automatic recenter:** `_checkAndRebalanceAuto` triggers when hysteresis conditions pass (`contracts/DnmPool.sol:1549`), respecting `recenterCooldownSec` and healthy frame counters.
+- **Governance controls:** Timelock-enforced parameter queues surface in `GovernanceQueue` utilities (`contracts/DnmPool.sol:567`, `contracts/lib/Errors.sol:24`).
 
-### Divergence Bands & Haircuts
+## Observer & Autopause Layer
+- **Oracle watcher:** `OracleWatcher` evaluates divergence, staleness, and error spikes from adapters; emits intents when thresholds breach (`contracts/observer/OracleWatcher.sol:200`).
+- **Pause handler:** `DnmPauseHandler` consumes watcher intents, calls `pause()`/`unpause()` on the pool, and logs mitigations for SRE runbooks (`contracts/observer/DnmPauseHandler.sol:22`).
+- **Shadow telemetry:** `shadow-bot` mirrors preview output, exports `dnmm_*` Prometheus series, and surfaces clamp/flag states for dashboards (`shadow-bot/metrics.ts:234-340`).
+- **Testing:** `test/integration/OracleWatcher_PauseHandler.t.sol:19` validates watcher ↔ handler glue; `Scenario_CanaryShadow.t.sol:22` exercises alert-driven recentering in tandem with the bot.
 
-- **Accept band** (`divergenceAcceptBps`): normal operations. When the soft-divergence feature flag is enabled, the pool records every sample in `softDivergenceState` while no extra fees are applied.
-- **Soft band** (`divergenceSoftBps`): quotes remain online but the pool emits `DivergenceHaircut(deltaBps, extraFeeBps)` and adds `haircutMinBps + haircutSlopeBps × (delta - accept)` to the fee (capped by `FeeConfig.capBps`).
-- **Hard band** (`divergenceHardBps`): emits `DivergenceRejected(deltaBps)` and reverts with `Errors.DivergenceHard(deltaBps, hardBps)`. Subsequent upgrades hook this into the AOMQ micro-liquidity path instead of a cold shutdown.
-- **Hysteresis**: `getSoftDivergenceState()` exposes `(active, lastDeltaBps, healthyStreak)` so keepers can monitor recovery. Three consecutive healthy samples (`delta ≤ accept`) are required before the state toggles back to inactive, preventing alert flapping.
+## Data Flow Diagram
+```mermaid
+flowchart LR
+  OracleHC[HyperCore Adapter] -->|mid, spread, sigma| DnmPool
+  OraclePyth[Pyth Adapter] -->|mid, conf| DnmPool
+  DnmPool -->|quote outcome| Preview[Preview Snapshot]
+  Preview -->|previewFees / previewLadder| Router
+  Router -->|swap tx (minOut, TTL)| DnmPool
+  DnmPool -->|events| Observability[Prometheus + Shadow Bot]
+  DnmPool -->|auto/manual recenter| Governance
+```
 
-### Size-Aware Fee Curve
-
-- Controlled via `FeeConfig.gammaSizeLinBps`, `gammaSizeQuadBps`, and `sizeFeeCapBps`, gated by the `enableSizeFee` feature flag.
-- The pool normalises trade size by the maker-configured `s0Notional` (quote notional in WAD). `u = tradeNotional / s0Notional` produces a dimensionless multiplier.
-- The additional surcharge is `gammaSizeLinBps × u + gammaSizeQuadBps × u²`, capped by `sizeFeeCapBps` and then by the global fee cap.
-- Works symmetrically for base-in and quote-in trades (quote notional derived from the mid price). Previews, swaps, and RFQ settlement all reuse the same helper ensuring parity.
-
-### BBO-Aware Floor (F05)
-
-- Configuration lives in `MakerConfig` (`alphaBboBps`, `betaFloorBps`) and is gated by `featureFlags.enableBboFloor`.
-- On every quote/swap the pool computes `floorDynamic = max(betaFloorBps, alphaBboBps * spreadBps / 10_000)`, where `spreadBps` comes from the HyperCore order book precompile.
-- The final fee is clamped to `max(feeBps, floorDynamic)` after the size curve and soft-divergence haircuts run, but before downstream discounts. The result still honours `FeeConfig.capBps`.
-- When the order book spread is unavailable (e.g., EMA/Pyth fallback), the absolute floor (`betaFloorBps`) is used so quotes never collapse to zero.
-- Both swap execution and preview paths share the same helper, ensuring routers cannot undercut the configured minimum even when rebates are introduced in later upgrades.
-
-### Inventory Tilt Upgrade (F06)
-
-- Tilt parameters sit in `InventoryConfig` (`invTiltBpsPer1pct`, `invTiltMaxBps`, `tiltConfWeightBps`, `tiltSpreadWeightBps`) and are guarded by `featureFlags.enableInvTilt`.
-- The instantaneous neutral inventory is computed as `x* = (Q + P × B) / (2P)` using live reserves; the deviation `Δ = B - x*` determines the tilt direction (positive = base-heavy).
-- The raw adjustment is `tiltBase = |Δ|_bps × invTiltBpsPer1pct / 100`, then re-weighted by `(1 + tiltConfWeightBps × confBps / 10_000 + tiltSpreadWeightBps × spreadBps / 10_000)` and finally capped by `invTiltMaxBps`.
-- Trades that worsen the deviation (e.g., base-heavy + base-in) receive a fee surcharge, while restorative trades are discounted symmetrically; adjustments never push below zero or above `FeeConfig.capBps`.
-- The helper runs in both swap and preview paths so routers observe matching incentives, and all math is performed in-memory (no extra storage writes).
-
-### Automatic Micro Quotes (F07)
-
-- Configuration (`AomqConfig`) exposes `minQuoteNotional`, `emergencySpreadBps`, and `floorEpsilonBps`, gated by `featureFlags.enableAOMQ`.
-- When soft-divergence is active, the pool is near its inventory floor, or the oracle falls back to EMA/Pyth (but remains within the soft band), the pool synthesises a micro quote instead of hard-rejecting.
-- The clamp size equals `minQuoteNotional` (quote units) or the precise floor gap if that is smaller. Ask-side trades honour the emergency spread floor via `max(emergencySpreadBps, floorDynamic)` so spreads never collapse.
-- Partial executions settle exactly against the inventory floor; the helper emits `AomqActivated(trigger, isBaseIn, amountIn, quoteNotional, spreadBps)` once per activation window and resets when the pool returns to healthy conditions.
-- Hard-divergence faults still revert; AOMQ only operates in ACCEPT/SOFT states, ensuring safety gates remain intact.
-
-### Snapshot-backed Fee Previews (F08)
-
-- A compact `PreviewSnapshot` records oracle mid, confidence/sigma proxies, divergence metadata, and AOMQ flags. It is refreshed after every successful swap (CEI order preserved) and via the permissionless `refreshPreviewSnapshot(mode, oracleData)` call, which respects `snapshotCooldownSec`.
-- `PreviewConfig` (gated via governance) controls `maxAgeSec`, `snapshotCooldownSec`, `revertOnStalePreview`, and `enablePreviewFresh` (live peek without snapshot reliance).
-- The default governance configuration leaves `maxAgeSec = 0` and `revertOnStalePreview = false`, which disables staleness reverts until operators flip the toggles during rollout; downstream tooling should treat snapshot age as advisory in that mode.
-- `previewFees(uint256[] sizesBaseWad)` replays the full fee pipeline (size curve, tilt, divergence haircut, BBO floor, AOMQ clamps) using the cached snapshot and current reserves. The call is `view` and returns ask/bid fee ladders in bps.
-- `previewLadder(uint256 s0BaseWad)` provides the canonical `[S0, 2S0, 5S0, 10S0]` buckets plus clamp flags, snapshot timestamp, and mid. Routers pre-compute slices without incurring swap gas.
-- `previewFeesFresh` (optional) peeks HyperCore/Pyth via view-only adapters and mirrors swap fee ordering without mutating state, useful for analytics when snapshots are stale but a refresh is undesirable.
-+
-### Preview Snapshot Storage & CLA
-
-- Snapshots are designed to fit within a single storage slot (packed `uint96` / `uint64` / `uint32` fields). Activation flags encode soft divergence, fallback usage, and AOMQ ask/bid state.
-- Cooldown-enforced refreshes prevent spamming oracle reads while still allowing keepers to refresh before router usage. When governance sets `maxAgeSec > 0` **and** enables `revertOnStalePreview`, snapshots older than the threshold revert, signalling routers to refresh or fall back to the fresh path.
-
-## Storage Layout
-
-| Slot | Component | Notes |
-|------|-----------|-------|
-| 0    | Tokens/reserve state | Uses 128-bit packing for base/quote balances |
-| 1    | Inventory config     | Floor, recenter thresholds, tilt coefficients |
-| 2    | Oracle config        | Freshness windows, confidence caps, divergence tolerance |
-| 3    | Fee config           | Base/alpha/beta/cap/decay parameters |
-| 4    | Maker config         | On-chain S0 settings + BBO-aware floor coefficients |
-| 5    | Guardians            | Governance + pauser |
-| 6    | Fee state            | Last fee in bps + last update block |
-| 7    | Cached mid           | Last mid used & timestamp for recentering |
-| 8    | Preview snapshot     | Packed `PreviewSnapshot` (mid/conf/divergence/AOMQ flags) + last refresh timestamp |
-
-## Contracts & Interfaces
-
-- `IDnmPool` – Exposes read-only views plus swap/quote entrypoints.
-- `IOracleAdapterHC` – Interface to HyperCore-specific reader contract.
-- `IOracleAdapterPyth` – Interface to Pyth fallback/divergence contract.
-- `IQuoteRFQ` – Optional verifying contract for off-chain quotes.
-
-## Extensibility
-
-- Additional oracles can be added by implementing the adapter interface and plugging into the pool's fallback chain.
-- Hedging keeper integration is left as a v2 extension via events and read-only getters.
-- Fee formulas allow parameterized exponent/coefficients; default matches spec but hook is general.
+## Code & Test Index
+- Core pool: `contracts/DnmPool.sol:333-1960`
+- Oracle adapters: `contracts/oracle/OracleAdapterHC.sol:1-220`, `contracts/oracle/OracleAdapterPyth.sol:1-210`
+- Fee policy library: `contracts/lib/FeePolicy.sol:1-210`
+- Preview + AOMQ scenarios: `test/integration/Scenario_Preview_AOMQ.t.sol:16`, `test/integration/Scenario_AOMQ.t.sol:21`
+- Recenter coverage: `test/unit/DnmPool_Rebalance.t.sol:20`, `test/integration/Scenario_RecenterThreshold.t.sol:18`
+- Observer layer: `contracts/observer/OracleWatcher.sol:1-260`, `contracts/observer/DnmPauseHandler.sol:1-120`, `test/integration/OracleWatcher_PauseHandler.t.sol:19`

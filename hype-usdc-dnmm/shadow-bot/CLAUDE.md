@@ -29,6 +29,14 @@
 - Maintain Prometheus alert mappings in `RUNBOOK.md` and Grafana dashboards referencing the exported series.
 - Record open monitoring questions (e.g., additional regime bits, gas normalization) so on-call teams know current gaps.
 
+## Feature Alignment
+- F01 (Auto/Manual Recenter): Emits `dnmm_recenter_commits_total` and captures `last_rebalance_price_wad` to mirror `TargetBaseXstarUpdated`.
+- F03 (Soft Divergence Haircut): Flags `dnmm_regime_bits` and `dnmm_delta_bps` bins when `DivergenceHaircut` fires on-chain.
+- F05 (BBO Floor): Tracks ladder rung clamps via `dnmm_fee_bps{regime}` to confirm floor enforcement.
+- F07 (AOMQ): Records `dnmm_aomq_clamps_total` and clamp labels synced with `_evaluateAomq` events.
+- F08 (Preview Snapshot): Mirrors `PreviewSnapshotRefreshed` into `dnmm_snapshot_age_sec` and ladder CSV outputs.
+- F09 (Rebates): Surface fee delta in CSV exporter so aggregator discounts can be reconciled with `AggregatorDiscountUpdated` events.
+
 ## Maintainers & Contacts
 - Primary: TBD (assign owner)
 - Backup: TBD (assign delegate)
@@ -37,3 +45,10 @@
 ## Change Log
 - 2025-10-03: Added mock (scenario engine) and fork (DeployMocks.s.sol) execution modes, `{mode}`-aware metrics/CSV outputs, refreshed Vitest coverage, and documentation for multi-mode operations.
 - 2025-10-02: Re-architected bot into modular TypeScript stack (config/provider/oracle/poolClient/probes/metrics/CSV), added Prometheus histograms and rolling uptime, synthetic probe parity, and Vitest coverage.
+
+## Metric ↔ Event Mapping
+- `dnmm_snapshot_age_sec` ↔ `PreviewSnapshotRefreshed`.
+- `dnmm_recenter_commits_total` ↔ `TargetBaseXstarUpdated`, `ManualRebalanceExecuted`.
+- `dnmm_aomq_clamps_total` ↔ `_evaluateAomq` clamp decisions and AOMQ flag bits recorded in preview snapshots.
+- `dnmm_quotes_total{result}` ↔ `QuoteFilled` success/failure breakdown.
+- `dnmm_delta_bps` ↔ `OracleDivergenceChecked`, `DivergenceHaircut`, `DivergenceRejected`.

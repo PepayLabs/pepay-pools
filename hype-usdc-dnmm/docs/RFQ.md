@@ -1,39 +1,56 @@
-# RFQ Path
+---
+title: "RFQ Integration"
+version: "8e6f14e"
+last_updated: "2025-10-03"
+---
+
+# RFQ Integration
+
+## Table of Contents
+- [Overview](#overview)
+- [EIP-712 Domain & Types](#eip-712-domain--types)
+- [Verify & Swap Flow](#verify--swap-flow)
+- [TTL & Slippage Guidance](#ttl--slippage-guidance)
+- [Preview APIs & Determinism](#preview-apis--determinism)
+- [Code & Test References](#code--test-references)
 
 ## Overview
+`QuoteRFQ` enables off-chain signed quotes to settle against `DnmPool` under strict oracle guards. The contract wraps signature verification, swap execution, and telemetry emission for auditability.
 
-`QuoteRFQ` enables low-latency makers to serve signed quotes off-chain while enforcing expiry, salt uniqueness, and signature verification on-chain. The contract coordinates token movement and forwards execution to `DnmPool` once a taker submits a validated quote.
+## EIP-712 Domain & Types
+- **Domain:** `name = "DNMM QuoteRFQ"`, `version = "1"`, `chainId = block.chainid`, `verifyingContract = QuoteRFQ` (`contracts/quotes/QuoteRFQ.sol:17-52`).
+- **Type hash:**
+  ```text
+  Quote(address taker,uint256 amountIn,uint256 minAmountOut,bool isBaseIn,uint256 expiry,uint256 salt)
+  ```
+- Domain/type constants exposed via `hashQuote`, `hashTypedDataV4` (`contracts/quotes/QuoteRFQ.sol:159-175`).
 
-## Flow
+## Verify & Swap Flow
+1. **Taker validation:** `verifyAndSwap` checks caller matches `params.taker` and TTL (`contracts/quotes/QuoteRFQ.sol:94-101`).
+2. **Signature check:** `hashTypedDataV4` + `_assertValidMakerSignature` support EOAs and ERC-1271 contracts (`contracts/quotes/QuoteRFQ.sol:205-233`).
+3. **Pool quote:** Calls `DnmPool.quoteSwapExactIn` in strict mode with provided oracle data before routing to `swapExactIn`; rejects if pool output would be larger than maker quote (`QuoteOutputBelowPool`).
+4. **Settlement:** Transfers tokens, returns leftovers on partial fills, emits `QuoteFilled` with actual fill amounts (`contracts/quotes/QuoteRFQ.sol:110-145`).
 
-1. Maker signs `QuoteParams` (taker, amountIn, minAmountOut, side, expiry, salt) using the RFQ EOA.
-2. Taker approves `QuoteRFQ` to pull the input token and submits the signature + params + oracle calldata.
-3. `QuoteRFQ` verifies expiry and salt, pulls input tokens, approves the pool, and calls `swapExactIn`.
-4. Any unused input (partial fill) is refunded and output tokens are forwarded to the taker.
+## TTL & Slippage Guidance
+- Default TTL: `maker.ttlMs = 300` ms (`config/parameters_default.json`). Aggregators should request new quotes when TTL > 250 ms to avoid expiry.
+- **Size buckets:**
+  - `≤ S0 (5k quote units)`: target slippage buffer ≥ 5 bps beyond preview ladder.
+  - `S0 .. 5S0`: widen to 15 bps; expect potential AOMQ clamps when divergence active.
+  - `> 5S0`: require explicit maker acknowledgement; if `enableSizeFee` is off, treat resulting fee as flat 15 bps.
+- Always set `minAmountOut = previewAmountOut - slippage` using the latest `previewFees` / `previewLadder` outputs.
 
-## Security Notes
+## Preview APIs & Determinism
+- **`previewFees` / `previewLadder`:** Deterministic because the pool replays against the stored snapshot (`contracts/DnmPool.sol:1288-1257`).
+- **Staleness handling:**
+  - With defaults (`preview.maxAgeSec = 0`, `revertOnStalePreview = false`), stale previews are allowed but flagged via `dnmm_snapshot_age_sec` metric.
+  - Enabling both `revertOnStalePreview = true` and `maxAgeSec > 0` makes stale previews revert (`PreviewSnapshotStale`).
+- **Workflow:**
+  1. Fetch ladder for `[S0, 2S0, 5S0, 10S0]`.
+  2. Compute `minOut` by subtracting slippage buffer per bucket.
+  3. Include `params.minAmountOut` + TTL in signed payload.
 
-- Salts are single-use to avoid replay. A per-quote GUID or monotonic counter is recommended.
-- Signatures include `chainId` and pool address to prevent cross-chain reuse.
-- Maker key rotation uses `setMakerKey`, gateable by `owner` (set to deployer by default).
-- Monitor `QuoteFilled` events with `salt` indexing to detect anomalies.
-
-## Integration Checklist
-
-- The maker service should track outstanding salts and invalidate old quotes at expiry.
-- Takers must approve `QuoteRFQ` for either HYPE or USDC prior to calling `verifyAndSwap`.
-- `oracleData` should include the same payload used in on-chain swaps (e.g., Pyth price update bundle).
-- For multi-sig key rotation, stage a new key via governance tooling before switching the signer live.
-
-## Pre-trade Previews
-
-Routers can now interrogate the pool's snapshot-backed preview surface before dispatching RFQs:
-
-- `previewFees(uint256[] sizesBaseWad)` returns ask/bid fee ladders (bps) for arbitrary base sizes using the latest snapshot. The call is `view` and gas-light (~1k with a single size) because it replays the same fee pipeline that `swapExactIn` uses.
-- `previewLadder(uint256 s0BaseWad)` is a convenience helper that outputs `[S0, 2S0, 5S0, 10S0]` sizes, clamp flags (AOMQ micro quotes), snapshot timestamp, and the mid used for the computation. If `s0BaseWad == 0` the pool derives S0 from `makerConfig.s0Notional`.
-- Snapshots are updated automatically after every filled swap and may optionally be refreshed off-cycle via `refreshPreviewSnapshot`. When governance sets `previewMaxAgeSec > 0`, integrators SHOULD monitor `previewSnapshotAge()` and refresh when `age > previewMaxAgeSec`; with the zero-default configuration there is no staleness guard and the snapshots are advisory only.
-- If `previewConfig.revertOnStalePreview == true` the preview calls revert with `PreviewSnapshotStale(age, maxAge)` once `previewMaxAgeSec > 0`. By default the flag is `false`, so routers can opt-in before roll-out. When enabled, routers should either trigger a refresh (if allowed) or fall back to `previewFeesFresh` when `enablePreviewFresh` is toggled on.
-- Clamp flags signal that AOMQ is active and the reported fee already includes the micro-quote spread floor. Respecting the clamp avoids takers requesting depth beyond the configured min-notional.
-- Even in spot mode, if both HyperCore spot and EMA fallbacks fail the pool peeks Pyth before finalising the quote; adapter implementations MUST avoid reverting in this path or the pool will bubble up `ForcedPeek`.
-
-> Tip: for RFQ slicing, run `previewFees` on the intended clip sizes, honour the clamp flags, then bundle the resulting fee ladders into the quote request that makers need to satisfy.
+## Code & Test References
+- RFQ contract: `contracts/quotes/QuoteRFQ.sol:1-234`
+- Interface: `contracts/interfaces/IQuoteRFQ.sol:1-140`
+- Pool preview functions: `contracts/DnmPool.sol:1071-1258`
+- Tests: `test/integration/Scenario_RFQ_AggregatorSplit.t.sol:18`, `test/integration/Scenario_Preview_AOMQ.t.sol:21`

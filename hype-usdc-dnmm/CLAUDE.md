@@ -34,6 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-03: Regenerated DNMM documentation set (architecture, rebalancing, fees, oracle, RFQ, observability, governance, router, testing, gas) with front matter and feature links; added docs CI scripts and reports/shadow-bot alignment.
 - 2025-10-03: Added shadow-bot mock/fork execution modes, scenario engine, fork mock deploy script, and refreshed docs/tests for dual-mode observability.
 - 2025-10-01: Implemented the BBO-aware fee floor (F05) behind `enableBboFloor`, ensuring swap/preview fees respect `max(betaFloorBps, alphaBboBps * spread)` and updating docs/tests accordingly.
 - 2025-10-01: Delivered inventory tilt incentives (F06) with signed adjustments from instantaneous `x*`, spread/conf weighting, symmetric caps, and regression coverage in `InventoryTiltTest`.

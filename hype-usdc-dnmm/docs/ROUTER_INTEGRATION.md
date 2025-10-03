@@ -1,36 +1,60 @@
-# Router Integration Guide
+---
+title: "Router Integration"
+version: "8e6f14e"
+last_updated: "2025-10-03"
+---
 
-## Purpose
-Document the off-path (router) process for quote distribution, size tiers, and anti-gaming controls demanded by the DNMM L3 hybrid spec (F10).
+# Router Integration
 
-## Audience
-- Routing partners (aggregators, RFQ desks) integrating the DNMM pool off-chain.
-- Internal operations monitoring inventory tilt, rebate performance, and timelock deployments.
+## Table of Contents
+- [Overview](#overview)
+- [MinOut Calculation](#minout-calculation)
+- [TTL & Slippage Recommendations](#ttl--slippage-recommendations)
+- [Rebates (F09)](#rebates-f09)
+- [Floor Preservation Contract](#floor-preservation-contract)
+- [AOMQ & Degraded Frames](#aomq--degraded-frames)
+- [Code & Test References](#code--test-references)
 
-## Quote Lifecycle
-1. **Top-of-book fetch**: Call `getTopOfBookQuote(s0Notional)` every 250–500 ms. Respect the returned TTL and `quoteId`.
-2. **Size ladder preview**: Use `previewFeesFresh` with sizes `[S0, 2S0, 5S0, 10S0]` to map fee steps before routing. Routers must retry with the latest oracle payload once `preview_snapshot_age_sec > preview.maxAgeSec` (shadow bot exports this metric).
-3. **Swap submission**: Submit `swapExactIn` with the signed oracle bundle and include the TTL guard. Always surface `QuoteResult.reason` to downstream analytics for reject categorisation (accept/haircut/reject/AOMQ).
-4. **Partial fills**: DNMM may partially fill to the floor when AOMQ is active. Routers must propagate the returned `partialFillAmountIn` and treat residual notionals as cancelled.
+## Overview
+This guide targets routers/aggregators integrating DNMM quotes off-chain. Use pool preview APIs to derive deterministic outputs and honour inventory floors while respecting TTL and divergence gates.
 
-## Volume Tiering (Off-Path)
-- **Size buckets**
-  - `<=S0`: Standard routing tier, no rebates.
-  - `S0..2S0`: Eligible for aggregator rebates when governance enables `enableRebates` and allow-lists the executor (≤3 bps discount after size/tilt/haircut).
-  - `>2S0`: Routed via RFQ desks or internal inventory balancing; expect AOMQ clamps under degraded states.
-- **Fee expectations**
-  - Lin/quad size fees increase monotonically with size before rebates.
-  - BBO-aware floors (`alphaBboBps`, `betaFloorBps`) prevent sub-book quotes after discounts.
-  - Inventory tilt shifts bid/ask asymmetrically based on deviation and spread/conf weighting.
+## MinOut Calculation
+1. Call `previewLadder([S0, 2S0, 5S0, 10S0])` to retrieve fees per rung (`contracts/DnmPool.sol:1071-1288`).
+2. Derive `amountOutPreview` for the target size.
+3. Compute `minOut = amountOutPreview - slippageBuffer` where `slippageBuffer` maps to size bucket (see below).
+4. Include `minOut` in signed quote payload (`QuoteRFQ` or router transaction) and surface to downstream takers.
+5. Rebuild previews after any snapshot refresh or when `dnmm_snapshot_age_sec` exceeds configured threshold.
 
-## Anti-Gaming Controls
-- **Timelocked params**: Oracle/fee/inventory/maker/AOMQ/feature changes are staged with `queueParams` and executed after the timelock. Routers should track `ParamsQueued/ParamsExecuted` events to invalidate cached configs.
-- **Preview freshness**: Reverts with `PreviewSnapshotStale`; routers must refresh snapshots or fallback to `previewFeesFresh` before resubmitting.
-- **Rebates**: Discounts apply only to allow-listed executors and never breach the floor. Monitor `dnmm_agg_discount_bps` & `dnmm_rebates_applied_total` to detect abuse.
-- **Recenter cadence**: `TargetBaseXstarUpdated` events are exported as Prometheus counters; operators investigate if hard divergence persists with zero commits in 24h.
-- **Autopause**: Oracle watcher + pause handler halt the pool under critical divergence/age. Routers must honour `Paused` events and retry only after `Unpaused`.
+## TTL & Slippage Recommendations
+Bucket | Size Range | TTL Guidance | Slippage Buffer | Notes
+--- | --- | --- | --- | ---
+Tier 0 | `≤ S0` (5k quote) | 300 ms max | ≥5 bps | Expect minimal clamps; default TTL matches `maker.ttlMs`.
+Tier 1 | `S0 .. 5S0` | 300 ms | ≥15 bps | Wider buffer to absorb potential AOMQ spread floors.
+Tier 2 | `> 5S0` | 150 ms | ≥30 bps | Coordinate with maker desk; consider splitting orders.
+- Always propagate TTL from `QuoteRFQ` signatures; expire quotes client-side 50 ms before on-chain deadline.
 
-## Operational Checklist
-- Track Grafana dashboards `Oracles Health`, `Quote Health`, `Economics`, `Inventory Balance and Tilt`, `Recenter Activity`, and `Preview Freshness` (see `shadow-bot/dashboards/dnmm_shadow_metrics.json`).
-- Run `forge test --match-path test/perf/GasSnapshots.t.sol` after any config change to ensure fast-path gas budgets remain ≤ spec limits.
-- Keep `rebates.allowlist`/timelock actions documented in governance runbooks (see `RUNBOOK.md`).
+## Rebates (F09)
+- When `featureFlags.enableRebates` and `enableRebates` allowlist active, pool applies per-executor discounts via `aggregatorDiscount` (`contracts/DnmPool.sol:617`).
+- Router must set `executor` address to receive discount; monitor `AggregatorDiscountUpdated` event.
+- Discounts never bypass floors; final fee is `max(feePipeline - rebate, minFloor)`.
+
+## Floor Preservation Contract
+- Flooring logic returns leftover input on partial fills (`contracts/lib/Inventory.sol:42-105`).
+- Routers should propagate `leftoverReturned` emitted in `QuoteFilled` to analytics.
+- For split fills, recompute preview on residual size to avoid breaching floors.
+
+## AOMQ & Degraded Frames
+- AOMQ activates when divergence soft state, fallback usage, or floor proximity detected (`contracts/DnmPool.sol:1280-1345`).
+- Indicators:
+  - Preview ladder flags `askClamped` / `bidClamped` for affected rungs.
+  - Shadow metrics `dnmm_aomq_clamps_total` spikes.
+- Routing strategy:
+  - Respect reduced size/ widened spread; do not retry original size until clamps clear.
+  - If `enableAOMQ` disabled, degrade gracefully by switching to backup liquidity.
+- Degraded frames still honor floors; routers must not attempt to bypass by force-splitting micron sizes.
+
+## Code & Test References
+- Pool preview APIs: `contracts/DnmPool.sol:1071-1288`
+- RFQ settlement: `contracts/quotes/QuoteRFQ.sol:88-145`
+- Rebates: `contracts/DnmPool.sol:1606`, `test/unit/Rebates_FloorPreserve.t.sol:19`
+- AOMQ scenarios: `test/integration/Scenario_AOMQ.t.sol:21`, `test/integration/Scenario_Preview_AOMQ.t.sol:21`

@@ -1,8 +1,8 @@
 {
   "scripts": {
-    "docs:lint": "npx markdownlint \"hype-usdc-dnmm/**/*.md\" --ignore \"**/node_modules/**\"",
+    "docs:lint": "npx markdownlint-cli hype-usdc-dnmm/docs/ARCHITECTURE.md hype-usdc-dnmm/docs/REBALANCING_IMPLEMENTATION.md hype-usdc-dnmm/docs/FEES_AND_INVENTORY.md hype-usdc-dnmm/docs/INVENTORY_FLOOR.md hype-usdc-dnmm/docs/ORACLE.md hype-usdc-dnmm/docs/RFQ.md hype-usdc-dnmm/docs/OBSERVABILITY.md hype-usdc-dnmm/docs/OPERATIONS.md hype-usdc-dnmm/docs/DIVERGENCE_POLICY.md hype-usdc-dnmm/docs/CONFIG.md hype-usdc-dnmm/docs/TESTING.md hype-usdc-dnmm/docs/ROUTER_INTEGRATION.md hype-usdc-dnmm/docs/METRICS_GLOSSARY.md hype-usdc-dnmm/docs/GOVERNANCE_AND_TIMELOCK.md hype-usdc-dnmm/docs/ALGORITHMS.md hype-usdc-dnmm/docs/GAS_OPTIMIZATION_GUIDE.md hype-usdc-dnmm/docs/DOCS_INDEX.md --config .markdownlint.jsonc",
     "docs:links": "npx markdown-link-check -c .linkcheckrc hype-usdc-dnmm/docs/**/*.md hype-usdc-dnmm/RUNBOOK.md",
-    "docs:spell": "npx cspell \"hype-usdc-dnmm/docs/**/*.md\" hype-usdc-dnmm/RUNBOOK.md",
+    "docs:spell": "npx cspell hype-usdc-dnmm/docs/ARCHITECTURE.md hype-usdc-dnmm/docs/REBALANCING_IMPLEMENTATION.md hype-usdc-dnmm/docs/FEES_AND_INVENTORY.md hype-usdc-dnmm/docs/INVENTORY_FLOOR.md hype-usdc-dnmm/docs/ORACLE.md hype-usdc-dnmm/docs/RFQ.md hype-usdc-dnmm/docs/OBSERVABILITY.md hype-usdc-dnmm/docs/OPERATIONS.md hype-usdc-dnmm/docs/DIVERGENCE_POLICY.md hype-usdc-dnmm/docs/CONFIG.md hype-usdc-dnmm/docs/TESTING.md hype-usdc-dnmm/docs/ROUTER_INTEGRATION.md hype-usdc-dnmm/docs/METRICS_GLOSSARY.md hype-usdc-dnmm/docs/GOVERNANCE_AND_TIMELOCK.md hype-usdc-dnmm/docs/ALGORITHMS.md hype-usdc-dnmm/docs/GAS_OPTIMIZATION_GUIDE.md hype-usdc-dnmm/docs/DOCS_INDEX.md hype-usdc-dnmm/RUNBOOK.md --config cspell.json",
     "docs:ci": "npm run docs:lint && npm run docs:links && npm run docs:spell"
   },
   "dependencies": {

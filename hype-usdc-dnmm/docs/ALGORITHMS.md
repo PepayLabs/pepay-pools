@@ -7,6 +7,7 @@ last_updated: "2025-10-03"
 # Algorithm Reference
 
 ## Table of Contents
+
 - [Size-Aware Fee](#size-aware-fee)
 - [Inventory Tilt](#inventory-tilt)
 - [BBO-Aware Fee Floor](#bbo-aware-fee-floor)
@@ -14,8 +15,10 @@ last_updated: "2025-10-03"
 - [Preview Snapshot](#preview-snapshot)
 
 ## Size-Aware Fee
+
 Pseudocode:
-```
+
+```text
 u = sizeWad / S0Wad
 fee_size_bps = gamma_lin_bps * u + gamma_quad_bps * u^2
 fee_size_bps = min(fee_size_bps, size_fee_cap_bps)
@@ -27,8 +30,10 @@ fee_size_bps = min(fee_size_bps, size_fee_cap_bps)
 - Tests: `test/unit/SizeFeeCurveTest.t.sol`.
 
 ## Inventory Tilt
+
 Pseudocode:
-```
+
+```text
 x_star = f(current reserves, mid)
 tilt_raw_bps = k * (B - x_star) / x_star
 tilt_weighted_bps = tilt_raw_bps * w_spread * w_conf
@@ -41,8 +46,10 @@ tilt_bps = clamp(tilt_weighted_bps, -tiltMaxBps, +tiltMaxBps)
 - Tests: `test/unit/InventoryTiltTest.t.sol`.
 
 ## BBO-Aware Fee Floor
+
 Pseudocode:
-```
+
+```text
 bbo_spread_bps = 10_000 * (ask - bid) / mid
 min_floor_bps = max(beta_floor_bps, alpha_bbo_bps * bbo_spread_bps / 10_000)
 final_fee_bps = max(final_fee_bps, min_floor_bps)
@@ -54,8 +61,10 @@ final_fee_bps = max(final_fee_bps, min_floor_bps)
 - Tests: `test/unit/BboFloorTest.t.sol`.
 
 ## Always-On Micro Quotes (AOMQ)
+
 Pseudocode:
-```
+
+```text
 if degraded_state and enableAOMQ:
   clamp size to minQuoteNotional and/or widen spread to emergencySpreadBps
   ensure floor-preserving partial fills
@@ -69,8 +78,10 @@ else:
 - Tests: `test/integration/Scenario_AOMQ.t.sol`, `test/integration/Scenario_Preview_AOMQ.t.sol`.
 
 ## Preview Snapshot
+
 Pseudocode:
-```
+
+```text
 On quote/swap: persist snapshot { mid, conf_bps, spread_bps, mode, ts, flags }
 previewFees(sizes[]) reads snapshot and recomputes fees (view-only)
 previewFresh optionally re-reads adapters without mutating state

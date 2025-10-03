@@ -49,7 +49,7 @@ All swap quotes pass through `_applyFeePipeline`, composing multiple adjustments
 ## Inventory Tilt Math
 Given reserves `(B, Q)`, mid price `m`, and target `x*`:
 
-```
+```text
 baseWad = B * 1e18 / baseScale
 quoteWad = Q * 1e18 / quoteScale
 targetWad = x* * 1e18 / baseScale

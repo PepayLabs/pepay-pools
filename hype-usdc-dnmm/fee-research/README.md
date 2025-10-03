@@ -19,6 +19,10 @@ This package orchestrates deterministic quoting runs across HyperEVM DEXs and ro
 4. Execute the evaluator: `pnpm start -- --run live` (or use `tsx evaluate_hype.ts` during development).
 5. Inspect artifacts in `metrics/hype-metrics`, and append run summaries to `README.md` as needed.
 
+### Commands Executed (2025-10-03)
+- `npm run build`
+- `npm run unit`
+
 > Quick iteration tip: set `FAST_QUOTE_PLAN=1` (or `FAST_MODE=1`) to reduce the quote ladder to `[1, 10, 100, 1000]` during local development. Direct DEX adapters still require `HYPE_RPC_URL` to be populated so on-chain quoters have a provider.
 
 ## Testing

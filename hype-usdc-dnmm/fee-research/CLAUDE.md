@@ -41,3 +41,4 @@
 - 2025-10-02: Aligned TypeScript compiler with NodeNext module resolution and hardened metrics output sanitization/tests to unblock `npm run build`.
 - 2025-10-02: Added Hypertrade dexWhitelist-backed adapters for Curve, Project X, and the remaining HyperEVM DEX targets as interim coverage; refreshed dex-docs registry notes and timestamps.
 - 2025-10-02: Implemented Hyperliquid order-book adapter via the official /info API so HYPE/USDC quotes run without Hypertrade fallbacks and capture depth usage per request.
+- 2025-10-03: Refactored HyperSwap onto a reusable UniswapV3 factory/quoter adapter scaffold to unlock direct router integrations for Hybra/Upheaval/HX once ABI and RPC access are confirmed.

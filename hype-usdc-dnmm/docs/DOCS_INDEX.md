@@ -36,6 +36,7 @@ Inventory Floors | `INVENTORY_FLOOR.md` | Floor types, partial fills, AOMQ inter
 Router Integration | `ROUTER_INTEGRATION.md` | MinOut, TTL/slippage, rebates.
 RFQ | `RFQ.md` | EIP-712 flow, preview determinism.
 Observability | `OBSERVABILITY.md` | Metric glossary, dashboards, alert rules.
+Observers | `ARCHITECTURE.md#observer--autopause-layer`, `docs/OPERATIONS.md` | Autopause watcher + handler overview, runbook tie-in.
 Metrics Glossary | `METRICS_GLOSSARY.md` | Contract/bot metric details, KPIs.
 Operations | `OPERATIONS.md` | Deployment checklist, feature toggles, runbooks.
 Governance | `GOVERNANCE_AND_TIMELOCK.md` | Timelock process, guard rails.

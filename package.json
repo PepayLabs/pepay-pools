@@ -14,5 +14,10 @@
     "csv-writer": "^1.6.0",
     "dayjs": "^1.11.18",
     "ethers": "^6.15.0"
+  },
+  "devDependencies": {
+    "cspell": "^8.14.2",
+    "markdown-link-check": "^3.11.2",
+    "markdownlint-cli": "^0.41.0"
   }
 }

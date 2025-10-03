@@ -13,6 +13,7 @@ last_updated: "2025-10-03"
 - [Swap Execution Workflow](#swap-execution-workflow)
 - [Preview Snapshot & Determinism](#preview-snapshot--determinism)
 - [Recenter & Inventory Governance](#recenter--inventory-governance)
+- [Observer & Autopause Layer](#observer--autopause-layer)
 - [Data Flow Diagram](#data-flow-diagram)
 - [Code & Test Index](#code--test-index)
 
@@ -46,6 +47,12 @@ The HYPE/USDC DNMM stack combines HyperCore order-book data with fallback oracle
 - **Automatic recenter:** `_checkAndRebalanceAuto` triggers when hysteresis conditions pass (`contracts/DnmPool.sol:1549`), respecting `recenterCooldownSec` and healthy frame counters.
 - **Governance controls:** Timelock-enforced parameter queues surface in `GovernanceQueue` utilities (`contracts/DnmPool.sol:567`, `contracts/lib/Errors.sol:24`).
 
+## Observer & Autopause Layer
+- **Oracle watcher:** `OracleWatcher` evaluates divergence, staleness, and error spikes from adapters; emits intents when thresholds breach (`contracts/observer/OracleWatcher.sol:200`).
+- **Pause handler:** `DnmPauseHandler` consumes watcher intents, calls `pause()`/`unpause()` on the pool, and logs mitigations for SRE runbooks (`contracts/observer/DnmPauseHandler.sol:22`).
+- **Shadow telemetry:** `shadow-bot` mirrors preview output, exports `dnmm_*` Prometheus series, and surfaces clamp/flag states for dashboards (`shadow-bot/metrics.ts:234-340`).
+- **Testing:** `test/integration/OracleWatcher_PauseHandler.t.sol:19` validates watcher ↔ handler glue; `Scenario_CanaryShadow.t.sol:22` exercises alert-driven recentering in tandem with the bot.
+
 ## Data Flow Diagram
 ```mermaid
 flowchart LR
@@ -64,3 +71,4 @@ flowchart LR
 - Fee policy library: `contracts/lib/FeePolicy.sol:1-210`
 - Preview + AOMQ scenarios: `test/integration/Scenario_Preview_AOMQ.t.sol:16`, `test/integration/Scenario_AOMQ.t.sol:21`
 - Recenter coverage: `test/unit/DnmPool_Rebalance.t.sol:20`, `test/integration/Scenario_RecenterThreshold.t.sol:18`
+- Observer layer: `contracts/observer/OracleWatcher.sol:1-260`, `contracts/observer/DnmPauseHandler.sol:1-120`, `test/integration/OracleWatcher_PauseHandler.t.sol:19`

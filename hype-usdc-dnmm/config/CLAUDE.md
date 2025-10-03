@@ -34,6 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-03: Documented full JSON schema/zero-default posture in `docs/CONFIG.md` and linked governance safety checks to timelock queueing.
 - 2025-10-01: Normalised `maker.ttlMs` to 300 (matching contract defaults) and reiterated zero-default flags for AOMQ/Rebates/Governance scaffolding.
 - 2025-10-01: Renamed the JSON toggle block to `featureFlags`, added inventory tilt/BBO floor/AOMQ defaults, rebates allowlist, and governance timelock scaffolding to `parameters_default.json`, and synced documentation.
 - 2025-10-01: Introduced explicit `features` block plus soft-divergence parameters (`divergenceAccept/Soft/Hard`, `haircutMin/slope`) and size-fee coefficients (`gammaSizeLin`, `gammaSizeQuad`, `sizeFeeCap`) in JSON configs for F03–F12 roll-out; documentation synced with DNMM L3 spec gating.

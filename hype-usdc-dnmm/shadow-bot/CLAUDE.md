@@ -35,4 +35,5 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-03: Added mock (scenario engine) and fork (DeployMocks.s.sol) execution modes, `{mode}`-aware metrics/CSV outputs, refreshed Vitest coverage, and documentation for multi-mode operations.
 - 2025-10-02: Re-architected bot into modular TypeScript stack (config/provider/oracle/poolClient/probes/metrics/CSV), added Prometheus histograms and rolling uptime, synthetic probe parity, and Vitest coverage.

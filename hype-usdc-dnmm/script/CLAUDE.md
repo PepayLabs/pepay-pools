@@ -34,6 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-03: Added `DeployMocks.s.sol` for fork-mode bring-up (mock tokens/oracles/pool, JSON output for shadow-bot) and documented OUTPUT_JSON flow.
 - 2025-10-02: Set preview defaults in `Deploy.s.sol` to zero-max-age / non-reverting snapshots so rollouts can opt into staleness guards explicitly.
 - 2025-10-01: Extended deployment fee config to include size-fee defaults (gamma lin/quad, cap) alongside zero-default feature flags.
 - 2025-10-01: Updated `Deploy.s.sol` to pass zero-default feature flags (all `false`) per DNMM L3 gating requirements.

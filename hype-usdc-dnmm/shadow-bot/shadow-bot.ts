@@ -2,19 +2,29 @@ import 'dotenv/config';
 import { Contract } from 'ethers';
 import { loadConfig } from './config.js';
 import { IDNM_POOL_ABI } from './abis.js';
-import { createProviderManager, ProviderManager } from './providers.js';
-import { PoolClient } from './poolClient.js';
-import { OracleReader } from './oracleReader.js';
+import { createLiveChainClient, LiveChainClient } from './providers.js';
+import { createNullChainClient } from './mock/mockChainClient.js';
+import { LivePoolClient } from './poolClient.js';
+import { MockPoolClient } from './mock/mockPool.js';
+import { LiveOracleReader } from './oracleReader.js';
+import { MockOracleReader } from './mock/mockOracle.js';
+import { createScenarioEngine } from './mock/scenarios.js';
+import { createMockClock, MockClock } from './mock/mockClock.js';
 import { createMetricsManager, MetricsManager } from './metrics.js';
 import { buildCsvRows, createCsvWriter } from './csvWriter.js';
 import { runSyntheticProbes } from './probes.js';
 import {
+  ChainBackedConfig,
+  ChainClient,
   LoopArtifacts,
+  OracleReaderAdapter,
+  PoolClientAdapter,
   ProbeQuote,
   RegimeFlag,
   RegimeFlags,
   REGIME_BIT_VALUES,
-  ShadowBotConfig
+  ShadowBotConfig,
+  isChainBackedConfig
 } from './types.js';
 
 interface Logger {
@@ -29,6 +39,27 @@ const LEVEL_WEIGHT: Record<'debug' | 'info' | 'error', number> = {
   info: 20,
   error: 30
 };
+
+interface Clock {
+  now(): number;
+  nowSeconds(): number;
+  sleep(ms: number): Promise<void>;
+}
+
+class SystemClock implements Clock {
+  now(): number {
+    return Date.now();
+  }
+
+  nowSeconds(): number {
+    return Math.floor(Date.now() / 1000);
+  }
+
+  async sleep(ms: number): Promise<void> {
+    if (ms <= 0) return;
+    await new Promise<void>((resolve) => setTimeout(resolve, ms));
+  }
+}
 
 function createLogger(level: 'info' | 'debug'): Logger {
   function shouldLog(target: 'debug' | 'info' | 'error'): boolean {
@@ -84,10 +115,6 @@ function mergeQuoteResult(probe: ProbeQuote): 'ok' | 'fallback' | 'error' {
   return 'ok';
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function detectTwoSided(probes: ProbeQuote[]): boolean {
   const baseIn = probes.some((probe) => probe.side === 'base_in' && probe.success);
   const quoteIn = probes.some((probe) => probe.side === 'quote_in' && probe.success);
@@ -95,17 +122,18 @@ function detectTwoSided(probes: ProbeQuote[]): boolean {
 }
 
 async function setupEventSubscriptions(
-  config: ShadowBotConfig,
-  providers: ProviderManager,
+  config: ChainBackedConfig,
+  chainClient: LiveChainClient,
   metrics: MetricsManager,
   logger: Logger
 ): Promise<(() => Promise<void>) | undefined> {
-  if (!providers.ws) {
+  const ws = chainClient.getWebSocketProvider();
+  if (!ws) {
     logger.info('ws.provider.unavailable', { note: 'Event subscriptions disabled' });
     return undefined;
   }
 
-  const wsContract = new Contract(config.poolAddress, IDNM_POOL_ABI, providers.ws);
+  const wsContract = new Contract(config.poolAddress, IDNM_POOL_ABI, ws);
 
   const recenterHandler = (_oldTarget: bigint, newTarget: bigint, mid: bigint) => {
     metrics.incrementRecenterCommit();
@@ -138,9 +166,10 @@ async function setupEventSubscriptions(
 
 async function runLoop(
   config: ShadowBotConfig,
-  poolClient: PoolClient,
+  clock: Clock,
+  poolClient: PoolClientAdapter,
   metrics: MetricsManager,
-  oracleReader: OracleReader,
+  oracleReader: OracleReaderAdapter,
   logger: Logger,
   csvWriter: ReturnType<typeof createCsvWriter>
 ): Promise<void> {
@@ -187,7 +216,7 @@ async function runLoop(
     }
   });
 
-  const timestampMs = Date.now();
+  const timestampMs = clock.now();
   metrics.recordTwoSided(timestampMs, detectTwoSided(probes));
 
   const csvRows = buildCsvRows(probes, timestampMs, {
@@ -216,26 +245,58 @@ async function main(): Promise<void> {
   const config = await loadConfig();
   const logger = createLogger(config.logLevel);
   const metrics = createMetricsManager(config);
-  const providers = createProviderManager(config, (sample) => metrics.recordProviderSample(sample));
-  const poolClient = new PoolClient(config, providers);
-  const oracleReader = new OracleReader(config, providers);
-  const csvWriter = createCsvWriter(config);
+  let clock: Clock;
+  let chainClient: ChainClient;
+  let poolClient: PoolClientAdapter;
+  let oracleReader: OracleReaderAdapter;
+  let scenarioMeta: { name: string; source: string } | undefined;
+
+  if (isChainBackedConfig(config)) {
+    clock = new SystemClock();
+    const liveClient = createLiveChainClient(config, (sample) => metrics.recordProviderSample(sample));
+    chainClient = liveClient;
+    poolClient = new LivePoolClient(config, liveClient);
+    oracleReader = new LiveOracleReader(config, liveClient);
+  } else {
+    const mockClock = createMockClock();
+    clock = mockClock;
+    chainClient = createNullChainClient(mockClock);
+    const { engine, definition, source } = await createScenarioEngine(
+      config.scenarioName,
+      mockClock.now(),
+      config.scenarioFile
+    );
+    scenarioMeta = { name: definition.name, source };
+    oracleReader = new MockOracleReader(engine, mockClock);
+    poolClient = new MockPoolClient(engine, mockClock, config.baseDecimals, config.quoteDecimals, config.guaranteedMinOut);
+  }
+
+  const csvWriter = createCsvWriter(config, logger);
 
   await metrics.startServer();
 
   const tokens = await poolClient.getTokens();
   const poolConfig = await poolClient.getConfig();
 
-  logger.info('shadowbot.init', {
-    rpcUrl: config.rpcUrl,
-    pool: config.poolAddress,
+  const initMeta: Record<string, unknown> = {
     labels: config.labels,
     sizes: config.sizeGrid.map((size) => size.toString()),
+    mode: config.mode,
     tokens,
     featureFlags: poolConfig.featureFlags
-  });
+  };
+  if (isChainBackedConfig(config)) {
+    initMeta.rpcUrl = config.rpcUrl;
+    initMeta.pool = config.poolAddress;
+  }
+  if (scenarioMeta) {
+    initMeta.scenario = scenarioMeta;
+  }
+  logger.info('shadowbot.init', initMeta);
 
-  const unsubscribe = await setupEventSubscriptions(config, providers, metrics, logger);
+  const unsubscribe = isChainBackedConfig(config)
+    ? await setupEventSubscriptions(config, chainClient as LiveChainClient, metrics, logger)
+    : undefined;
 
   let running = true;
   const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
@@ -249,7 +310,7 @@ async function main(): Promise<void> {
   while (running) {
     const loopStarted = Date.now();
     try {
-      await runLoop(config, poolClient, metrics, oracleReader, logger, csvWriter);
+      await runLoop(config, clock, poolClient, metrics, oracleReader, logger, csvWriter);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       logger.error('loop.error', { detail });
@@ -258,7 +319,7 @@ async function main(): Promise<void> {
     const waitMs = Math.max(config.intervalMs - elapsed, 0);
     if (!running) break;
     if (waitMs > 0) {
-      await sleep(waitMs);
+      await clock.sleep(waitMs);
     }
   }
 
@@ -266,7 +327,7 @@ async function main(): Promise<void> {
     await unsubscribe();
   }
   await metrics.stopServer();
-  await providers.close();
+  await chainClient.close();
   logger.info('shadowbot.stopped');
 }
 

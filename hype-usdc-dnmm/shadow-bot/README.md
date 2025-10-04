@@ -40,6 +40,83 @@ forge script script/DeployMocks.s.sol --rpc-url http://127.0.0.1:8545 --broadcas
 
 The script prints JSON with pool/token/oracle addresses and writes `metrics/hype-metrics/output/deploy-mocks.json`. `loadConfig()` consumes that file when `MODE=fork`.
 
+## Multi-setting Benchmark Runner
+
+The benchmark harness replays deterministic order-flow patterns against DNMM and baseline AMMs (CPMM, StableSwap) without mutating chain state. It reuses the live HyperCore/Pyth samplers, quote path, and CSV/Prom stack to keep parity with production telemetry.
+
+```bash
+npm run build
+
+# Execute five settings concurrently using the bundled specification
+node dist/multi-run.js \
+  --settings settings/hype_settings.json \
+  --run-id $(date -u +%Y%m%dT%H%M%SZ) \
+  --max-parallel 6 \
+  --benchmarks dnmm,cpmm,stableswap
+
+# Override duration and Prometheus port
+MODE=fork RPC_URL=http://127.0.0.1:8545 \
+  node dist/multi-run.js --settings path/to/custom.json --duration-sec 900 --prom-port 9465
+```
+
+Outputs are written under `metrics/hype-metrics/run_<RUN_ID>/`:
+
+| Artifact | Path | Description |
+| --- | --- | --- |
+| `trades/<SETTING>_<BENCHMARK>.csv` | Per-intent execution outcomes (pricing, fees, inventory deltas). |
+| `quotes/<SETTING>_<BENCHMARK>.csv` | Quote ladder snapshots for `base_in`/`quote_in` probes. |
+| `scoreboard.csv` | Aggregate KPIs per setting & benchmark (PnL, uptime, win-rate, clamps). |
+
+Prometheus metrics for multi-run sessions are exposed on `http://0.0.0.0:${PROM_PORT}/metrics` with label set `{run_id, setting_id, benchmark, pair}` and metric names prefixed `shadow.*` (see [Observability](../docs/OBSERVABILITY.md)).
+
+The multi-run loader reads the same environment variables as the single-run bot (e.g. `MODE`, `RPC_URL`) and augments them with runner-specific options:
+
+| Flag / Env | Default | Description |
+| --- | --- | --- |
+| `--settings`, `SETTINGS_FILE` | `settings/hype_settings.json` | Multi-run specification (see [Settings Schema](#settings-schema)). |
+| `--run-id`, `RUN_ID` | ISO8601 timestamp | Used for output folder & Prom labels. |
+| `--max-parallel`, `MAX_PARALLEL` | `6` | Concurrent settings processed. |
+| `--benchmarks`, `BENCHMARKS` | `dnmm` | Comma list of enabled benchmarks. |
+| `--seed-base`, `SEED_BASE` | `1337` | Base seed for deterministic RNG seeding. |
+| `--duration-sec`, `DURATION_SEC` | per-setting | Optional cap on run length. |
+| `--prom-port`, `PROM_PORT` | Single-run `PROM_PORT` | HTTP port for multi-run Prometheus exporter. |
+| `--persist-csv`, `PERSIST_CSV` | `true` | Disable to skip CSV emission (metrics only). |
+
+### Settings Schema
+
+```
+{
+  "version": "1",
+  "pair": "HYPE/USDC",
+  "runs": [
+    {
+      "id": "A",
+      "label": "baseline_calm",
+      "featureFlags": { "enableSoftDivergence": true, ... },
+      "makerParams": { "betaFloorBps": 15, "alphaBboBps": 2500, "S0Notional": 10000 },
+      "inventoryParams": { "invTiltBpsPer1pct": 100, ... },
+      "aomqParams": { "minQuoteNotional": 200, ... },
+      "flow": {
+        "pattern": "benign_poisson",
+        "seconds": 600,
+        "seed": 42,
+        "txn_rate_per_min": 20,
+        "size_dist": "lognormal",
+        "size_params": { "mu": 0, "sigma": 0.9, "min": 50, "max": 2500 }
+      },
+      "latency": { "quote_to_tx_ms": 250, "jitter_ms": 50 },
+      "router": { "slippage_bps": 30, "ttl_sec": 20, "minOut_policy": "preview" }
+    }
+  ],
+  "benchmarks": ["dnmm", "cpmm", "stableswap"]
+}
+```
+
+Benchmarks share the DNMM `PoolClientAdapter` interface and consume HyperCore/Pyth snapshots every tick. 
+- `dnmm` – wraps the live/fork pool (read-only). 
+- `cpmm` – constant-product emulator with identical decimals & fee schedule. 
+- `stableswap` – amplification-based comparator mirroring Curve-style invariant.
+
 ## Configuration
 
 ### Common variables
@@ -172,4 +249,3 @@ Run `npm run test`; all suites use mocks and require no chain connectivity.
 - Surface size ladder previews in mock mode for large rung coverage.
 - Extend scenario engine with scripted AOMQ off ramp and EMA fallback sequencing.
 - Add CLI to snapshot/export historical probe distributions for offline analysis.
-

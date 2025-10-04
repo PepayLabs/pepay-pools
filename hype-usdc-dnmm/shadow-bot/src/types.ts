@@ -574,6 +574,8 @@ export type RuntimeChainConfig = ChainRuntimeConfig | MockRuntimeConfig;
 export interface MultiRunRuntimeConfig {
   readonly runId: string;
   readonly baseConfig: ShadowBotConfig;
+  readonly chainConfig?: ChainBackedConfig;
+  readonly mockConfig?: MockShadowBotConfig;
   readonly logLevel: 'info' | 'debug';
   readonly benchmarks: readonly BenchmarkId[];
   readonly maxParallel: number;

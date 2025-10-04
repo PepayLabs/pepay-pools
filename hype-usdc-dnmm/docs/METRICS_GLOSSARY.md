@@ -38,6 +38,24 @@ Name | Type | Labels | Unit | Description | Source
 `dnmm_bbo_spread_bps` | Histogram | `pair,chain,mode` | bps | HyperCore spread. | `shadow-bot/metrics.ts:289`
 `dnmm_fee_bps` | Histogram | `pair,chain,mode,side,rung,regime` | bps | Fee pipeline output. | `shadow-bot/metrics.ts:294`
 `dnmm_total_bps` | Histogram | `pair,chain,mode,side,rung,regime` | bps | Fee minus rebates. | `shadow-bot/metrics.ts:300`
+
+### Multi-run Benchmark Metrics (`shadow.*`)
+Name | Type | Labels | Unit | Description | Source
+--- | --- | --- | --- | --- | ---
+`shadow_mid` | Gauge | `run_id,setting_id,benchmark,pair` | WAD | HyperCore mid used for the latest benchmark tick. | `shadow-bot/src/metrics/multi.ts`
+`shadow_spread_bps` | Gauge | `run_id,setting_id,benchmark,pair` | bps | HyperCore BBO spread passed to adapters. | `shadow-bot/src/metrics/multi.ts`
+`shadow_conf_bps` | Gauge | `run_id,setting_id,benchmark,pair` | bps | Pyth confidence for the tick. | `shadow-bot/src/metrics/multi.ts`
+`shadow_uptime_two_sided_pct` | Gauge | `run_id,setting_id,benchmark,pair` | percent | Rolling two-sided uptime (5 min window). | `shadow-bot/src/metrics/multi.ts`
+`shadow_pnl_quote_cum` | Gauge | `run_id,setting_id,benchmark,pair` | quote units | Cumulative benchmark PnL. | `shadow-bot/src/metrics/multi.ts`
+`shadow_pnl_quote_rate` | Gauge | `run_id,setting_id,benchmark,pair` | quote units/min | PnL rate computed from cumulative PnL. | `shadow-bot/src/metrics/multi.ts`
+`shadow_quotes_total` | Counter | `run_id,setting_id,benchmark,pair,side` | count | Quote samples per side. | `shadow-bot/src/metrics/multi.ts`
+`shadow_trades_total` | Counter | `run_id,setting_id,benchmark,pair` | count | Successful trade executions. | `shadow-bot/src/metrics/multi.ts`
+`shadow_rejects_total` | Counter | `run_id,setting_id,benchmark,pair` | count | Trade intents that failed min-out or liquidity checks. | `shadow-bot/src/metrics/multi.ts`
+`shadow_aomq_clamps_total` | Counter | `run_id,setting_id,benchmark,pair` | count | Trades where AOMQ contributed clamp logic. | `shadow-bot/src/metrics/multi.ts`
+`shadow_recenter_commits_total` | Counter | `run_id,setting_id,benchmark,pair` | count | Recenter events observed in the benchmark loop. | `shadow-bot/src/metrics/multi.ts`
+`shadow_trade_size_base_wad` | Histogram | `run_id,setting_id,benchmark,pair` | WAD | Trade size distribution. | `shadow-bot/src/metrics/multi.ts`
+`shadow_trade_slippage_bps` | Histogram | `run_id,setting_id,benchmark,pair` | bps | Slippage vs HyperCore mid. | `shadow-bot/src/metrics/multi.ts`
+`shadow_quote_latency_ms` | Histogram | `run_id,setting_id,benchmark,pair,side` | milliseconds | Synthetic quote latency per side. | `shadow-bot/src/metrics/multi.ts`
 `dnmm_provider_calls_total` | Counter | `pair,chain,mode,method,result` | count | Oracle RPC successes/failures. | `shadow-bot/metrics.ts:308`
 `dnmm_precompile_errors_total` | Counter | `pair,chain,mode` | count | HyperCore read failures. | `shadow-bot/metrics.ts:318`
 `dnmm_preview_stale_reverts_total` | Counter | `pair,chain,mode` | count | Preview requests that reverted on staleness. | `shadow-bot/metrics.ts:322`

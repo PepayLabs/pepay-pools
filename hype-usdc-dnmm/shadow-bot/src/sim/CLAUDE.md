@@ -1,6 +1,6 @@
 # Shadow Bot Simulation Implementation Guide
 
-**Path**: `hype-usdc-dnmm/shadow-bot/sim`
+**Path**: `hype-usdc-dnmm/shadow-bot/src/sim`
 
 **Description**: Lightweight adapters for fork/mock compatibility when on-chain contracts are unavailable, mirroring DNMM oracle and pool logic.
 

@@ -44,14 +44,6 @@ export class CpmmBenchmarkAdapter implements BenchmarkAdapter {
     // deterministic emulator – no external resources
   }
 
-  async init(): Promise<void> {
-    // no-op for deterministic emulator
-  }
-
-  async close(): Promise<void> {
-    // no-op
-  }
-
   async prepareTick(context: BenchmarkTickContext): Promise<void> {
     this.lastOracle = context.oracle;
     const mid = context.oracle.hc.midWad;

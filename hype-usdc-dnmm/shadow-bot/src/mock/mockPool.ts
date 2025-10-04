@@ -128,6 +128,7 @@ export class MockPoolClient implements PoolClientAdapter {
   private readonly tokens: PoolTokens;
   private readonly config: PoolConfig;
   private lastParams: ScenarioParams;
+  private featureFlags: FeatureFlagsState;
 
   constructor(
     private readonly engine: ScenarioEngine,
@@ -146,19 +147,20 @@ export class MockPoolClient implements PoolClientAdapter {
       baseScale,
       quoteScale
     };
+    this.featureFlags = buildFeatureFlags(this.engine.getParams(this.clock.now()));
     this.config = {
       oracle: defaultOracleConfig(),
       inventory: defaultInventoryConfig(baseScale),
       fee: defaultFeeConfig(),
       maker: defaultMakerConfig(quoteScale),
-      featureFlags: buildFeatureFlags(this.engine.getParams(this.clock.now()))
+      featureFlags: this.featureFlags
     };
     this.lastParams = this.engine.getParams(this.clock.now());
   }
 
   private refreshParams(): ScenarioParams {
     this.lastParams = this.engine.getParams(this.clock.now());
-    this.config.featureFlags = buildFeatureFlags(this.lastParams);
+    this.featureFlags = buildFeatureFlags(this.lastParams);
     return this.lastParams;
   }
 
@@ -168,7 +170,10 @@ export class MockPoolClient implements PoolClientAdapter {
 
   async getConfig(): Promise<PoolConfig> {
     this.refreshParams();
-    return this.config;
+    return {
+      ...this.config,
+      featureFlags: this.featureFlags
+    };
   }
 
   async getState(): Promise<PoolState> {

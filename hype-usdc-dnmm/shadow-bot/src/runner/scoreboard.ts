@@ -25,7 +25,7 @@ export class ScoreboardAggregator {
 
   constructor(settings: readonly RunSettingDefinition[], benchmarks: readonly BenchmarkId[]) {
     for (const setting of settings) {
-      this.makerNotional.set(setting.id, setting.makerParams.s0Notional);
+      this.makerNotional.set(setting.id, setting.makerParams.S0Notional);
       for (const benchmark of benchmarks) {
         this.map.set(key(setting.id, benchmark), createAccumulator());
       }
@@ -103,11 +103,11 @@ export class ScoreboardAggregator {
   }
 
   private get(settingId: string, benchmark: BenchmarkId): Accumulator {
-    const bucket = this.map.get(key(settingId, benchmark));
+    const bucketKey = key(settingId, benchmark);
+    let bucket = this.map.get(bucketKey);
     if (!bucket) {
-      const created = createAccumulator();
-      this.map.set(key(settingId, benchmark), created);
-      return created;
+      bucket = createAccumulator();
+      this.map.set(bucketKey, bucket);
     }
     return bucket;
   }

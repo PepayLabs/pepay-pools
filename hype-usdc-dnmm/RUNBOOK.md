@@ -43,6 +43,25 @@
 - Deploy `OracleWatcher` alongside the pool, configure thresholds, and run `scripts/watch_oracles.ts` to stream `OracleAlert` / `AutoPauseRequested`. Route `critical=true` alerts to on-call and wire the optional pause handler contract if using auto-pause. Track `lastRebalancePrice`, `lastRebalanceAt`, and cooldown adherence (time since last rebalance vs `recenterCooldownSec`) in dashboards/alerts.
 - Publish Grafana annotations for DNMM params changes (`ParamsUpdated`) and auto-pause events; annotate any manual overrides (fee cap, floor, target) for future incident reviews.
 
+### 6b. Multi-setting Benchmark Workflow
+1. `npm run build` to compile the CLI entry points (`dist/shadow-bot.js`, `dist/multi-run.js`).
+2. Duplicate `settings/hype_settings.json` and adjust `runs[]` (feature flags, maker/inventory knobs, flow patterns, latency/router policies).
+3. Execute the runner:
+   ```bash
+   MODE=fork RPC_URL=http://127.0.0.1:8545 \
+     node dist/multi-run.js \
+       --settings experiments/fork_regime.json \
+       --run-id 2025-10-04-lb-test \
+       --max-parallel 6 \
+       --benchmarks dnmm,cpmm,stableswap
+   ```
+4. Review outputs under `metrics/hype-metrics/run_<RUN_ID>/`:
+   - `quotes/*.csv` for ladder symmetry, effective spreads, and fallback usage.
+   - `trades/*.csv` for PnL, clamp flags, inventory drift, and slippage.
+   - `scoreboard.csv` for aggregate KPIs (PnL per notional, uptime, reject rate).
+5. Overlay the `shadow_*` Prometheus series in Grafana (`run_id`, `setting_id`, `benchmark` labels) to compare candidate configurations side-by-side.
+6. Nominate the best-performing settings (highest PnL per notional with ≥99% uptime and acceptable clamp counts) for promotion in the next release PR; archive the run folder as part of the experiment record.
+
 ### Shadow Bot Alert Playbook
 
 | Alert Condition | First Response | Follow-up |

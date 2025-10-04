@@ -1,6 +1,6 @@
 # Shadow Bot Flows Implementation Guide
 
-**Path**: `hype-usdc-dnmm/shadow-bot/flows`
+**Path**: `hype-usdc-dnmm/shadow-bot/src/flows`
 
 **Description**: Deterministic trade-flow generators for multi-pattern simulations (arb, toxic, trend, mean-revert, benign, mixed).
 

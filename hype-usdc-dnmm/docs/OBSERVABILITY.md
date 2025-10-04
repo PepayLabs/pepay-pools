@@ -36,6 +36,27 @@ Metric | Type | Labels | Unit | Description | Source
 `dnmm_quotes_total` | Counter | `pair, chain, mode, result` | count | Quote attempts classified as `ok`, `error`, `fallback`. | `shadow-bot/metrics.ts:334`
 `dnmm_two_sided_uptime_pct` | Gauge | `pair, chain, mode` | percent | Rolling two-sided liquidity uptime over 15 minutes. | `shadow-bot/metrics.ts:340`
 
+### Multi-run (Benchmark) Metrics
+
+When the multi-setting runner is active (`node dist/multi-run.js`), the Prometheus exporter exposes an additional family of `shadow.*` series labelled by `{run_id, setting_id, benchmark, pair}`.
+
+Metric | Type | Labels | Unit | Description | Source
+--- | --- | --- | --- | --- | ---
+`shadow_mid` | Gauge | `run_id, setting_id, benchmark, pair` | WAD | Latest HyperCore mid observed for the benchmark during the tick. | `shadow-bot/src/metrics/multi.ts`
+`shadow_spread_bps` | Gauge | `run_id, setting_id, benchmark, pair` | bps | HyperCore BBO spread forwarded to adapters. | `shadow-bot/src/metrics/multi.ts`
+`shadow_conf_bps` | Gauge | `run_id, setting_id, benchmark, pair` | bps | Pyth confidence captured per tick. | `shadow-bot/src/metrics/multi.ts`
+`shadow_uptime_two_sided_pct` | Gauge | `run_id, setting_id, benchmark, pair` | percent | Rolling 5-minute two-sided uptime for simulated quotes. | `shadow-bot/src/metrics/multi.ts`
+`shadow_pnl_quote_cum` | Gauge | `run_id, setting_id, benchmark, pair` | quote units | Cumulative PnL accrued by the benchmark. | `shadow-bot/src/metrics/multi.ts`
+`shadow_pnl_quote_rate` | Gauge | `run_id, setting_id, benchmark, pair` | quote units/min | PnL run-rate derived from cumulative PnL. | `shadow-bot/src/metrics/multi.ts`
+`shadow_quotes_total` | Counter | `run_id, setting_id, benchmark, pair, side` | count | Quote samples taken (`base_in` / `quote_in`). | `shadow-bot/src/metrics/multi.ts`
+`shadow_trades_total` | Counter | `run_id, setting_id, benchmark, pair` | count | Executed trades where `success=true`. | `shadow-bot/src/metrics/multi.ts`
+`shadow_rejects_total` | Counter | `run_id, setting_id, benchmark, pair` | count | Trade intents rejected (min-out, insufficient liquidity, etc.). | `shadow-bot/src/metrics/multi.ts`
+`shadow_aomq_clamps_total` | Counter | `run_id, setting_id, benchmark, pair` | count | Trades where AOMQ clamp engaged. | `shadow-bot/src/metrics/multi.ts`
+`shadow_recenter_commits_total` | Counter | `run_id, setting_id, benchmark, pair` | count | Placeholder counter for recenter triggers (driver increments when applicable). | `shadow-bot/src/metrics/multi.ts`
+`shadow_trade_size_base_wad` | Histogram | `run_id, setting_id, benchmark, pair` | WAD | Distribution of simulated trade sizes. | `shadow-bot/src/metrics/multi.ts`
+`shadow_trade_slippage_bps` | Histogram | `run_id, setting_id, benchmark, pair` | bps | Observed slippage versus oracle mid. | `shadow-bot/src/metrics/multi.ts`
+`shadow_quote_latency_ms` | Histogram | `run_id, setting_id, benchmark, pair, side` | milliseconds | Synthetic quote latency measurement per side. | `shadow-bot/src/metrics/multi.ts`
+
 ## Derived KPIs
 - `two_sided_uptime_pct` = rolling success rate of quotes returning non-zero liquidity; use `dnmm_two_sided_uptime_pct`.
 - `adverse_selection_bps` = `avg(dnmm_fee_bps)` − `avg(dnmm_total_bps)` when AOMQ inactive; negative swings warrant review of rebates.
@@ -67,4 +88,3 @@ Event | Metrics to Watch | Notes
 `QuoteFilled` (`contracts/quotes/QuoteRFQ.sol:55`) | `dnmm_quotes_total{result="ok"}` | Compare taker fill rate vs pool parity via shadow bot.
 `AggregatorDiscountUpdated` (`contracts/DnmPool.sol:283`) | `dnmm_fee_bps`, `dnmm_total_bps` | Validate discount effect on observed fees.
 `PreviewSnapshotStale` (revert) | `dnmm_preview_stale_reverts_total` | Align with preview config changes.
-

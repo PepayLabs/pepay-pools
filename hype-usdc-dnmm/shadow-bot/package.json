@@ -16,11 +16,21 @@
     "clean": "rimraf dist && rimraf metrics/hype-metrics && rimraf reports"
   },
   "dependencies": {
+    "cross-spawn": "^7.0.3",
     "csv-parse": "^5.5.0",
     "dotenv": "^16.4.5",
     "ethers": "^6.15.0",
+    "execa": "^5.1.1",
+    "isexe": "^1.1.2",
+    "merge-stream": "^1.0.1",
     "node-fetch": "^3.3.2",
-    "prom-client": "^15.1.1"
+    "path-key": "^2.0.1",
+    "picocolors": "^1.0.0",
+    "prom-client": "^15.1.1",
+    "shebang-command": "^1.2.0",
+    "signal-exit": "^3.0.7",
+    "tinypool": "^0.2.4",
+    "which": "^1.3.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -28,7 +38,7 @@
     "rimraf": "^5.0.7",
     "ts-node": "^10.9.2",
     "typescript": "5.6.3",
-    "vitest": "^1.2.2"
+    "vitest": "1.2.2"
   },
   "engines": {
     "node": ">=18.0.0"

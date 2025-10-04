@@ -2,7 +2,7 @@
 
 **Path**: `hype-usdc-dnmm/shadow-bot`
 
-**Description**: TypeScript multi-setting benchmark harness for HYPE/USDC DNMM, producing concurrent simulations, CSV traces, and Prometheus metrics across DNMM/CPMM/StableSwap comparators.
+**Description**: TypeScript monitoring and simulation suite for the HYPE/USDC DNMM, combining the legacy single-run shadow bot with the new multi-setting benchmark harness (DNMM/CPMM/StableSwap comparators, CSV exports, and Prometheus telemetry).
 
 ## Purpose
 - Capture the intent of this module/folder and its relationship to the broader HYPE/HyperEVM initiative.

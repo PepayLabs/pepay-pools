@@ -18,7 +18,9 @@
   "dependencies": {
     "cross-spawn": "^7.0.3",
     "csv-parse": "^5.5.0",
+    "debug": "^4.3.5",
     "dotenv": "^16.4.5",
+    "esbuild": "^0.21.3",
     "ethers": "^6.15.0",
     "execa": "^5.1.1",
     "isexe": "^1.1.2",
@@ -26,6 +28,7 @@
     "node-fetch": "^3.3.2",
     "path-key": "^2.0.1",
     "picocolors": "^1.0.0",
+    "pretty-format": "^27.5.1",
     "prom-client": "^15.1.1",
     "shebang-command": "^1.2.0",
     "signal-exit": "^3.0.7",

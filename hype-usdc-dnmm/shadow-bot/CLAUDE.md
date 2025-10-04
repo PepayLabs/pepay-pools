@@ -34,4 +34,4 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2025-10-04: Multi-run pipeline now persists checkpoints, emits scoreboard JSON/Markdown reports, surfaces derived KPIs + DNMM import metrics, and wires risk scenario-aware oracle simulations (spread/sigma/pyth degradations) into mock runs.
+- 2025-10-04: Multi-run pipeline now persists checkpoints, emits scoreboard JSON/Markdown reports, surfaces derived KPIs + DNMM import metrics, wires risk scenario-aware oracle simulations (spread/sigma/pyth degradations), scales TTL via scenario targets, and enforces strict Pyth freshness with dedicated telemetry + docs.

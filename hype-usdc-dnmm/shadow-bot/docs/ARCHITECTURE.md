@@ -47,7 +47,9 @@ shadow-bot/
 | `src/runner/multiSettings.ts` | Orchestrates concurrent runs (using `FlowEngine`), drives benchmark adapters, writes per-setting CSVs, records metrics, and aggregates scoreboard rows. |
 | `src/runner/scoreboard.ts` | Aggregates per-trade statistics into the scoreboard (PnL, win rate, uptime, reject rate, clamp counts, etc.). |
 | `src/csv/multiWriter.ts` | Handles `quotes/*.csv`, `trades/*.csv`, and `scoreboard.csv` emission for multi-run sessions. |
-| `src/metrics/multi.ts` | Prometheus exporter for multi-run metrics. Metrics are prefixed `shadow.*` and labelled `{run_id, setting_id, benchmark, pair}`. |
+| `src/metrics/multi.ts` | Prometheus exporter for multi-run metrics (`shadow_*` gauges/counters including sigma + strict Pyth rejects). |
+| `src/sim/simOracle.ts` | Scenario-aware HyperCore/Pyth oracle simulator (spread/sigma ranges, latency spikes, outages). |
+| `src/utils/random.ts` | Seeded RNG + hash helpers shared across flow/oracle simulations. |
 
 ---
 
@@ -118,27 +120,36 @@ A full metric glossary is maintained in `docs/METRICS_GLOSSARY.md` and now inclu
 
 ## 8. Testing & QA
 
-To avoid the sandbox issues encountered with Vitest, the repository now uses Node’s built-in test runner:
-
 ```bash
 npm run build
-node --test test
+npm run test
 ```
 
-Place new test files in `test/` (e.g. `test/multi-run-smoke.test.mjs`). Existing suites under `src/__tests__/` were left for reference and should be ported to the new harness as time allows. A typical smoke test should:
+`npm run test` invokes Vitest (`vitest run`) and covers CSV writers, metrics aggregation, mock pool/oracle flows, and the scenario-aware oracle simulator. Add new suites under `src/__tests__/*.spec.ts`.
+
+Smoke tests should:
 
 1. Run the multi-setting CLI in mock mode for a short duration (≤5 s).
-2. Assert that expected CSV files and scoreboard rows are produced.
-3. Optionally scrape the Prometheus endpoint to verify new metrics.
+2. Assert expected CSV artefacts (`quotes/`, `trades/`, `scoreboard.csv`).
+3. Scrape `shadow_*` metrics (especially `shadow_sigma_bps`, `shadow_pyth_strict_rejects_total`).
 
 ---
 
 ## 9. Extending the Stack
 
-1. **New flow pattern** → add generator to `src/flows/patterns.ts` and document the option in both the README and settings schema.
-2. **New benchmark** → implement `BenchmarkAdapter`, register it in `runner/multiSettings.ts`, and update the settings schema + docs.
-3. **Telemetry** → extend `src/metrics/multi.ts` or `src/metrics.ts`, add the documentation row in `docs/METRICS_GLOSSARY.md`, and provide Grafana examples under `docs/OBSERVABILITY.md`.
-4. **Configuration knobs** → update `src/config.ts` and `src/config-multi.ts`, add defaults to `.dnmmenv`, and document them in the README’s configuration section.
+1. **New flow pattern** → add a generator to `src/flows/patterns.ts` and document it in settings + docs.
+2. **New benchmark** → implement `BenchmarkAdapter`, register it in `runner/multiSettings.ts`, and update schema/docs.
+3. **Telemetry** → extend `src/metrics/multi.ts`, note the metric in `docs/METRICS_GLOSSARY.md`, and update `docs/DASHBOARDS.md` with Grafana guidance.
+4. **Configuration knobs** → update `src/config.ts` and `src/config-multi.ts`, add defaults to `.dnmmenv`, and document them in the README.
+
+---
+
+## 10. Risk Scenarios & Oracle Guardrails
+
+- Attach scenarios via `riskScenarioId` (see `docs/RISK_SCENARIOS.md`).
+- `src/sim/simOracle.ts` injects spread/sigma ranges, latency spikes, dropouts, and outage bursts.
+- `runMultiSettings` scales maker/router TTLs using `ttl_expiry_rate_target` and enforces the strict Pyth freshness SLA (`PythStaleStrict`).
+- Monitor via `shadow_sigma_bps`, `shadow_quote_latency_ms`, `shadow_pyth_strict_rejects_total`, and the analyst summary output.
 
 ---
 

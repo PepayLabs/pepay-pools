@@ -2,6 +2,7 @@ import {
   BenchmarkId,
   HighlightRule,
   ReportsConfig,
+  RiskScenarioDefinition,
   ScoreboardRow,
   ShadowBotLabels
 } from '../types.js';
@@ -13,6 +14,7 @@ interface ScoreboardArtifactInput {
   readonly rows: readonly ScoreboardRow[];
   readonly benchmarks: readonly BenchmarkId[];
   readonly reports?: ReportsConfig;
+  readonly scenarioMeta?: Record<string, RiskScenarioDefinition | undefined>;
 }
 
 interface ScoreboardJsonPayload {
@@ -55,6 +57,8 @@ interface SummaryContext {
   readonly baselineRouterWinRate?: number;
   readonly topPerBenchmark: Map<BenchmarkId, ScoreboardRow>;
   readonly aggregate: AggregateStats;
+  readonly scenarioMeta: Record<string, RiskScenarioDefinition | undefined>;
+  readonly scenarioInsights: ScenarioInsights;
 }
 
 interface AggregateStats {
@@ -65,6 +69,11 @@ interface AggregateStats {
   readonly avgLvrCapture: number;
   readonly maxTimeoutRate: number;
   readonly avgEffectiveFee: number;
+}
+
+interface ScenarioInsights {
+  readonly autopauseSettings: readonly string[];
+  readonly ttlTargets: readonly { settingId: string; target: number }[];
 }
 
 export function generateScoreboardArtifacts(input: ScoreboardArtifactInput): ScoreboardArtifacts {
@@ -87,12 +96,16 @@ export function generateScoreboardArtifacts(input: ScoreboardArtifactInput): Sco
   const highlights = buildHighlights(input, baselineRouterWinRate);
   const topPerBenchmark = computeTopPerBenchmark(input.rows);
   const aggregate = computeAggregateStats(input.rows);
+  const scenarioMeta = input.scenarioMeta ?? {};
+  const scenarioInsights = computeScenarioInsights(scenarioMeta);
   const summaryMarkdown = buildSummaryMarkdown({
     input,
     highlights,
     baselineRouterWinRate,
     topPerBenchmark,
-    aggregate
+    aggregate,
+    scenarioMeta,
+    scenarioInsights
   });
 
   return {
@@ -188,6 +201,17 @@ function buildExecutiveSummary(context: SummaryContext): string {
   } else {
     bullets.push('- No highlight rules triggered for this run.');
   }
+  if (context.scenarioInsights.autopauseSettings.length > 0) {
+    bullets.push(
+      `- Risk scenarios flagged autopause expectations on ${context.scenarioInsights.autopauseSettings.join(', ')}.`
+    );
+  }
+  if (context.scenarioInsights.ttlTargets.length > 0) {
+    const formatted = context.scenarioInsights.ttlTargets
+      .map(({ settingId, target }) => `${settingId}: ${(target * 100).toFixed(1)}% TTL expiry target`)
+      .join('; ');
+    bullets.push(`- TTL pressure scenarios applied → ${formatted}.`);
+  }
   return bullets.join('\n');
 }
 
@@ -220,10 +244,22 @@ function buildEdgeAttribution(context: SummaryContext): string {
 }
 
 function buildRiskSection(context: SummaryContext): string {
-  return [
+  const lines = [
     `- Median two-sided uptime: ${formatFixed(context.aggregate.avgUptime, 3)}% (mean).`,
     `- Average reject rate: ${formatFixed(context.aggregate.avgRejectRate, 3)}%; worst-case timeout rate ${formatFixed(context.aggregate.maxTimeoutRate, 3)}%.`
-  ].join('\n');
+  ];
+  if (context.scenarioInsights.autopauseSettings.length > 0) {
+    lines.push(
+      `- Autopause guardrails expected on ${context.scenarioInsights.autopauseSettings.join(', ')}; monitor inventory decay to confirm.`
+    );
+  }
+  if (context.scenarioInsights.ttlTargets.length > 0) {
+    const formatted = context.scenarioInsights.ttlTargets
+      .map(({ settingId, target }) => `${settingId} (${formatFixed(target * 100, 2)}% target)`)
+      .join(', ');
+    lines.push(`- TTL expiry targets enforced for ${formatted} — maker/router TTLs scaled by (1 - target).`);
+  }
+  return lines.join('\n');
 }
 
 function buildRecommendation(context: SummaryContext): string {
@@ -402,6 +438,27 @@ function computeAggregateStats(rows: readonly ScoreboardRow[]): AggregateStats {
     avgLvrCapture: sum.lvr / rows.length,
     maxTimeoutRate: sum.timeout,
     avgEffectiveFee: sum.effectiveFee / rows.length
+  };
+}
+
+function computeScenarioInsights(
+  meta: Record<string, RiskScenarioDefinition | undefined>
+): ScenarioInsights {
+  const autopauseSettings: string[] = [];
+  const ttlTargets: { settingId: string; target: number }[] = [];
+  for (const [settingId, scenario] of Object.entries(meta)) {
+    if (!scenario) continue;
+    if (scenario.autopauseExpected) {
+      autopauseSettings.push(settingId);
+    }
+    if (scenario.ttlExpiryRateTarget !== undefined && Number.isFinite(scenario.ttlExpiryRateTarget)) {
+      ttlTargets.push({ settingId, target: Number(scenario.ttlExpiryRateTarget) });
+    }
+  }
+  autopauseSettings.sort();
+  return {
+    autopauseSettings,
+    ttlTargets
   };
 }
 

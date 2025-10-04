@@ -16,6 +16,7 @@ This document captures how to interpret the CSV artefacts and Prometheus metrics
 - **`shadow_mid`** – HyperCore midpoint used for the most recent tick. Track divergence between settings (e.g., if a benchmark lags due to latency).
 - **`shadow_spread_bps`** – BBO spread from HyperCore. When this widens, expect higher `shadow_trade_slippage_bps`.
 - **`shadow_conf_bps`** – Pyth confidence. High confidence volatility often correlates with AOMQ clamps.
+- **`shadow_sigma_bps`** – Scenario-driven volatility estimate (bps). Track alongside `shadow_spread_bps` to validate risk injections.
 - **`shadow_uptime_two_sided_pct`** – Rolling 5-minute window showing the percentage of ticks where both sides of the book were available. Anything below ~99% warrants investigation.
 - **`shadow_pnl_quote_cum` / `shadow_pnl_quote_rate`** – Total PnL per benchmark and its per-minute rate. Operators compare these to decide which configuration graduates to canary.
 
@@ -24,6 +25,7 @@ This document captures how to interpret the CSV artefacts and Prometheus metrics
 - **`shadow_trades_total` / `shadow_rejects_total`** – Execution vs. rejection counts. A high reject fraction implies min-out or liquidity issues.
 - **`shadow_aomq_clamps_total`** – Frequency of AOMQ protection; high counts indicate guardrails tripping.
 - **`shadow_recenter_commits_total`** – Tracks recenter triggers (useful when inventory tilt or floor kicks in).
+- **`shadow_pyth_strict_rejects_total`** – Count of trades rejected because Pyth data violated the strict freshness SLA. Spikes imply oracle instability or overly aggressive TTLs.
 
 ### Histograms
 

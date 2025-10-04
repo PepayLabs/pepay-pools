@@ -20,7 +20,7 @@ interface MetricsContext {
   recordOracle(sample: { mid: bigint; spreadBps?: number; confBps?: number; sigmaBps?: number }): void;
   recordQuote(sample: BenchmarkQuoteSample): void;
   recordTrade(result: BenchmarkTradeResult): void;
-  recordReject(): void;
+  recordReject(reason?: string): void;
   recordTwoSided(timestampMs: number, twoSided: boolean): void;
 }
 
@@ -218,8 +218,11 @@ class MetricsContextImpl implements MetricsContext {
     }
   }
 
-  recordReject(): void {
+  recordReject(reason?: string): void {
     this.counters.rejects.inc(this.labels);
+    if (reason && reason.toLowerCase().includes('pythstalestrict')) {
+      this.counters.pythStrictRejects.inc(this.labels);
+    }
   }
 
   recordTwoSided(timestampMs: number, twoSided: boolean): void {
@@ -369,7 +372,13 @@ function createCounters(register: Registry) {
     labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
     registers: [register]
   });
-  return { quotes, trades, rejects, aomq, recenter } as const;
+  const pythStrictRejects = new Counter({
+    name: 'shadow_pyth_strict_rejects_total',
+    help: 'Rejects triggered by strict Pyth freshness enforcement',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  return { quotes, trades, rejects, aomq, recenter, pythStrictRejects } as const;
 }
 
 function createHistograms(register: Registry) {

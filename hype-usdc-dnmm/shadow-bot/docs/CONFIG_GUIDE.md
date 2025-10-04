@@ -114,6 +114,30 @@ The config loader matches entries by `poolAddress` (case-insensitive) or `chainI
 4. Snapshot `.dnmmenv` and settings JSON in the release artefacts so runs are reproducible.
 5. Use `node dist/multi-run.js --run-id <release>` to record performance metrics during canary.
 
+## 7. Risk Scenario Fields (Multi-Run)
+
+`riskScenarios[]` entries enrich `runs[]` by referencing `riskScenarioId`:
+
+| Field | Effect |
+| --- | --- |
+| `bbo_spread_bps` | Overrides simulated HyperCore spread range (min/max bps). |
+| `sigma_bps` | Controls simulated volatility; also surfaces on `shadow_sigma_bps`. |
+| `quote_latency_ms` | Injects router latency and re-computes maker/router TTL for the scenario. |
+| `duration_min` | Extends run duration if scenario analysis requires longer coverage. |
+| `ttl_expiry_rate_target` | Sets the target timeout rate (0–1). The runner scales maker/router TTLs by `(1 - target)` to apply pressure. |
+| `pyth_outages` | Schedules burst outages in the simulated oracle feed (bursts × seconds). |
+| `pyth_drop_rate` | Probability that Pyth data is missing on each tick. |
+| `autopause_expected` | Narrative hint; surfaced in the analyst summary under Risk & Uptime. |
+
+> Tip: Combine `riskScenarioId` with sweeps to test multiple TTL stressors without duplicating full run definitions.
+
+## 8. Strict Pyth Freshness Policy
+
+- `parameters.oracle.pyth.maxAgeSecStrict` defines the maximum tolerated staleness for RFQ verification.
+- Whenever the observed Pyth publish time exceeds the threshold (or no sample is present), DNMM trades are forced to reject with reason `PythStaleStrict`.
+- Prometheus counter `shadow_pyth_strict_rejects_total{run_id,setting_id,benchmark}` tracks how often the guardrail trips; analyst reports roll these into preview staleness ratios.
+- Preview quote exports include the stale-reject rate in `preview_staleness_ratio_pct`, allowing quick comparisons against the 1% ceiling in the experiment spec.
+
 ---
 
 Last updated: 2025-10-04.

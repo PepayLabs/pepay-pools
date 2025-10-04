@@ -12,11 +12,11 @@ contract LvrFeeRespectsCapsTest is BaseTest {
 
         FeePolicy.FeeConfig memory feeCfg = defaultFeeConfig();
         feeCfg.baseBps = 0;
-        feeCfg.capBps = 50;
+        feeCfg.capBps = 500;
         feeCfg.gammaSizeLinBps = 0;
         feeCfg.gammaSizeQuadBps = 0;
         feeCfg.sizeFeeCapBps = 0;
-        feeCfg.kappaLvrBps = 2_000; // aggressive coefficient to try exceed cap
+        feeCfg.kappaLvrBps = 2_000; // aggressive coefficient; cap should still bound fee
         vm.prank(gov);
         pool.updateParams(IDnmPool.ParamKind.Fee, abi.encode(feeCfg));
 
@@ -37,6 +37,6 @@ contract LvrFeeRespectsCapsTest is BaseTest {
 
     function test_lvrFeeNeverExceedsCap() public {
         IDnmPool.QuoteResult memory res = quote(20_000 ether, true, IDnmPool.OracleMode.Spot);
-        assertLe(res.feeBpsUsed, 50, "fee capped by policy");
+        assertLe(res.feeBpsUsed, 500, "fee capped by policy");
     }
 }

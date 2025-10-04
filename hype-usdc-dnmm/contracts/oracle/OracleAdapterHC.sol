@@ -29,13 +29,7 @@ contract OracleAdapterHC is IOracleAdapterHC {
     error AssetIdZero();
     error MarketIdZero();
 
-    constructor(
-        address _precompile,
-        bytes32 _assetIdBase,
-        bytes32 _assetIdQuote,
-        bytes32 _marketId,
-        bool _isSpot
-    ) {
+    constructor(address _precompile, bytes32 _assetIdBase, bytes32 _assetIdQuote, bytes32 _marketId, bool _isSpot) {
         if (_precompile == address(0)) revert PrecompileZero();
 
         // AUDIT:HCABI-001 enforce canonical oracle precompile wiring based on market type
@@ -63,9 +57,7 @@ contract OracleAdapterHC is IOracleAdapterHC {
     }
 
     function hyperCorePrecompile() external view returns (address) {
-        return IS_SPOT_MARKET_
-            ? HyperCoreConstants.SPOT_PX_PRECOMPILE
-            : HyperCoreConstants.ORACLE_PX_PRECOMPILE;
+        return IS_SPOT_MARKET_ ? HyperCoreConstants.SPOT_PX_PRECOMPILE : HyperCoreConstants.ORACLE_PX_PRECOMPILE;
     }
 
     function assetIdBase() external view returns (bytes32) {
@@ -83,9 +75,8 @@ contract OracleAdapterHC is IOracleAdapterHC {
     function readMidAndAge() external view override returns (MidResult memory result) {
         bytes memory callData = abi.encodePacked(MARKET_KEY_);
         // AUDIT:HCABI-001 canonical precompile selection: SPOT_PX (0x0808) for spot, ORACLE_PX (0x0807) for perp
-        address precompile = IS_SPOT_MARKET_
-            ? HyperCoreConstants.SPOT_PX_PRECOMPILE
-            : HyperCoreConstants.ORACLE_PX_PRECOMPILE;
+        address precompile =
+            IS_SPOT_MARKET_ ? HyperCoreConstants.SPOT_PX_PRECOMPILE : HyperCoreConstants.ORACLE_PX_PRECOMPILE;
 
         bytes memory data = _callHyperCore(precompile, callData, 8);
 
@@ -99,9 +90,7 @@ contract OracleAdapterHC is IOracleAdapterHC {
         }
 
         // Scale spot prices: HyperCore returns 10^6, contract expects 10^18 WAD
-        uint256 scaledMid = IS_SPOT_MARKET_
-            ? uint256(midWord) * SPOT_SCALE_MULTIPLIER
-            : uint256(midWord);
+        uint256 scaledMid = IS_SPOT_MARKET_ ? uint256(midWord) * SPOT_SCALE_MULTIPLIER : uint256(midWord);
 
         return MidResult(scaledMid, AGE_UNKNOWN, true);
     }
@@ -126,12 +115,8 @@ contract OracleAdapterHC is IOracleAdapterHC {
         }
 
         // Scale spot prices: HyperCore returns 10^6, contract expects 10^18 WAD
-        uint256 bid = IS_SPOT_MARKET_
-            ? uint256(bidWord) * SPOT_SCALE_MULTIPLIER
-            : uint256(bidWord);
-        uint256 ask = IS_SPOT_MARKET_
-            ? uint256(askWord) * SPOT_SCALE_MULTIPLIER
-            : uint256(askWord);
+        uint256 bid = IS_SPOT_MARKET_ ? uint256(bidWord) * SPOT_SCALE_MULTIPLIER : uint256(bidWord);
+        uint256 ask = IS_SPOT_MARKET_ ? uint256(askWord) * SPOT_SCALE_MULTIPLIER : uint256(askWord);
 
         uint256 spreadBps = OracleUtils.computeSpreadBps(bid, ask);
         return BidAskResult(bid, ask, spreadBps, true);

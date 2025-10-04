@@ -14,7 +14,7 @@ contract ScenarioPreviewAomqTest is BaseTest {
 
     function setUp() public {
         setUpBase();
-        (, , , , baseScale, quoteScale) = pool.tokens();
+        (,,,, baseScale, quoteScale) = pool.tokens();
 
         approveAll(alice);
         approveAll(bob);
@@ -68,7 +68,7 @@ contract ScenarioPreviewAomqTest is BaseTest {
         }
         (, uint128 quoteReserve) = pool.reserves();
         uint16 floorBps;
-        (, floorBps, , , , ,) = pool.inventoryConfig();
+        (, floorBps,,,,,) = pool.inventoryConfig();
         uint256 floorAmount = Inventory.floorAmount(uint256(quoteReserve), floorBps);
         uint256 availableQuote = uint256(quoteReserve) - floorAmount;
         uint256 s0QuoteUnits = FixedPointMath.mulDivDown(uint256(makerCfg.s0Notional), quoteScale, WAD);

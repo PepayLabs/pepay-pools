@@ -387,23 +387,19 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             revert Errors.InvalidConfig();
         }
 
-        uint256 baseScale = _pow10(baseDecimals_);
-        uint256 quoteScale = _pow10(quoteDecimals_);
-        tokenConfig = TokenConfig({
-            baseToken: baseToken_,
-            quoteToken: quoteToken_,
-            baseDecimals: baseDecimals_,
-            quoteDecimals: quoteDecimals_,
-            baseScale: baseScale,
-            quoteScale: quoteScale
-        });
+        BASE_SCALE_ = _pow10(baseDecimals_);
+        QUOTE_SCALE_ = _pow10(quoteDecimals_);
+        tokenConfig.baseToken = baseToken_;
+        tokenConfig.quoteToken = quoteToken_;
+        tokenConfig.baseDecimals = baseDecimals_;
+        tokenConfig.quoteDecimals = quoteDecimals_;
+        tokenConfig.baseScale = BASE_SCALE_;
+        tokenConfig.quoteScale = QUOTE_SCALE_;
 
         ORACLE_HC_ = IOracleAdapterHC(oracleHc_);
         ORACLE_PYTH_ = IOracleAdapterPyth(oraclePyth_);
         BASE_TOKEN_ = baseToken_;
         QUOTE_TOKEN_ = quoteToken_;
-        BASE_SCALE_ = baseScale;
-        QUOTE_SCALE_ = quoteScale;
         inventoryConfig = inventoryConfig_;
         oracleConfig = oracleConfig_;
         feeConfigPacked = FeePolicy.pack(feeConfig_);

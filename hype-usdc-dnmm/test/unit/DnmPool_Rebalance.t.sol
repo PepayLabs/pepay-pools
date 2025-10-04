@@ -235,20 +235,12 @@ contract DnmPoolRebalanceTest is BaseTest {
         return mid;
     }
 
-    function _readSpot()
-        internal
-        view
-        returns (uint256 mid, uint256 ageSec, bool success)
-    {
+    function _readSpot() internal view returns (uint256 mid, uint256 ageSec, bool success) {
         return oracleHC.spot();
     }
 
-    function _computeTarget(uint128 baseReserves, uint128 quoteReserves, uint256 mid)
-        internal
-        view
-        returns (uint128)
-    {
-        (, , , , uint256 baseScale, uint256 quoteScale) = pool.tokens();
+    function _computeTarget(uint128 baseReserves, uint128 quoteReserves, uint256 mid) internal view returns (uint128) {
+        (,,,, uint256 baseScale, uint256 quoteScale) = pool.tokens();
         uint256 baseWad = FixedPointMath.mulDivDown(uint256(baseReserves), ONE, baseScale);
         uint256 quoteWad = FixedPointMath.mulDivDown(uint256(quoteReserves), ONE, quoteScale);
         uint256 baseNotional = FixedPointMath.mulDivDown(baseWad, mid, ONE);

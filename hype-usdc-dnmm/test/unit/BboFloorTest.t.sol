@@ -57,8 +57,7 @@ contract BboFloorTest is BaseTest {
         updateBidAsk(0, 0, 0, false); // spread unavailable
         updateEma(1e18, 1, true);
 
-        DnmPool.QuoteResult memory result =
-            pool.quoteSwapExactIn(500 ether, true, IDnmPool.OracleMode.Spot, bytes(""));
+        DnmPool.QuoteResult memory result = pool.quoteSwapExactIn(500 ether, true, IDnmPool.OracleMode.Spot, bytes(""));
         assertEq(result.feeBpsUsed, 25, "fallback absolute floor when spread missing");
     }
 
@@ -77,8 +76,7 @@ contract BboFloorTest is BaseTest {
         updateBidAsk(900e15, 1_100e15, 2_000, true); // 2000 bps spread would push above cap
         updateEma(1e18, 1, true);
 
-        DnmPool.QuoteResult memory result =
-            pool.quoteSwapExactIn(800 ether, true, IDnmPool.OracleMode.Spot, bytes(""));
+        DnmPool.QuoteResult memory result = pool.quoteSwapExactIn(800 ether, true, IDnmPool.OracleMode.Spot, bytes(""));
         assertEq(result.feeBpsUsed, 150, "clamped by fee cap");
     }
 }

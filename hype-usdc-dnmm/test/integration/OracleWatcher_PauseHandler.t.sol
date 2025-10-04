@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {OracleWatcher} from "../../contracts/observer/OracleWatcher.sol";
 import {DnmPauseHandler} from "../../contracts/observer/DnmPauseHandler.sol";
-import {DnmPool} from "../../contracts/DnmPool.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 
 contract OracleWatcherPauseHandlerIntegrationTest is BaseTest {

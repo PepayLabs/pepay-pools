@@ -35,7 +35,7 @@ contract DnmPoolQuoteTest is BaseTest {
         // widen spread to raise confidence component
         updateBidAsk(95e16, 105e16, 1000, true);
         // skew inventory by adding extra base liquidity
-        hype.transfer(address(pool), 40_000 ether);
+        require(hype.transfer(address(pool), 40_000 ether), "ERC20: transfer failed");
         pool.sync();
 
         DnmPool.QuoteResult memory res = quote(5_000 ether, true, IDnmPool.OracleMode.Spot);
@@ -48,7 +48,7 @@ contract DnmPoolQuoteTest is BaseTest {
     function test_quote_reverts_when_quote_reserves_zero() public {
         uint256 quoteBal = usdc.balanceOf(address(pool));
         vm.prank(address(pool));
-        usdc.transfer(address(0xdead), quoteBal);
+        require(usdc.transfer(address(0xdead), quoteBal), "ERC20: transfer failed");
         pool.sync();
 
         vm.expectRevert(Errors.FloorBreach.selector);

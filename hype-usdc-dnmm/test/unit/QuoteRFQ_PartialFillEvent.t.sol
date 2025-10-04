@@ -22,7 +22,7 @@ contract QuoteRFQPartialFillEventTest is BaseTest {
         approveAll(bob);
 
         // ensure taker inventory is sufficient to cover large partial-fill requests
-        hype.transfer(alice, 500_000 ether);
+        require(hype.transfer(alice, 500_000 ether), "ERC20: transfer failed");
 
         vm.prank(alice);
         hype.approve(address(rfq), type(uint256).max);

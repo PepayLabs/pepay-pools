@@ -46,7 +46,7 @@ contract FailurePathGasTest is BaseTest {
         uint256 quoteBalance = usdc.balanceOf(address(pool));
         if (quoteBalance > 0) {
             vm.prank(address(pool));
-            usdc.transfer(address(0xdead), quoteBalance);
+            require(usdc.transfer(address(0xdead), quoteBalance), "ERC20: transfer failed");
             pool.sync();
             require(usdc.balanceOf(address(pool)) == 0, "quote balance check");
         }

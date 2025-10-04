@@ -20,7 +20,7 @@ contract InventoryTiltTest is BaseTest {
 
     function test_invTiltPenalisesTradesThatWorsenDeviation() public {
         // Make the pool base-heavy by depositing additional base and syncing reserves.
-        hype.transfer(address(pool), 50_000 ether);
+        require(hype.transfer(address(pool), 50_000 ether), "ERC20: transfer failed");
         pool.sync();
 
         // Configure tilt parameters and enable the feature flag.

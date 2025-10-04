@@ -5,7 +5,6 @@ import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 import {FixedPointMath} from "../../contracts/lib/FixedPointMath.sol";
-import {Vm} from "forge-std/Vm.sol";
 
 contract FirmLadderTIFHonoredTest is BaseTest {
     function setUp() public {

@@ -26,8 +26,8 @@ contract InvariantNoRunDry is StdInvariant, BaseTest {
         quoteInitial = quoteRes;
 
         handler = new Handler(pool, hype, usdc, oracleHC, oraclePyth);
-        hype.transfer(address(handler), 200_000 ether);
-        usdc.transfer(address(handler), 5_000_000000);
+        require(hype.transfer(address(handler), 200_000 ether), "ERC20: transfer failed");
+        require(usdc.transfer(address(handler), 5_000_000000), "ERC20: transfer failed");
         targetContract(address(handler));
     }
 

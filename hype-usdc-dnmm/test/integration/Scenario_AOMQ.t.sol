@@ -97,7 +97,7 @@ contract ScenarioAomqTest is BaseTest {
 
         _configureAomq(60_000000, 90, 900);
 
-        hype.transfer(alice, 1_200_000 ether);
+        require(hype.transfer(alice, 1_200_000 ether), "ERC20: transfer failed");
         vm.startPrank(alice);
         pool.swapExactIn(999_800 ether, 0, true, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
         vm.stopPrank();
@@ -110,7 +110,7 @@ contract ScenarioAomqTest is BaseTest {
         uint256 slackBps = s0Notional > 0 ? FixedPointMath.toBps(availableQuote, uint256(s0Notional)) : 0;
         assertLe(slackBps, 900, "inventory near floor");
 
-        hype.transfer(bob, 50_000 ether);
+        require(hype.transfer(bob, 50_000 ether), "ERC20: transfer failed");
         approveAll(bob);
 
         recordLogs();

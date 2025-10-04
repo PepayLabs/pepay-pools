@@ -46,7 +46,7 @@ contract LvrFeeFloorInvariantTest is BaseTest {
         (, uint128 quoteRes) = pool.reserves();
         uint256 burn = (uint256(quoteRes) * 60) / 100;
         vm.prank(address(pool));
-        usdc.transfer(address(0xdead), burn);
+        require(usdc.transfer(address(0xdead), burn), "ERC20: transfer failed");
         pool.sync();
 
         updateSpot(1e18, 0, true);

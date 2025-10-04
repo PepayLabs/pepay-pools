@@ -148,8 +148,8 @@ contract TupleSweepTest is Test {
             guardians
         );
 
-        baseToken.transfer(address(pool), 80_000 * baseScale);
-        quoteToken.transfer(address(pool), 80_000 * quoteScale);
+        require(baseToken.transfer(address(pool), 80_000 * baseScale), "ERC20: transfer failed");
+        require(quoteToken.transfer(address(pool), 80_000 * quoteScale), "ERC20: transfer failed");
         pool.sync();
 
         baseToken.approve(address(pool), type(uint256).max);

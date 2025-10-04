@@ -120,11 +120,11 @@ contract DnmPoolReadOracleFailClosedTest is Test {
             DnmPool.Guardians({governance: GOV, pauser: PAUSER})
         );
 
-        baseToken.transfer(address(pool), 100_000 ether);
-        quoteToken.transfer(address(pool), 10_000_000000);
+        require(baseToken.transfer(address(pool), 100_000 ether), "ERC20: transfer failed");
+        require(quoteToken.transfer(address(pool), 10_000_000000), "ERC20: transfer failed");
         pool.sync();
 
-        baseToken.transfer(trader, 1_000_000 ether);
+        require(baseToken.transfer(trader, 1_000_000 ether), "ERC20: transfer failed");
         vm.prank(trader);
         baseToken.approve(address(pool), type(uint256).max);
 

@@ -56,14 +56,14 @@ contract ScenarioPreviewAomqTest is BaseTest {
         pool.updateParams(IDnmPool.ParamKind.Maker, abi.encode(makerCfg));
 
         // Make the pool quote reserves scarce so AOMQ clamps large asks.
-        usdc.transfer(address(pool), 500_000000);
+        require(usdc.transfer(address(pool), 500_000000), "ERC20: transfer failed");
         pool.sync();
         (, uint128 quoteReserveBefore) = pool.reserves();
         uint256 targetQuoteReserves = 300_000000; // ~300 quote units (6 decimals)
         if (quoteReserveBefore > targetQuoteReserves) {
             uint256 burnAmount = uint256(quoteReserveBefore) - targetQuoteReserves;
             vm.prank(address(pool));
-            usdc.transfer(address(0xdead), burnAmount);
+            require(usdc.transfer(address(0xdead), burnAmount), "ERC20: transfer failed");
             pool.sync();
         }
         (, uint128 quoteReserve) = pool.reserves();

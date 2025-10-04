@@ -46,7 +46,7 @@ Historical baseline (2025-09-23): `quote_hc` 115,248, `swap_base_hc` 210,893 (pr
 
 ## Debug Event Controls
 - `featureFlags.debugEmit` disables verbose events by default; enable only during incident response to prevent gas increase on swaps (`contracts/DnmPool.sol:617`).
-- Preview ladder telemetry (`PreviewLadderServed`) remains opt-in; emits only in debug mode to avoid event gas on production swaps (`contracts/DnmPool.sol:300-313`, `contracts/DnmPool.sol:2037-2051`).
+- Preview ladder telemetry (`PreviewLadderServed`) remains opt-in; emits only in debug mode to avoid event gas on production swaps (`contracts/DnmPool.sol:300-313`, `contracts/DnmPool.sol:1997-2051`).
 
 ## Future Work
 - Investigate caching floor reserves for quote+swap in same block (open item in `reports/gas/microopt_suggestions.md`).

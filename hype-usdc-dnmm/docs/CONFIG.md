@@ -133,7 +133,7 @@ Oracle | `oracle.hypercore.divergenceSoftBps` | `50` | bps | Soft haircut trigge
 Oracle | `oracle.hypercore.divergenceHardBps` | `75` | bps | Hard reject threshold.
 Oracle | `oracle.hypercore.haircutMinBps` | `3` | bps | Base haircut applied once soft active.
 Oracle | `oracle.hypercore.haircutSlopeBps` | `1` | bps | Additional haircut per bps beyond accept.
-Oracle | `oracle.pyth.maxAgeSec` | `40000` | seconds | Relaxed fallback bound; tighten in prod.
+Oracle | `oracle.pyth.maxAgeSec` | `10` | seconds | Strict bound for RFQ verification and preview freshness.
 Fee | `fee.baseBps` | `15` | bps | Applied when no modifiers active.
 Fee | `fee.capBps` | `150` | bps | Global fee ceiling.
 Fee | `fee.gammaSizeLinBps` | `0` | bps | Linear size coefficient.

@@ -44,6 +44,7 @@ last_updated: "2025-10-04"
   3. Compute `minAmountOut = previewAmountOut - slippage_buffer[rung]` (default buffers: `[5, 15, 15, 30]` bps; governance may tune for specific partners).
   4. Embed `minAmountOut` and TTL inside the signed payload; expire the quote client-side ≥50 ms before on-chain deadline.
 - Ensure the executing address is allow-listed via `setAggregatorRouter` before enabling rebates; non-listed executors will observe the full fee with no 3 bps discount.
+- Strict RFQ policy: `oracle.pyth.maxAgeSec` is hard-capped at 10 seconds; quotes older than that revert during `verifyAndSwap`.
 
 ## Preview APIs & Determinism
 - **`previewFees` / `previewLadder`:** Deterministic because the pool replays against the stored snapshot (`contracts/DnmPool.sol:1296-1416`).

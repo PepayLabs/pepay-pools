@@ -208,7 +208,7 @@ async function deploy() {
         USDC,
         30,     // 0.3% fee
         10e18,  // concentration
-        5e17,   // inventory exponent (0.5)
+        500000000000000000,   // inventory exponent (0.5)
         50      // 0.5% rebalance threshold
     );
 

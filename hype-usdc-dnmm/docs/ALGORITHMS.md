@@ -110,5 +110,5 @@ previewFresh optionally re-reads adapters without mutating state
 - Staleness guards: `PreviewSnapshotStale`, `PreviewSnapshotCooldown` errors when conditions violated (`contracts/DnmPool.sol:1045-1159`).
 - Complexity: Snapshot persistence O(1); preview ladder O(n) over size array length.
 - Gas: Snapshot persist ≈15k gas (event + struct write). `previewFees` read-only.
-- Telemetry: When `featureFlags.debugEmit` true, `_emitPreviewLadderDebug` emits `PreviewLadderServed` with rung/TTL payload for router parity checks (`contracts/DnmPool.sol:1998-2050`).
+- Telemetry: When `featureFlags.debugEmit` true, `_emitPreviewLadderDebug` emits `PreviewLadderServed` with rung/TTL payload for router parity checks (`contracts/DnmPool.sol:1997-2050`).
 - Tests: `test/unit/PreviewFees_Parity.t.sol`, `test/integration/Scenario_Preview_AOMQ.t.sol`, `test/integration/FirmLadder_TIFHonored.t.sol`.

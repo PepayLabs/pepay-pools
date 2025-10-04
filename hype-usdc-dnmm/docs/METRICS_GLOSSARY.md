@@ -16,7 +16,7 @@ last_updated: "2025-10-04"
 Name | Type | Labels | Unit | Description | Source
 --- | --- | --- | --- | --- | ---
 `PreviewSnapshotRefreshed` | Event | `caller` | - | Snapshot persisted with mid, divergence, flags. | `contracts/DnmPool.sol:297`
-`PreviewLadderServed` | Event | `snapId,rungs,feeBps,ttlMs` | - | Debug ladder telemetry for router parity. | `contracts/DnmPool.sol:300`
+`PreviewLadderServed` | Event | `snapId,rungs[4],feeBps[8],ttlMs` | - | Debug ladder telemetry for router parity. | `contracts/DnmPool.sol:300`
 `LvrFeeApplied` | Event | `caller,isBaseIn,lvrFeeBps` | bps | Volatility surcharge applied during swap/quote. | `contracts/DnmPool.sol:312`
 `TargetBaseXstarUpdated` | Event | `oldTarget,newTarget,mid` | base WAD | Recenter executed. | `contracts/DnmPool.sol:293`
 `ManualRebalanceExecuted` | Event | `caller,price` | WAD | Manual recenter completed. | `contracts/DnmPool.sol:294`

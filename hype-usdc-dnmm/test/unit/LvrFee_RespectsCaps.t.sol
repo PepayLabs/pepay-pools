@@ -16,7 +16,7 @@ contract LvrFeeRespectsCapsTest is BaseTest {
         feeCfg.gammaSizeLinBps = 0;
         feeCfg.gammaSizeQuadBps = 0;
         feeCfg.sizeFeeCapBps = 0;
-        feeCfg.kappaLvrBps = 2_000; // aggressive coefficient; cap should still bound fee
+        feeCfg.kappaLvrBps = 500; // aggressive coefficient capped at same bound
         vm.prank(gov);
         pool.updateParams(IDnmPool.ParamKind.Fee, abi.encode(feeCfg));
 

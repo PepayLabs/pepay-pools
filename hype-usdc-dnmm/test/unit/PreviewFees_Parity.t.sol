@@ -32,7 +32,7 @@ contract PreviewFeesParityTest is BaseTest {
         approveAll(bob);
 
         ladder = new uint256[](4);
-        ladder[0] = 5e17; // 0.5 base
+        ladder[0] = 500_000_000_000_000_000; // 0.5 base
         ladder[1] = 1e18; // 1 base
         ladder[2] = 2e18; // 2 base
         ladder[3] = 5e18; // 5 base

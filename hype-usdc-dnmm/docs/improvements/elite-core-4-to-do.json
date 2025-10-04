@@ -1,0 +1,555 @@
+{
+   "meta": {
+     "name": "DNMM Elite – Core‑4 Implementation Context",
+     "version": "0.1.0",
+     "generated_at": "2025-10-04",
+     "owner": "Protocol Eng",
+     "objectives": [
+       "Win aggregator routing via deterministic firm quotes and tiny router-edge pricing",
+       "Protect POL against adverse selection/IL without degrading UX",
+       "Increase PnL per unit of risk with LVR fees and signal-driven clamps",
+       "Ship enterprise-grade: audited, tested, observable, gas-aware, governed rollouts"
+     ],
+     "non_functional_requirements": {
+       "two_sided_uptime_target_pct": 99.5,
+       "swap_gas_budget_max": 305000,
+       "rfq_verify_swap_gas_budget_max": 470000,
+       "quote_hc_gas_budget_max": 130000,
+       "preview_parity_required": true
+     },
+     "refs": [
+       "",
+       "",
+       ""
+     ]
+   },
+ 
+   "source_of_truth": {
+     "docs": [
+       "ARCHITECTURE.md",
+       "FEES_AND_INVENTORY.md",
+       "ROUTER_INTEGRATION.md",
+       "RFQ.md",
+       "CONFIG.md",
+       "DIVERGENCE_POLICY.md",
+       "INVENTORY_FLOOR.md",
+       "OBSERVABILITY.md",
+       "GOVERNANCE_AND_TIMELOCK.md",
+       "GAS_OPTIMIZATION_GUIDE.md",
+       "TESTING.md",
+       "ALGORITHMS.md",
+       "REBALANCING_IMPLEMENTATION.md",
+       "DOCS_INDEX.md"
+     ],
+     "notes": "Keep these synchronized via the docs tasks in this file.",
+     "refs": [
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       ""
+     ]
+   },
+ 
+   "core4_features": [
+     {
+       "id": "FIRM_LADDER_TIF",
+       "goal": "Deterministic, router-friendly quotes with explicit time-in-force, minOut, and enforced preview freshness.",
+       "where": {
+         "preview_api": "DnmPool.previewLadder([S0,2S0,5S0,10S0])",
+         "rfq": "QuoteRFQ.verifyAndSwap – strict mode, TTL carry-through"
+       },
+       "implementation": {
+         "onchain": {
+           "changes": [
+             {
+               "file": "contracts/DnmPool.sol",
+               "area": "Preview snapshot + events",
+               "actions": [
+                 "Ensure snapshot fields (mid, spread, conf, flags, ts) already persisted per call path remain unchanged for determinism.",
+                 "Add optional event `PreviewLadderServed(bytes32 snapId, uint8[] rungs, uint16[] feeBps, uint32 tifMs)` gated by debug flag for auditability without gas bloat in prod."
+               ]
+             }
+           ]
+         },
+         "offchain": {
+           "router_kit": {
+             "outputs": [
+               "rung_size: enum{S0,2S0,5S0,10S0}",
+               "fee_bps",
+               "amountOutPreview",
+               "minOut = amountOutPreview - slippage_buffer[rung]",
+               "tif_ms = maker.ttlMs (e.g., 300)"
+             ],
+             "slippage_buffers_bps": { "S0": 5, "2S0": 15, "5S0": 15, "10S0": 30 }
+           },
+           "preview_freshness": {
+             "set_preview.maxAgeSec": 1,
+             "set_preview.revertOnStalePreview": true
+           }
+         }
+       },
+       "config_deltas": {
+         "preview.maxAgeSec": 1,
+         "preview.revertOnStalePreview": true,
+         "maker.ttlMs": 300
+       },
+       "security": [
+         "Do not expose internal state that could leak inventory targets.",
+         "In strict RFQ mode, enforce tighter oracle caps and TTL before swap."
+       ],
+       "gas": {
+         "budget": "No new hot-path arithmetic. Optional debug event behind feature flag.",
+         "refs": [""]
+       },
+       "tests": {
+         "foundry": [
+           "test/integration/Scenario_Preview_AOMQ.t.sol (parity still holds)",
+           "test/integration/FirmLadder_TIFHonored.t.sol (NEW): TTL honored, minOut parity across rungs, stale preview reverts when enabled"
+         ],
+         "shadow_bot": [
+           "Router parity harness: preview→minOut→RFQ settle; measure re-quote and expiry rate"
+         ]
+       },
+       "refs": [
+         "",
+         "",
+         ""
+       ]
+     },
+     {
+       "id": "AGGREGATOR_RECOGNITION_F09",
+       "goal": "Recognize aggregator routers and apply a conservative 3 bps discount post-pipeline without bypassing floors.",
+       "implementation": {
+         "onchain": [
+           {
+             "file": "contracts/DnmPool.sol",
+             "area": "Swap path (post fee-pipeline)",
+             "actions": [
+               "Check `isAggregatorRouter[msg.sender]` (SLOAD ~2k gas).",
+               "Apply `finalFeeBps = max(0, dynamicFeeBps - AGGREGATOR_DISCOUNT_BPS)`.",
+               "Never bypass BBO floor; ensure `finalFee >= bbo_floor`."
+             ]
+           },
+           {
+             "file": "contracts/DnmPool.sol",
+             "area": "Governance",
+             "actions": [
+               "Add `setAggregatorRouter(address,bool)` under governance role.",
+               "Emit `AggregatorDiscountUpdated(address,uint16)` on changes."
+             ]
+           }
+         ],
+         "ops": [
+           "Whitelist 1inch/CoW/Matcha/Paraswap/Kyber router addresses only after verifying deployment on HyperEVM.",
+           "Default discount: 3 bps."
+         ]
+       },
+       "config_deltas": {
+         "featureFlags.enableRebates": true,
+         "rebates.allowlist": ["<router_addr_1>", "<router_addr_2>"]
+       },
+       "security": [
+         "Ensure discount never produces negative fees after floors and rebates.",
+         "Restrict whitelist mutation to governance; timelock updates."
+       ],
+       "gas": {
+         "expected_delta": "+~2k on aggregator path, ~0 otherwise",
+         "budgets": { "swap_base_hc_max": 305000 }
+       },
+       "tests": {
+         "foundry": [
+           "test/unit/Rebates_FloorPreserve.t.sol",
+           "test/integration/Scenario_RFQ_AggregatorSplit.t.sol (large notional acceptance – close known gap F10)"
+         ],
+         "perf": [
+           "Measure weighted gas (70% aggregator, 25% institution, 5% retail) stays ~+2.3% vs baseline"
+         ]
+       },
+       "refs": [
+         "",
+         "",
+         ""
+       ]
+     },
+     {
+       "id": "LVR_AWARE_FEE",
+       "goal": "Charge an additive fee term equal to expected loss-vs-reprice over the swap TTL; tax toxic flow; protect POL.",
+       "implementation": {
+         "onchain": [
+           {
+             "file": "contracts/DnmPool.sol",
+             "area": "_applyFeePipeline",
+             "insert_after": "size/tilt components",
+             "insert_before": "BBO-aware floor",
+             "pseudocode": [
+               "sigma = ewma_sigma_from_snapshot_or_conf()",
+               "dt = maker.ttlMs / 1000.0",
+               "e_abs_dP_over_P = c1 * sigma * sqrt(dt) + c2 * toxicity_bias",
+               "fee_lvr_bps = min(fee.capBps, kappaLvrBps * e_abs_dP_over_P)",
+               "fee_pipeline_bps += fee_lvr_bps"
+             ],
+             "invariants": [
+               "final_fee_bps >= bbo_floor",
+               "fee_pipeline_bps <= fee.capBps",
+               "Monotonic: higher sigma or TTL → non-decreasing LVR fee"
+             ]
+           }
+         ],
+         "telemetry": [
+           "Emit/record `dnmm_lvr_fee_bps` (histogram) and aggregate `lvr_fee_collected_bps` off-chain"
+         ]
+       },
+       "config_deltas": {
+         "featureFlags.enableLvrFee": true,
+         "fee.kappaLvrBps": 800,
+         "maker.ttlMs": 300
+       },
+       "security": [
+         "No external calls; pure math.",
+         "Respect fee caps and floors.",
+         "Preview parity: include term in snapshot replay."
+       ],
+       "gas": {
+         "expected_delta": "~+1–2k math-only adds; no new SLOADs if config packed",
+         "budget": "Stay within swap gas max"
+       },
+       "tests": {
+         "foundry": [
+           "test/unit/LvrFee_Monotonic.t.sol (sigma↑, ttl↑ ⇒ fee↑)",
+           "test/unit/LvrFee_RespectsCaps.t.sol (capBps respected)",
+           "test/integration/LvrFee_FloorInvariant.t.sol (final fee ≥ floor, partial fills unchanged)"
+         ],
+         "shadow_bot": [
+           "Scoreboard: `pnl_per_risk`, `lvr_fee_collected_bps` trending positive",
+           "A/B frames (enable vs disable) comparing adverse selection proxy"
+         ]
+       },
+       "refs": [
+         "",
+         "",
+         ""
+       ]
+     },
+     {
+       "id": "TOXICITY_DRIVEN_AOMQ",
+       "goal": "Drive AOMQ clamps via an off-chain toxicity score to maintain uptime and protect against toxic bursts.",
+       "implementation": {
+         "onchain": [
+           "No changes; reuse `_evaluateAomq` and flags. Floors/partials remain authoritative."
+         ],
+         "offchain": {
+           "toxicity_score": {
+             "features": [
+               "mid_drift_bps (HC vs last snapshot)",
+               "pyth_conf_bps / conf_cap",
+               "bbo_spread_bps",
+               "quote_to_tx_latency_ms",
+               "recent_reject_rate"
+             ],
+             "range": "0..100",
+             "mapping": "thresholds → aomq.minQuoteNotional / aomq.emergencySpreadBps"
+           },
+           "emit_metrics": ["dnmm_toxicity_score"]
+         }
+       },
+       "config_deltas": {
+         "featureFlags.enableAOMQ": true,
+         "aomq.minQuoteNotional": "5000e6",
+         "aomq.emergencySpreadBps": 30,
+         "aomq.floorEpsilonBps": 2
+       },
+       "security": [
+         "Clamp logic never bypasses floors or solver partials.",
+         "Autopause remains separate for oracle failure modes."
+       ],
+       "gas": {
+         "expected_delta": "Only when AOMQ active; ~+7k per swap path",
+         "budget": "Stay within swap gas max"
+       },
+       "tests": {
+         "foundry": [
+           "test/integration/Scenario_AOMQ.t.sol (still passes)",
+           "test/integration/Scenario_Preview_AOMQ.t.sol (parity under clamps)"
+         ],
+         "shadow_bot": [
+           "Correlation: toxicity_score ↑ ⇒ clamps ↑; uptime remains ≥99%"
+         ]
+       },
+       "refs": [
+         "",
+         "",
+         ""
+       ]
+     }
+   ],
+ 
+   "config_schema_changes": {
+     "parameters_default.json_patch": {
+       "add_fields": {
+         "fee.kappaLvrBps": { "type": "uint16", "default": 0 },
+         "featureFlags.enableLvrFee": { "type": "bool", "default": false }
+       },
+       "update_fields": {
+         "preview.maxAgeSec": 1,
+         "preview.revertOnStalePreview": true,
+         "featureFlags.enableAOMQ": true,
+         "featureFlags.enableRebates": true
+       },
+       "notes": "Zero‑default posture maintained; production flips go through timelock.",
+       "refs": [
+         "",
+         ""
+       ]
+     }
+   },
+ 
+   "governance_and_rollout": {
+     "timelock_required": [
+       "feature flags (enableLvrFee, enableAOMQ, enableRebates)",
+       "preview freshness behavior",
+       "aggregator allowlist updates"
+     ],
+     "rollout_phases": [
+       {
+         "name": "Phase 1 – Router-first",
+         "steps": [
+           "Enable preview freshness gates (staging → prod)",
+           "Publish firm ladder + TIF in router kit",
+           "Enable F09 rebates with 3 bps and whitelist verified routers"
+         ],
+         "success_criteria": [
+           "Re-quote rate ↓",
+           "Aggregator fill share ↑",
+           "Gas steady within budgets"
+         ]
+       },
+       {
+         "name": "Phase 2 – Edge & Defense",
+         "steps": [
+           "Enable `enableLvrFee` at kappa=800 on canary pool",
+           "Turn on toxicity-driven AOMQ thresholds (off-chain control)",
+           "Promote to prod after 24h stable"
+         ],
+         "success_criteria": [
+           "PnL_per_risk ↑",
+           "Adverse selection proxy ↓",
+           "Uptime ≥ 99.5%"
+         ]
+       }
+     ],
+     "refs": [
+       "",
+       ""
+     ]
+   },
+ 
+   "observability": {
+     "metrics_additions": [
+       { "name": "dnmm_lvr_fee_bps", "type": "histogram", "desc": "Per-fill LVR fee component (bps)" },
+       { "name": "dnmm_toxicity_score", "type": "gauge", "desc": "Off-chain computed score driving AOMQ" }
+     ],
+     "existing_to_watch": [
+       "dnmm_two_sided_uptime_pct",
+       "dnmm_aomq_clamps_total",
+       "dnmm_preview_stale_reverts_total",
+       "dnmm_fee_bps",
+       "dnmm_total_bps",
+       "dnmm_delta_bps",
+       "dnmm_bbo_spread_bps"
+     ],
+     "dashboards": [
+       "quote-health.json",
+       "oracle-health.json",
+       "inventory-rebalancing.json",
+       "dnmm_shadow_metrics.json"
+     ],
+     "refs": [
+       "",
+       ""
+     ]
+   },
+ 
+   "gas_and_performance": {
+     "budgets": {
+       "quote_hc_max": 130000,
+       "swap_base_hc_max": 305000,
+       "rfq_verify_swap_max": 470000
+     },
+     "tactics": [
+       "Keep fee config and feature flags packed to avoid extra SLOADs",
+       "Do not add fresh Pyth reads in relaxed path unless thresholds demand",
+       "Early-out paths for AOMQ when disabled or size==0",
+       "Keep debug emits off in prod"
+     ],
+     "refs": [
+       "",
+       ""
+     ]
+   },
+ 
+   "security": {
+     "threat_model": [
+       "Discount misuse → ensure governance-only allowlist, timelocked",
+       "Preview freshness → stale previews must revert when enabled",
+       "Fee cap/floor invariants → never undershoot floor, never exceed cap",
+       "RFQ strict mode → enforce TTL and strict oracle bounds",
+       "Reentrancy → unchanged guards remain on swap path"
+     ],
+     "invariants": [
+       "final_fee_bps >= bbo_floor_bps",
+       "fee_pipeline_bps <= fee.capBps",
+       "floors always preserved (partial fill solver authoritative)"
+     ],
+     "tests": [
+       "Invariant suite with floor-preserve and fee bounds",
+       "Negative cases for timelock-required updates"
+     ],
+     "refs": [
+       "",
+       "",
+       ""
+     ]
+   },
+ 
+   "testing": {
+     "matrix": {
+       "unit": [
+         "LvrFee_Monotonic.t.sol",
+         "LvrFee_RespectsCaps.t.sol",
+         "FirmLadder_TIFHonored.t.sol",
+         "Rebates_FloorPreserve.t.sol"
+       ],
+       "integration": [
+         "Scenario_Preview_AOMQ.t.sol",
+         "Scenario_AOMQ.t.sol",
+         "Scenario_RFQ_AggregatorSplit.t.sol (≥5S0 notional)",
+         "LvrFee_FloorInvariant.t.sol"
+       ],
+       "invariants": [
+         "script/run_invariants.sh – fee caps/floors, partial fills, timelock-required updates"
+       ],
+       "shadow_bot": [
+         "Router parity + toxicity A/B toggles with metrics export"
+       ]
+     },
+     "commands": [
+       "forge test",
+       "FOUNDRY_PROFILE=gas forge test --gas-report",
+       "yarn --cwd shadow-bot test"
+     ],
+     "refs": [
+       ""
+     ]
+   },
+ 
+   "router_integration": {
+     "policy": [
+       "No retry with micro-splits to bypass floors",
+       "Honor AOMQ clamps, then retry when flags clear"
+     ],
+     "refs": [
+       ""
+     ]
+   },
+ 
+   "docs_tasks": [
+     {
+       "file": "docs/CONFIG.md",
+       "updates": [
+         "Add `featureFlags.enableLvrFee` and `fee.kappaLvrBps`",
+         "Document preview freshness defaults for prod endpoints"
+       ],
+       "refs": [""]
+     },
+     {
+       "file": "docs/FEES_AND_INVENTORY.md",
+       "updates": [
+         "New subsection: LVR-aware fee term in pipeline ordering (after size/tilt, before floor).",
+         "Worked example with σ, TTL and resulting bps."
+       ],
+       "refs": [""]
+     },
+     {
+       "file": "docs/ROUTER_INTEGRATION.md",
+       "updates": [
+         "Firm ladder/TIF schema, slippage buffers, stale preview behavior.",
+         "Aggregator discount note (F09) and invariants with floors."
+       ],
+       "refs": [""]
+     },
+     {
+       "file": "docs/OBSERVABILITY.md",
+       "updates": [
+         "Add `dnmm_lvr_fee_bps`, `dnmm_toxicity_score` and dashboards sections."
+       ],
+       "refs": [""]
+     },
+     {
+       "file": "docs/GOVERNANCE_AND_TIMELOCK.md",
+       "updates": [
+         "Timelock playbooks for enabling LVR fee, AOMQ thresholds, and aggregator allowlist changes."
+       ],
+       "refs": [""]
+     },
+     {
+       "file": "docs/TESTING.md",
+       "updates": [
+         "Add new unit/integration suites and CI gates for parity and gas."
+       ],
+       "refs": [""]
+     }
+   ],
+ 
+   "ci_pipeline": {
+     "gates": [
+       "Preview parity suite must pass (parityCiOn true)",
+       "Gas regression thresholds enforced vs snapshots",
+       "Docs lint + link check on every PR touching config or contracts",
+       "Fail build if `dnmm_preview_stale_reverts_total` baseline increases after enabling freshness"
+     ],
+     "commands": [
+       "forge fmt && forge test",
+       "FOUNDRY_PROFILE=gas forge test --gas-report",
+       "yarn --cwd shadow-bot test",
+       "yarn docs:lint"
+     ],
+     "refs": [
+       "",
+       ""
+     ]
+   },
+ 
+   "acceptance_criteria": [
+     "Aggregator fill share increases ≥ +10% at S0/2S0 buckets without raising revert rate",
+     "PnL per unit risk increases ≥ +5% with LVR fee enabled on canary",
+     "Two-sided uptime ≥ 99.5% over 24h with toxicity-driven AOMQ",
+     "No preview parity diffs; floor-preserving invariants remain green",
+     "Gas budgets respected on hot paths"
+   ],
+ 
+   "risk_register": [
+     {
+       "risk": "Overcharging benign flow with LVR fee",
+       "mitigation": "Start small (kappaLvrBps=800), monitor taker slippage deltas and router win-rate"
+     },
+     {
+       "risk": "Aggregator allowlist drift on chain",
+       "mitigation": "Require timelock; add on-call alert on `AggregatorDiscountUpdated`"
+     },
+     {
+       "risk": "Preview staleness in prod endpoints",
+       "mitigation": "Enable freshness gates; alert on `dnmm_preview_stale_reverts_total`"
+     }
+   ]
+ }
+ 

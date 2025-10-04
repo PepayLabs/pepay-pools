@@ -163,7 +163,7 @@ class MetricsContextImpl implements MetricsContext {
   ) {}
 
   recordOracle(sample: { mid: bigint; spreadBps?: number; confBps?: number }): void {
-    this.gauges.mid.set(this.labels, Number(sample.mid));
+    this.gauges.mid.set(this.labels, wadToFloat(sample.mid));
     if (sample.spreadBps !== undefined) {
       this.gauges.spread.set(this.labels, sample.spreadBps);
     }
@@ -175,8 +175,10 @@ class MetricsContextImpl implements MetricsContext {
   recordQuote(sample: BenchmarkQuoteSample): void {
     const quoteLabels = { ...this.labels, side: sample.side } as const;
     this.counters.quotes.inc(quoteLabels);
-    this.histograms.quoteLatency.observe(quoteLabels, 10);
-    this.gauges.mid.set(this.labels, Number(sample.mid));
+    if (sample.latencyMs !== undefined) {
+      this.histograms.quoteLatency.observe(quoteLabels, sample.latencyMs);
+    }
+    this.gauges.mid.set(this.labels, wadToFloat(sample.mid));
     this.gauges.spread.set(this.labels, sample.spreadBps);
     if (sample.confBps !== undefined) {
       this.gauges.conf.set(this.labels, sample.confBps);
@@ -185,7 +187,15 @@ class MetricsContextImpl implements MetricsContext {
 
   recordTrade(result: BenchmarkTradeResult): void {
     this.counters.trades.inc(this.labels);
-    this.histograms.tradeSize.observe(this.labels, Number(result.amountIn));
+    const baseSizeWad =
+      result.intentBaseSizeWad ??
+      result.executedBaseSizeWad ??
+      (result.intent.side === 'base_in'
+        ? result.appliedAmountIn ?? result.amountIn
+        : result.amountOut);
+    if (baseSizeWad !== undefined) {
+      this.histograms.tradeSize.observe(this.labels, wadToFloat(baseSizeWad));
+    }
     this.histograms.tradeSlippage.observe(this.labels, result.slippageBpsVsMid);
     if (result.aomqClamped) {
       this.counters.aomq.inc(this.labels);
@@ -198,6 +208,11 @@ class MetricsContextImpl implements MetricsContext {
       this.gauges.pnlRate.set(this.labels, this.lastPnl / elapsedMinutes);
     }
     this.lastTimestamp = now;
+
+    const latencyLabels = { ...this.labels, side: result.intent.side } as const;
+    if (Number.isFinite(result.latencyMs)) {
+      this.histograms.quoteLatency.observe(latencyLabels, result.latencyMs);
+    }
   }
 
   recordReject(): void {

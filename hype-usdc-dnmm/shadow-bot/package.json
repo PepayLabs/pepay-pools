@@ -11,7 +11,8 @@
     "multi": "node dist/multi-run.js",
     "analyze": "node --loader ts-node/esm src/analysis.ts",
     "monitor": "node --loader ts-node/esm src/monitor.ts",
-    "test": "npm run build && node --test test",
+    "test": "npm run build && vitest run",
+    "test:unit": "vitest run",
     "clean": "rimraf dist && rimraf metrics/hype-metrics && rimraf reports"
   },
   "dependencies": {

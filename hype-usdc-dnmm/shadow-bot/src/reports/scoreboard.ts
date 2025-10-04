@@ -1,5 +1,6 @@
 import {
   BenchmarkId,
+  HighlightRule,
   ReportsConfig,
   ScoreboardRow,
   ShadowBotLabels
@@ -33,6 +34,8 @@ interface ScoreboardArtifacts {
   readonly scoreboardMarkdown: string;
   readonly summaryMarkdown: string;
 }
+
+type HighlightRuleInput = HighlightRule | string;
 
 interface HighlightFinding {
   readonly ruleId: string;
@@ -241,7 +244,10 @@ function buildHighlights(
   baselineRouterWinRate?: number
 ): HighlightFinding[] {
   const rules = input.reports?.analystSummaryMd?.highlightRules ?? [];
-  return rules.map((rule) => evaluateRule(rule.id, rule.description, input.rows, baselineRouterWinRate, rule.params));
+  return rules.map((rule) => {
+    const normalized = normalizeHighlightRule(rule);
+    return evaluateRule(normalized.id, normalized.description, input.rows, baselineRouterWinRate, normalized.params);
+  });
 }
 
 function evaluateRule(
@@ -315,6 +321,41 @@ function evaluateUptimeFloor(
       detail: `${row.settingId}/${row.benchmark} uptime ${formatFixed(row.twoSidedUptimePct, 3)}%`
     }));
   return { ruleId: 'uptime_floor', description, matches };
+}
+
+function normalizeHighlightRule(rule: HighlightRuleInput): HighlightRule {
+  if (typeof rule !== 'string') {
+    return rule;
+  }
+  const description = rule.trim();
+  const lowered = description.toLowerCase();
+  if (lowered.includes('preview_staleness')) {
+    return {
+      id: 'preview_staleness_threshold',
+      description,
+      params: { thresholdPct: extractPercentage(description) ?? 1 }
+    };
+  }
+  if (lowered.includes('uptime') || lowered.includes('two_sided')) {
+    return {
+      id: 'uptime_floor',
+      description,
+      params: { thresholdPct: extractPercentage(description) ?? 99.5 }
+    };
+  }
+  const topMatch = description.match(/top\s+(\d+)/i);
+  return {
+    id: 'pnl_per_risk_top',
+    description,
+    params: { top: topMatch ? Number(topMatch[1]) : 2 }
+  };
+}
+
+function extractPercentage(text: string): number | undefined {
+  const match = text.match(/([-+]?[0-9]*\.?[0-9]+)\s*%/);
+  if (!match) return undefined;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : undefined;
 }
 
 function computeTopPerBenchmark(rows: readonly ScoreboardRow[]): Map<BenchmarkId, ScoreboardRow> {

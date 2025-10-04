@@ -17,6 +17,7 @@ interface StablePreviewResult {
   readonly midWad: bigint;
   readonly spreadBps: number;
   readonly slippageBps: number;
+  readonly latencyMs: number;
   readonly nextBaseReserves: number;
   readonly nextQuoteReserves: number;
   readonly reason?: string;
@@ -96,6 +97,7 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
       rebateBps: 0,
       floorBps: 0,
       ttlMs: undefined,
+      latencyMs: preview.latencyMs,
       minOut: preview.success ? toBigInt(preview.amountOut, side === 'base_in' ? this.quoteScale : this.baseScale) : undefined,
       aomqFlags: undefined,
       mid: this.currentMidWad,
@@ -221,6 +223,7 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
         midWad: this.currentMidWad,
         spreadBps: this.currentSpreadBps,
         slippageBps: 0,
+        latencyMs: 5,
         nextBaseReserves: x,
         nextQuoteReserves: y,
         reason: 'fee_zero',
@@ -259,6 +262,7 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
         midWad: this.currentMidWad,
         spreadBps: this.currentSpreadBps,
         slippageBps: computeSlippageBps(midBefore, midAfter),
+        latencyMs: 12,
         nextBaseReserves: nextBase,
         nextQuoteReserves: nextQuote,
         reason: amountOut > 0 ? undefined : 'zero_output',
@@ -296,6 +300,7 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
       midWad: this.currentMidWad,
       spreadBps: this.currentSpreadBps,
       slippageBps: computeSlippageBps(midBefore, midAfter),
+      latencyMs: 12,
       nextBaseReserves: nextBase,
       nextQuoteReserves: nextQuote,
       reason: amountOut > 0 ? undefined : 'zero_output',

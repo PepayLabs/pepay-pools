@@ -1,5 +1,4 @@
-import { strict as assert } from 'node:assert';
-import { describe, it } from 'node:test';
+import { describe, expect, it } from 'vitest';
 import { generateScoreboardArtifacts } from '../reports/scoreboard.js';
 import { ScoreboardRow } from '../types.js';
 
@@ -91,12 +90,12 @@ describe('generateScoreboardArtifacts', () => {
       }
     });
 
-    assert.equal(artifacts.scoreboardJson.runId, 'test-run');
-    assert.equal(artifacts.scoreboardJson.rows.length, MOCK_ROWS.length);
+    expect(artifacts.scoreboardJson.runId).toBe('test-run');
+    expect(artifacts.scoreboardJson.rows).toHaveLength(MOCK_ROWS.length);
 
-    assert.match(artifacts.scoreboardMarkdown, /\| Setting \| Benchmark \|/);
-    assert.match(artifacts.summaryMarkdown, /## Executive Summary/);
-    assert.match(artifacts.summaryMarkdown, /dnmm_lvr_800/);
-    assert.match(artifacts.summaryMarkdown, /preview_staleness_ratio/);
+    expect(artifacts.scoreboardMarkdown).toMatch(/\| Setting \| Benchmark \|/);
+    expect(artifacts.summaryMarkdown).toMatch(/## Executive Summary/);
+    expect(artifacts.summaryMarkdown).toMatch(/dnmm_lvr_800/);
+    expect(artifacts.summaryMarkdown).toMatch(/preview_staleness_ratio/);
   });
 });

@@ -1,8 +1,8 @@
-# Shadow Bot Reports Implementation Guide
+# Shadow Bot Metrics Implementation Guide
 
-**Path**: `hype-usdc-dnmm/shadow-bot/src/reports`
+**Path**: `hype-usdc-dnmm/shadow-bot/src/metrics`
 
-**Description**: Markdown/JSON report generation utilities for multi-run benchmarks, including scoreboard tabulation and analyst summaries.
+**Description**: Prometheus instrumentation for multi-setting runs, including raw probe histograms, scoreboard-derived KPIs, and DNMM live-import gauges.
 
 ## Purpose
 - Capture the intent of this module/folder and its relationship to the broader HYPE/HyperEVM initiative.
@@ -34,5 +34,4 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2025-10-04: Initial extraction of scoreboard + analyst summary generation helpers.
-- 2025-10-04: Added highlight rule normalization, aggregate KPI narratives, and scoreboard JSON/Markdown emissions.
+- 2025-10-04: Added scoreboard KPI gauges, latency histogram wiring, and DNMM live snapshot import for fork/live runs.

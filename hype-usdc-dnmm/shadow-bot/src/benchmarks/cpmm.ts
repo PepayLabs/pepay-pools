@@ -69,6 +69,7 @@ export class CpmmBenchmarkAdapter implements BenchmarkAdapter {
       rebateBps: 0,
       floorBps: 0,
       ttlMs: undefined,
+      latencyMs: preview.latencyMs,
       minOut: preview.success ? preview.amountOutWad : undefined,
       aomqFlags: undefined,
       mid: this.currentMidWad,

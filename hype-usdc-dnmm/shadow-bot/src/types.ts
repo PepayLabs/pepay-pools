@@ -990,6 +990,7 @@ export interface BenchmarkQuoteSample {
   readonly rebateBps?: number;
   readonly floorBps?: number;
   readonly ttlMs?: number;
+  readonly latencyMs?: number;
   readonly minOut?: bigint;
   readonly aomqFlags?: string;
   readonly mid: bigint;

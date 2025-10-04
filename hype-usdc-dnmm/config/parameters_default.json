@@ -19,6 +19,7 @@
     },
     "pyth": {
       "maxAgeSec": 10,
+      "maxAgeSecStrict": 10,
       "confCapBps": 100
     }
   },
@@ -79,5 +80,6 @@
   },
   "governance": {
     "timelockDelaySec": 0
-  }
+  },
+  "enableLvrFee": false
 }

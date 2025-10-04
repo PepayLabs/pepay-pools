@@ -101,7 +101,8 @@ export class LivePoolClient implements PoolClientAdapter {
       decayPctPerBlock: Number(feeRaw.decayPctPerBlock ?? feeRaw[6]),
       gammaSizeLinBps: Number(feeRaw.gammaSizeLinBps ?? feeRaw[7]),
       gammaSizeQuadBps: Number(feeRaw.gammaSizeQuadBps ?? feeRaw[8]),
-      sizeFeeCapBps: Number(feeRaw.sizeFeeCapBps ?? feeRaw[9])
+      sizeFeeCapBps: Number(feeRaw.sizeFeeCapBps ?? feeRaw[9]),
+      kappaLvrBps: Number(feeRaw.kappaLvrBps ?? feeRaw[10] ?? 0)
     };
 
     const makerConfig: MakerConfigState = {

@@ -53,6 +53,109 @@ interface SamplingConfig {
   readonly retryAttempts: number;
 }
 
+export interface ShadowBotPreviewConfig {
+  readonly maxAgeSec: number;
+  readonly snapshotCooldownSec: number;
+  readonly revertOnStalePreview: boolean;
+  readonly enablePreviewFresh: boolean;
+}
+
+export interface ShadowBotFeeConfig {
+  readonly baseBps: number;
+  readonly alphaConfNumerator: number;
+  readonly alphaConfDenominator: number;
+  readonly betaInvDevNumerator: number;
+  readonly betaInvDevDenominator: number;
+  readonly capBps: number;
+  readonly decayPctPerBlock: number;
+  readonly gammaSizeLinBps: number;
+  readonly gammaSizeQuadBps: number;
+  readonly sizeFeeCapBps: number;
+  readonly kappaLvrBps: number;
+}
+
+export interface ShadowBotMakerConfig {
+  readonly S0Notional: number;
+  readonly ttlMs: number;
+  readonly alphaBboBps: number;
+  readonly betaFloorBps: number;
+}
+
+export interface ShadowBotInventoryConfig {
+  readonly floorBps: number;
+  readonly recenterThresholdPct: number;
+  readonly initialTargetBaseXstar: string | 'auto';
+  readonly invTiltBpsPer1pct: number;
+  readonly invTiltMaxBps: number;
+  readonly tiltConfWeightBps: number;
+  readonly tiltSpreadWeightBps: number;
+}
+
+export interface ShadowBotFeatureFlagsConfig {
+  readonly blendOn: boolean;
+  readonly parityCiOn: boolean;
+  readonly debugEmit: boolean;
+  readonly enableSoftDivergence: boolean;
+  readonly enableSizeFee: boolean;
+  readonly enableBboFloor: boolean;
+  readonly enableInvTilt: boolean;
+  readonly enableAOMQ: boolean;
+  readonly enableRebates: boolean;
+  readonly enableAutoRecenter: boolean;
+  readonly enableLvrFee: boolean;
+}
+
+export interface ShadowBotAomqConfig {
+  readonly minQuoteNotional: number;
+  readonly emergencySpreadBps: number;
+  readonly floorEpsilonBps: number;
+}
+
+export interface ShadowBotRebateConfig {
+  readonly allowlist: string[];
+}
+
+export interface ShadowBotOracleHyperCoreConfig {
+  readonly confCapBpsSpot: number;
+  readonly confCapBpsStrict: number;
+  readonly maxAgeSec: number;
+  readonly stallWindowSec: number;
+  readonly allowEmaFallback: boolean;
+  readonly divergenceBps: number;
+  readonly divergenceAcceptBps: number;
+  readonly divergenceSoftBps: number;
+  readonly divergenceHardBps: number;
+  readonly haircutMinBps: number;
+  readonly haircutSlopeBps: number;
+  readonly confWeightSpreadBps: number;
+  readonly confWeightSigmaBps: number;
+  readonly confWeightPythBps: number;
+  readonly sigmaEwmaLambdaBps: number;
+}
+
+export interface ShadowBotOraclePythConfig {
+  readonly maxAgeSec: number;
+  readonly maxAgeSecStrict: number;
+  readonly confCapBps: number;
+}
+
+export interface ShadowBotOracleConfig {
+  readonly hypercore: ShadowBotOracleHyperCoreConfig;
+  readonly pyth: ShadowBotOraclePythConfig;
+}
+
+export interface ShadowBotParameters {
+  readonly enableLvrFee: boolean;
+  readonly oracle: ShadowBotOracleConfig;
+  readonly fee: ShadowBotFeeConfig;
+  readonly inventory: ShadowBotInventoryConfig;
+  readonly maker: ShadowBotMakerConfig;
+  readonly preview: ShadowBotPreviewConfig;
+  readonly featureFlags: ShadowBotFeatureFlagsConfig;
+  readonly aomq: ShadowBotAomqConfig;
+  readonly rebates: ShadowBotRebateConfig;
+}
+
 export interface BaseShadowBotConfig {
   readonly mode: ShadowBotMode;
   readonly labels: ShadowBotLabels;
@@ -69,6 +172,7 @@ export interface BaseShadowBotConfig {
   readonly sampling: SamplingConfig;
   readonly baseDecimals: number;
   readonly quoteDecimals: number;
+  readonly parameters: ShadowBotParameters;
 }
 
 export interface ChainBackedConfig extends BaseShadowBotConfig {
@@ -218,6 +322,7 @@ export interface FeeConfigState {
   readonly gammaSizeLinBps: number;
   readonly gammaSizeQuadBps: number;
   readonly sizeFeeCapBps: number;
+  readonly kappaLvrBps: number;
 }
 
 export interface MakerConfigState {

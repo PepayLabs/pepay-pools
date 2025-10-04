@@ -41,7 +41,7 @@ export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
   }
 
   async close(): Promise<void> {
-    // no-op
+    // adapters do not hold external resources currently
   }
 
   async prepareTick(context: BenchmarkTickContext): Promise<void> {

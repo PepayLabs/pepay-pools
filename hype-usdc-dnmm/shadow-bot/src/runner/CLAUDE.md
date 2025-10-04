@@ -1,6 +1,6 @@
 # Shadow Bot Runner Implementation Guide
 
-**Path**: `hype-usdc-dnmm/shadow-bot/runner`
+**Path**: `hype-usdc-dnmm/shadow-bot/src/runner`
 
 **Description**: Orchestration layer for multi-setting benchmarking, concurrency control, scoreboard aggregation, and CLI entrypoints.
 

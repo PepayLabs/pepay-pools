@@ -1,6 +1,6 @@
 # Shadow Bot Benchmarks Implementation Guide
 
-**Path**: `hype-usdc-dnmm/shadow-bot/benchmarks`
+**Path**: `hype-usdc-dnmm/shadow-bot/src/benchmarks`
 
 **Description**: Adapters that emulate DNMM and baseline AMMs (CPMM, StableSwap-like) for comparative simulations and scoring.
 

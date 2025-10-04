@@ -1,0 +1,107 @@
+{
+  "version": "1",
+  "pair": "HYPE/USDC",
+  "runs": [
+    {
+      "id": "A",
+      "label": "baseline_calm",
+      "featureFlags": {
+        "enableSoftDivergence": true,
+        "enableSizeFee": false,
+        "enableBboFloor": true,
+        "enableInvTilt": true,
+        "enableAOMQ": false,
+        "enableRebates": false
+      },
+      "makerParams": {
+        "betaFloorBps": 15,
+        "alphaBboBps": 2500,
+        "S0Notional": 10000
+      },
+      "inventoryParams": {
+        "invTiltBpsPer1pct": 100,
+        "invTiltMaxBps": 150,
+        "tiltConfWeightBps": 4000,
+        "tiltSpreadWeightBps": 4000
+      },
+      "aomqParams": {
+        "minQuoteNotional": 200,
+        "emergencySpreadBps": 120,
+        "floorEpsilonBps": 200
+      },
+      "flow": {
+        "pattern": "benign_poisson",
+        "seconds": 600,
+        "seed": 42,
+        "txn_rate_per_min": 20,
+        "size_dist": "lognormal",
+        "size_params": {
+          "mu": 0,
+          "sigma": 0.9,
+          "min": 50,
+          "max": 2500
+        }
+      },
+      "latency": {
+        "quote_to_tx_ms": 250,
+        "jitter_ms": 50
+      },
+      "router": {
+        "slippage_bps": 30,
+        "ttl_sec": 20,
+        "minOut_policy": "preview"
+      }
+    },
+    {
+      "id": "B",
+      "label": "size_fee_active",
+      "featureFlags": {
+        "enableSoftDivergence": true,
+        "enableSizeFee": true,
+        "enableBboFloor": true,
+        "enableInvTilt": true,
+        "enableAOMQ": false,
+        "enableRebates": false
+      },
+      "makerParams": {
+        "betaFloorBps": 15,
+        "alphaBboBps": 3000,
+        "S0Notional": 15000
+      },
+      "inventoryParams": {
+        "invTiltBpsPer1pct": 120,
+        "invTiltMaxBps": 200,
+        "tiltConfWeightBps": 5000,
+        "tiltSpreadWeightBps": 5000
+      },
+      "aomqParams": {
+        "minQuoteNotional": 300,
+        "emergencySpreadBps": 150,
+        "floorEpsilonBps": 200
+      },
+      "flow": {
+        "pattern": "trend",
+        "seconds": 600,
+        "seed": 43,
+        "txn_rate_per_min": 18,
+        "size_dist": "lognormal",
+        "size_params": {
+          "mu": 0.2,
+          "sigma": 1.1,
+          "min": 50,
+          "max": 5000
+        }
+      },
+      "latency": {
+        "quote_to_tx_ms": 300,
+        "jitter_ms": 60
+      },
+      "router": {
+        "slippage_bps": 25,
+        "ttl_sec": 20,
+        "minOut_policy": "preview_ladder"
+      }
+    }
+  ],
+  "benchmarks": ["dnmm", "cpmm", "stableswap"]
+}

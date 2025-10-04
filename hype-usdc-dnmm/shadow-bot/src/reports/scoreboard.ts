@@ -29,6 +29,7 @@ interface ScoreboardJsonPayload {
     readonly totalBenchmarks: number;
   };
   readonly rows: readonly ScoreboardRow[];
+  readonly scenarioMeta?: Record<string, RiskScenarioDefinition | undefined>;
 }
 
 interface ScoreboardArtifacts {
@@ -73,7 +74,11 @@ interface AggregateStats {
 
 interface ScenarioInsights {
   readonly autopauseSettings: readonly string[];
-  readonly ttlTargets: readonly { settingId: string; target: number }[];
+  readonly ttlTargets: readonly {
+    settingId: string;
+    targetPct: number;
+    observedPct?: number;
+  }[];
 }
 
 export function generateScoreboardArtifacts(input: ScoreboardArtifactInput): ScoreboardArtifacts {
@@ -88,7 +93,8 @@ export function generateScoreboardArtifacts(input: ScoreboardArtifactInput): Sco
       totalSettings: new Set(input.rows.map((row) => row.settingId)).size,
       totalBenchmarks: new Set(input.rows.map((row) => row.benchmark)).size
     },
-    rows: input.rows
+    rows: input.rows,
+    scenarioMeta: input.scenarioMeta
   };
 
   const scoreboardMarkdown = buildScoreboardMarkdown(input.rows);
@@ -97,7 +103,7 @@ export function generateScoreboardArtifacts(input: ScoreboardArtifactInput): Sco
   const topPerBenchmark = computeTopPerBenchmark(input.rows);
   const aggregate = computeAggregateStats(input.rows);
   const scenarioMeta = input.scenarioMeta ?? {};
-  const scenarioInsights = computeScenarioInsights(scenarioMeta);
+  const scenarioInsights = computeScenarioInsights(input.rows, scenarioMeta);
   const summaryMarkdown = buildSummaryMarkdown({
     input,
     highlights,
@@ -208,7 +214,10 @@ function buildExecutiveSummary(context: SummaryContext): string {
   }
   if (context.scenarioInsights.ttlTargets.length > 0) {
     const formatted = context.scenarioInsights.ttlTargets
-      .map(({ settingId, target }) => `${settingId}: ${(target * 100).toFixed(1)}% TTL expiry target`)
+      .map(({ settingId, targetPct, observedPct }) => {
+        const observed = observedPct !== undefined ? `${formatFixed(observedPct, 2)}% observed` : 'obs N/A';
+        return `${settingId}: ${formatFixed(targetPct, 2)}% target (${observed})`;
+      })
       .join('; ');
     bullets.push(`- TTL pressure scenarios applied → ${formatted}.`);
   }
@@ -254,10 +263,10 @@ function buildRiskSection(context: SummaryContext): string {
     );
   }
   if (context.scenarioInsights.ttlTargets.length > 0) {
-    const formatted = context.scenarioInsights.ttlTargets
-      .map(({ settingId, target }) => `${settingId} (${formatFixed(target * 100, 2)}% target)`)
-      .join(', ');
-    lines.push(`- TTL expiry targets enforced for ${formatted} — maker/router TTLs scaled by (1 - target).`);
+    for (const { settingId, targetPct, observedPct } of context.scenarioInsights.ttlTargets) {
+      const observed = observedPct !== undefined ? `${formatFixed(observedPct, 2)}%` : 'N/A';
+      lines.push(`- TTL expiry for ${settingId}: target ${formatFixed(targetPct, 2)}%, observed ${observed}.`);
+    }
   }
   return lines.join('\n');
 }
@@ -442,17 +451,29 @@ function computeAggregateStats(rows: readonly ScoreboardRow[]): AggregateStats {
 }
 
 function computeScenarioInsights(
+  rows: readonly ScoreboardRow[],
   meta: Record<string, RiskScenarioDefinition | undefined>
 ): ScenarioInsights {
   const autopauseSettings: string[] = [];
-  const ttlTargets: { settingId: string; target: number }[] = [];
+  const ttlTargets: { settingId: string; targetPct: number; observedPct?: number }[] = [];
+  const dnmmRows = new Map<string, ScoreboardRow>();
+  for (const row of rows) {
+    if (row.benchmark === 'dnmm') {
+      dnmmRows.set(row.settingId, row);
+    }
+  }
   for (const [settingId, scenario] of Object.entries(meta)) {
     if (!scenario) continue;
     if (scenario.autopauseExpected) {
       autopauseSettings.push(settingId);
     }
     if (scenario.ttlExpiryRateTarget !== undefined && Number.isFinite(scenario.ttlExpiryRateTarget)) {
-      ttlTargets.push({ settingId, target: Number(scenario.ttlExpiryRateTarget) });
+      const row = dnmmRows.get(settingId);
+      ttlTargets.push({
+        settingId,
+        targetPct: Number(scenario.ttlExpiryRateTarget) * 100,
+        observedPct: row?.timeoutExpiryRatePct
+      });
     }
   }
   autopauseSettings.sort();

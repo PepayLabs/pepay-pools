@@ -257,7 +257,6 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     uint256 private constant FEE_GAMMA_QUAD_OFFSET = 160;
     uint256 private constant FEE_SIZE_CAP_OFFSET = 176;
     uint256 private constant FEE_KAPPA_LVR_OFFSET = 192;
-    uint256 private constant LVR_DENOMINATOR = 5e17; // calibrates σ√Δt to BPS scale
 
     uint256 private constant FLAG_BLEND_ON = 1 << 0;
     uint256 private constant FLAG_PARITY_CI_ON = 1 << 8;
@@ -693,12 +692,13 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             if (newCfg.baseBps > newCfg.capBps) {
                 revert FeePolicy.FeeBaseAboveCap(newCfg.baseBps, newCfg.capBps);
             }
+            if (newCfg.kappaLvrBps > newCfg.capBps) revert Errors.InvalidConfig();
             feeConfigPacked = FeePolicy.pack(newCfg);
             emit ParamsUpdated("FEE", abi.encode(oldCfg), data);
         } else if (kind == IDnmPool.ParamKind.Inventory) {
             InventoryConfig memory oldCfg = inventoryConfig;
             InventoryConfig memory newCfg = abi.decode(data, (InventoryConfig));
-            if (newCfg.floorBps > BPS) revert Errors.InvalidConfig();
+            if (newCfg.floorBps > 5000) revert Errors.InvalidConfig();
             if (newCfg.invTiltBpsPer1pct > BPS) revert Errors.InvalidConfig();
             if (newCfg.invTiltMaxBps > BPS) revert Errors.InvalidConfig();
             if (newCfg.tiltConfWeightBps > BPS) revert Errors.InvalidConfig();
@@ -1927,27 +1927,27 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         if (sqrtDtRaw == 0) {
             return 0;
         }
-        uint256 sqrtDtWad = sqrtDtRaw * 1e9; // promote sqrt to WAD scale
+        uint256 sqrtDtWad = sqrtDtRaw * 1e9; // sqrt returns 9 decimals less than WAD scale
 
         uint256 sigmaWad = sigmaBps * 1e14;
-        uint256 eAbsWad = FixedPointMath.mulDivDown(sigmaWad, sqrtDtWad, 1e18);
+        uint256 termWad = FixedPointMath.mulDivUp(sigmaWad, sqrtDtWad, 1e18);
 
         if (gates.aomq && aomqCfg.emergencySpreadBps > 0) {
             AomqActivationState storage state = isBaseIn ? _aomqAskState : _aomqBidState;
             if (state.active) {
-                eAbsWad += uint256(aomqCfg.emergencySpreadBps) * 1e14;
+                termWad += uint256(aomqCfg.emergencySpreadBps) * 1e14;
             }
         }
 
         if (outcome.softDivergenceActive) {
-            eAbsWad += 5 * 1e14; // modest premium when divergence flagged
+            termWad += 5 * 1e14; // modest premium when divergence flagged
         }
 
-        if (eAbsWad == 0) {
+        if (termWad == 0) {
             return 0;
         }
 
-        uint256 feeLvr = FixedPointMath.mulDivUp(uint256(kappaLvrBps), eAbsWad, LVR_DENOMINATOR);
+        uint256 feeLvr = FixedPointMath.mulDivUp(uint256(kappaLvrBps), termWad, 1e18);
         if (feeLvr > capBps) {
             feeLvr = capBps;
         }

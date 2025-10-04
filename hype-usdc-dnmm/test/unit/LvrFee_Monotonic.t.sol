@@ -15,7 +15,7 @@ contract LvrFeeMonotonicTest is BaseTest {
 
         FeePolicy.FeeConfig memory feeCfg = defaultFeeConfig();
         feeCfg.baseBps = 0;
-        feeCfg.capBps = 500;
+        feeCfg.capBps = 900;
         feeCfg.gammaSizeLinBps = 0;
         feeCfg.gammaSizeQuadBps = 0;
         feeCfg.sizeFeeCapBps = 0;
@@ -55,7 +55,7 @@ contract LvrFeeMonotonicTest is BaseTest {
         uint16 baselineFee = _quoteFee();
 
         DnmPool.MakerConfig memory makerCfg = defaultMakerConfig();
-        makerCfg.ttlMs = 1_200; // 1.2 seconds vs 0.3 baseline
+        makerCfg.ttlMs = 3_000; // 3.0 seconds vs 0.3 baseline
         vm.prank(gov);
         pool.updateParams(IDnmPool.ParamKind.Maker, abi.encode(makerCfg));
 

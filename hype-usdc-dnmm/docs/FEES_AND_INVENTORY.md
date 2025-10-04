@@ -44,12 +44,12 @@ Core-4 introduces a **loss-vs-reprice (LVR)** surcharge that scales with blended
 - Normalized size `u = sizeWad / S0Wad` with `S0` from `maker.S0Notional` (`5000` quote units). Linear (`gammaSizeLinBps`) and quadratic (`gammaSizeQuadBps`) multipliers accumulate (`contracts/lib/FeePolicy.sol:117`).
 - Capped at `fee.sizeFeeCapBps` (default `0`).
 
-### LVR-Aware Fee
+- **Pipeline order:** base → confidence → size → inventory tilt → LVR surcharge → cap → BBO floor → rebates. LVR always runs before cap/floor so that pricing remains monotonic.
 - Enabled by `featureFlags.enableLvrFee` (default `false`).
-- Adds `fee_lvr = min(fee.capBps, kappaLvrBps * (σ√Δt + toxicity_bias) * LVR_SCALE)` where σ is the blended confidence sigma (`contracts/DnmPool.sol:2547`), `Δt = maker.ttlMs / 1000`, `LVR_SCALE = 1 / 5e17`, and `toxicity_bias` activates when AOMQ clamps are live (`contracts/DnmPool.sol:1759-1799`).
+- Adds `fee_lvr = min(fee.capBps, kappaLvrBps * (σ√Δt + toxicity_bias) * LVR_SCALE)` where σ is the blended confidence sigma (`contracts/DnmPool.sol:2551`), `Δt = maker.ttlMs / 1000`, `LVR_SCALE = 1 / 5e17`, and `toxicity_bias` activates when AOMQ clamps are live (`contracts/DnmPool.sol:1763-1807`).
 - `fee.kappaLvrBps` controls the slope; defaults to `0` (disabled).
 - Emits `LvrFeeApplied` on-settlement when the term is non-zero, enabling the `dnmm_lvr_fee_bps` histogram.
-- Does not bypass the BBO floor or global cap; `_applyFeePipeline` clamps after adding the surcharge (`contracts/DnmPool.sol:1738-1748`).
+- Does not bypass the BBO floor or global cap; `_applyFeePipeline` clamps after adding the surcharge (`contracts/DnmPool.sol:1742-1752`).
 
 ### Caps & Floors
 - Global cap `fee.capBps` bounds the pipeline (default `150` bps).

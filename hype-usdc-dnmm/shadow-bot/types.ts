@@ -403,3 +403,334 @@ export interface LoopArtifacts {
 export interface OracleReaderAdapter {
   sample(): Promise<OracleSnapshot>;
 }
+
+export type BenchmarkId = 'dnmm' | 'cpmm' | 'stableswap';
+export const BENCHMARK_IDS: readonly BenchmarkId[] = ['dnmm', 'cpmm', 'stableswap'] as const;
+
+export type FlowPatternId =
+  | 'arb_constant'
+  | 'toxic'
+  | 'trend'
+  | 'mean_revert'
+  | 'benign_poisson'
+  | 'mixed';
+
+export type FlowSizeDistributionKind = 'lognormal' | 'pareto' | 'fixed';
+
+interface FlowSizeDistributionBase {
+  readonly kind: FlowSizeDistributionKind;
+  readonly min: number;
+  readonly max: number;
+}
+
+export interface FlowLognormalDistribution extends FlowSizeDistributionBase {
+  readonly kind: 'lognormal';
+  readonly mu: number;
+  readonly sigma: number;
+}
+
+export interface FlowParetoDistribution extends FlowSizeDistributionBase {
+  readonly kind: 'pareto';
+  readonly mu: number;
+  readonly sigma: number;
+}
+
+export interface FlowFixedDistribution extends FlowSizeDistributionBase {
+  readonly kind: 'fixed';
+}
+
+export type FlowSizeDistribution =
+  | FlowLognormalDistribution
+  | FlowParetoDistribution
+  | FlowFixedDistribution;
+
+export interface FlowToxicityConfig {
+  readonly oracleLeadMs: number;
+  readonly edgeBpsMu: number;
+  readonly edgeBpsSigma: number;
+}
+
+export interface FlowPatternConfig {
+  readonly pattern: FlowPatternId;
+  readonly seconds: number;
+  readonly seed: number;
+  readonly txnRatePerMin: number;
+  readonly size: FlowSizeDistribution;
+  readonly toxicity?: FlowToxicityConfig;
+}
+
+export interface LatencyProfile {
+  readonly quoteToTxMs: number;
+  readonly jitterMs: number;
+}
+
+export type RouterMinOutPolicy = 'preview' | 'preview_ladder' | 'fixed_margin';
+
+export interface RouterConfig {
+  readonly slippageBps: number;
+  readonly ttlSec: number;
+  readonly minOutPolicy: RouterMinOutPolicy;
+}
+
+export interface RunFeatureFlags {
+  readonly enableSoftDivergence: boolean;
+  readonly enableSizeFee: boolean;
+  readonly enableBboFloor: boolean;
+  readonly enableInvTilt: boolean;
+  readonly enableAOMQ: boolean;
+  readonly enableRebates: boolean;
+}
+
+export interface RunMakerParams {
+  readonly betaFloorBps: number;
+  readonly alphaBboBps: number;
+  readonly s0Notional: number;
+}
+
+export interface RunInventoryParams {
+  readonly invTiltBpsPer1pct: number;
+  readonly invTiltMaxBps: number;
+  readonly tiltConfWeightBps: number;
+  readonly tiltSpreadWeightBps: number;
+}
+
+export interface RunAomqParams {
+  readonly minQuoteNotional: number;
+  readonly emergencySpreadBps: number;
+  readonly floorEpsilonBps: number;
+}
+
+export interface RunSettingDefinition {
+  readonly id: string;
+  readonly label: string;
+  readonly featureFlags: RunFeatureFlags;
+  readonly makerParams: RunMakerParams;
+  readonly inventoryParams: RunInventoryParams;
+  readonly aomqParams: RunAomqParams;
+  readonly flow: FlowPatternConfig;
+  readonly latency: LatencyProfile;
+  readonly router: RouterConfig;
+}
+
+export interface SettingsOracles {
+  readonly hypercore?: string;
+  readonly pyth?: string;
+}
+
+export interface SettingsFileSchema {
+  readonly version: string;
+  readonly pair: string;
+  readonly base?: string;
+  readonly quote?: string;
+  readonly baseSymbol?: string;
+  readonly quoteSymbol?: string;
+  readonly runs: readonly RunSettingDefinition[];
+  readonly oracles?: SettingsOracles;
+  readonly benchmarks?: readonly BenchmarkId[];
+}
+
+export interface RunnerPaths {
+  readonly runRoot: string;
+  readonly tradesDir: string;
+  readonly quotesDir: string;
+  readonly scoreboardPath: string;
+}
+
+export interface ChainRuntimeConfig {
+  readonly mode: 'live' | 'fork';
+  readonly rpcUrl: string;
+  readonly wsUrl?: string;
+  readonly chainId?: number;
+  readonly poolAddress: string;
+  readonly baseTokenAddress: string;
+  readonly quoteTokenAddress: string;
+  readonly baseDecimals: number;
+  readonly quoteDecimals: number;
+  readonly pythAddress?: string;
+  readonly hcPxPrecompile: string;
+  readonly hcBboPrecompile: string;
+  readonly hcPxKey: number;
+  readonly hcBboKey: number;
+  readonly hcMarketType: 'spot' | 'perp';
+  readonly hcSizeDecimals: number;
+  readonly hcPxMultiplier: bigint;
+  readonly pythPriceId?: string;
+  readonly gasPriceGwei?: number;
+  readonly nativeUsd?: number;
+  readonly addressBookSource?: string;
+}
+
+export interface MockRuntimeConfig {
+  readonly mode: 'mock';
+}
+
+export type RuntimeChainConfig = ChainRuntimeConfig | MockRuntimeConfig;
+
+export interface MultiRunRuntimeConfig {
+  readonly runId: string;
+  readonly mode: ShadowBotMode;
+  readonly logLevel: 'info' | 'debug';
+  readonly benchmarks: readonly BenchmarkId[];
+  readonly maxParallel: number;
+  readonly persistCsv: boolean;
+  readonly promPort: number;
+  readonly seedBase: number;
+  readonly durationOverrideSec?: number;
+  readonly pairLabels: ShadowBotLabels;
+  readonly settings: SettingsFileSchema;
+  readonly runs: readonly RunSettingDefinition[];
+  readonly paths: RunnerPaths;
+  readonly chain?: ChainRuntimeConfig;
+  readonly mock?: MockRuntimeConfig;
+  readonly addressBookPath?: string;
+}
+
+export interface TradeIntent {
+  readonly id: string;
+  readonly timestampMs: number;
+  readonly settingId: string;
+  readonly pattern: FlowPatternId;
+  readonly side: ProbeSide;
+  readonly amountIn: number;
+  readonly minOut?: number;
+  readonly ttlMs: number;
+  readonly slippageBps: number;
+}
+
+export interface QuoteCsvRecord {
+  readonly tsIso: string;
+  readonly settingId: string;
+  readonly benchmark: BenchmarkId;
+  readonly side: ProbeSide;
+  readonly sizeBaseWad: string;
+  readonly feeBps: number;
+  readonly mid: string;
+  readonly spreadBps: number;
+  readonly confBps?: number;
+  readonly aomqActive: boolean;
+}
+
+export interface TradeCsvRecord {
+  readonly tsIso: string;
+  readonly settingId: string;
+  readonly benchmark: BenchmarkId;
+  readonly side: ProbeSide;
+  readonly amountIn: string;
+  readonly amountOut: string;
+  readonly midUsed: string;
+  readonly feeBpsUsed: number;
+  readonly floorBps?: number;
+  readonly tiltBps?: number;
+  readonly aomqClamped: boolean;
+  readonly minOut?: string;
+  readonly slippageBpsVsMid: number;
+  readonly pnlQuote: number;
+  readonly inventoryBase: string;
+  readonly inventoryQuote: string;
+}
+
+export interface ScoreboardRow {
+  readonly settingId: string;
+  readonly benchmark: BenchmarkId;
+  readonly trades: number;
+  readonly pnlQuoteTotal: number;
+  readonly pnlPerMmNotionalBps: number;
+  readonly winRatePct: number;
+  readonly avgFeeBps: number;
+  readonly avgSlippageBps: number;
+  readonly twoSidedUptimePct: number;
+  readonly rejectRatePct: number;
+  readonly aomqClampsTotal: number;
+  readonly recenterCommitsTotal: number;
+}
+
+export interface ScoreboardContext {
+  readonly runId: string;
+  readonly pair: string;
+  readonly benchmarks: readonly BenchmarkId[];
+}
+
+export interface ScoreboardInputRow {
+  readonly settingId: string;
+  readonly benchmark: BenchmarkId;
+  readonly executed: boolean;
+  readonly pnlQuote: number;
+  readonly feeBps: number;
+  readonly slippageBps: number;
+  readonly aomqClamped: boolean;
+  readonly rejected: boolean;
+  readonly twoSidedSnapshot: boolean;
+}
+
+export interface PrometheusLabelSet {
+  readonly run_id: string;
+  readonly setting_id: string;
+  readonly benchmark: BenchmarkId;
+  readonly pair: string;
+}
+
+export interface BenchmarkTradeResult {
+  readonly intent: TradeIntent;
+  readonly success: boolean;
+  readonly amountIn: bigint;
+  readonly amountOut: bigint;
+  readonly midUsed: bigint;
+  readonly feeBpsUsed: number;
+  readonly floorBps?: number;
+  readonly tiltBps?: number;
+  readonly aomqClamped: boolean;
+  readonly minOut?: bigint;
+  readonly slippageBpsVsMid: number;
+  readonly pnlQuote: number;
+  readonly inventoryBase: bigint;
+  readonly inventoryQuote: bigint;
+  readonly latencyMs: number;
+  readonly rejectReason?: string;
+}
+
+export interface BenchmarkQuoteSample {
+  readonly timestampMs: number;
+  readonly side: ProbeSide;
+  readonly sizeBaseWad: bigint;
+  readonly feeBps: number;
+  readonly mid: bigint;
+  readonly spreadBps: number;
+  readonly confBps?: number;
+  readonly aomqActive: boolean;
+}
+
+export interface BenchmarkAdapter {
+  readonly id: BenchmarkId;
+  init(): Promise<void>;
+  close(): Promise<void>;
+  sampleQuote(side: ProbeSide, sizeBaseWad: bigint): Promise<BenchmarkQuoteSample>;
+  simulateTrade(intent: TradeIntent): Promise<BenchmarkTradeResult>;
+}
+
+export interface BenchmarkFactoryContext {
+  readonly labels: ShadowBotLabels;
+  readonly chain?: ChainRuntimeConfig;
+  readonly logger: {
+    debug(message: string, meta?: Record<string, unknown>): void;
+    info(message: string, meta?: Record<string, unknown>): void;
+    error(message: string, meta?: Record<string, unknown>): void;
+  };
+  readonly oracleReader: OracleReaderAdapter;
+  readonly poolClient?: PoolClientAdapter;
+}
+
+export type BenchmarkFactory = (context: BenchmarkFactoryContext) => Promise<BenchmarkAdapter>;
+
+export interface CsvWriterContext {
+  readonly tradesHeader: readonly string[];
+  readonly quotesHeader: readonly string[];
+  readonly scoreboardHeader: readonly string[];
+}
+
+export interface CsvWriterAdapter {
+  init(): Promise<void>;
+  appendTrades(records: readonly TradeCsvRecord[]): Promise<void>;
+  appendQuotes(records: readonly QuoteCsvRecord[]): Promise<void>;
+  writeScoreboard(rows: readonly ScoreboardRow[]): Promise<void>;
+}
+

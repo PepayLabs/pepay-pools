@@ -1,5 +1,5 @@
 import { JsonRpcProvider, WebSocketProvider } from 'ethers';
-import { ChainBackedConfig, ChainClient, ProviderHealthSample } from './types.js';
+import { ChainRuntimeConfig, ChainClient, ProviderHealthSample } from './types.js';
 
 type HealthCallback = (sample: ProviderHealthSample) => void;
 
@@ -31,14 +31,11 @@ export class LiveChainClient implements ChainClient {
   private readonly retryBackoffMs: number;
   private readonly timeoutMs: number;
 
-  constructor(
-    private readonly config: ChainBackedConfig,
-    private readonly onHealthSample?: HealthCallback
-  ) {
+  constructor(private readonly config: ChainRuntimeConfig, private readonly onHealthSample?: HealthCallback) {
     this.rpc = new JsonRpcProvider(config.rpcUrl, config.chainId ?? undefined);
-    this.retryAttempts = config.sampling.retryAttempts;
-    this.retryBackoffMs = config.sampling.retryBackoffMs;
-    this.timeoutMs = config.sampling.timeoutMs;
+    this.retryAttempts = 3;
+    this.retryBackoffMs = 500;
+    this.timeoutMs = 7_500;
 
     if (config.wsUrl) {
       this.ws = new WebSocketProvider(config.wsUrl, config.chainId ?? undefined);
@@ -129,10 +126,7 @@ export class LiveChainClient implements ChainClient {
   }
 }
 
-export function createLiveChainClient(
-  config: ChainBackedConfig,
-  onHealthSample?: HealthCallback
-): LiveChainClient {
+export function createLiveChainClient(config: ChainRuntimeConfig, onHealthSample?: HealthCallback): LiveChainClient {
   return new LiveChainClient(config, onHealthSample);
 }
 

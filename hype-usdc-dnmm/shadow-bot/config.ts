@@ -1,14 +1,25 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { parseUnits } from 'ethers';
 import {
   AddressBookEntry,
   AddressBookFile,
-  ChainBackedConfig,
-  HistogramBuckets,
-  MockShadowBotConfig,
-  ShadowBotConfig,
+  ChainRuntimeConfig,
+  BenchmarkId,
+  FlowPatternConfig,
+  FlowSizeDistribution,
+  FlowSizeDistributionKind,
+  FlowToxicityConfig,
+  LatencyProfile,
+  MultiRunRuntimeConfig,
+  RunAomqParams,
+  RunFeatureFlags,
+  RunInventoryParams,
+  RunMakerParams,
+  RunSettingDefinition,
+  RunnerPaths,
+  RouterConfig,
+  SettingsFileSchema,
   ShadowBotLabels,
   ShadowBotMode
 } from './types.js';
@@ -16,47 +27,476 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DEFAULT_PAIR = 'HYPE/USDC';
-const DEFAULT_BASE_SYMBOL = 'HYPE';
-const DEFAULT_QUOTE_SYMBOL = 'USDC';
-const DEFAULT_INTERVAL_MS = 5_000;
-const DEFAULT_TIMEOUT_MS = 7_500;
-const DEFAULT_BACKOFF_MS = 500;
-const DEFAULT_RETRIES = 3;
-const DEFAULT_SNAPSHOT_MAX_AGE_SEC = 30;
-const DEFAULT_PROM_PORT = 9_464;
-const DEFAULT_CSV_DIR = path.resolve(__dirname, '../metrics/hype-metrics');
-const DEFAULT_SUMMARY_PATH = path.join(DEFAULT_CSV_DIR, 'shadow_summary.json');
-const DEFAULT_ADDRESS_BOOK = path.resolve(__dirname, 'address-book.json');
-const DEFAULT_HISTOGRAM_BUCKETS: HistogramBuckets = {
-  deltaBps: [5, 10, 20, 30, 40, 50, 75, 100, 200, 500],
-  confBps: [10, 20, 40, 60, 80, 100, 150, 200],
-  bboSpreadBps: [5, 10, 20, 30, 40, 50, 75, 100, 200],
-  quoteLatencyMs: [5, 10, 20, 50, 100, 200, 500, 1_000],
-  feeBps: [5, 10, 15, 20, 30, 40, 60, 80, 100, 150],
-  totalBps: [5, 10, 15, 20, 30, 40, 60, 80, 100, 150, 200]
-};
-const DEFAULT_MODE: ShadowBotMode = 'mock';
-const DEFAULT_SCENARIO = 'calm';
-const DEFAULT_FORK_OUTPUT_PATH = path.resolve(
-  __dirname,
-  '../metrics/hype-metrics/output/deploy-mocks.json'
-);
-
-function must(envName: string): string {
-  const value = process.env[envName];
-  if (!value || value.trim().length === 0) {
-    throw new Error(`Missing required environment variable ${envName}`);
-  }
-  return value.trim();
+interface CliOptions {
+  readonly mode?: string;
+  readonly runId?: string;
+  readonly settings?: string;
+  readonly durationSec?: number;
+  readonly maxParallel?: number;
+  readonly seedBase?: number;
+  readonly benchmarks?: string[];
+  readonly persistCsv?: boolean;
+  readonly promPort?: number;
+  readonly logLevel?: 'info' | 'debug';
+  readonly runRoot?: string;
+  readonly addressBook?: string;
 }
 
-function getOptional(envName: string): string | undefined {
-  const value = process.env[envName];
-  if (!value || value.trim().length === 0) {
-    return undefined;
+const DEFAULT_SETTINGS_PATH = path.resolve(__dirname, './settings/hype_settings.json');
+const DEFAULT_METRICS_ROOT = path.resolve(__dirname, '../metrics/hype-metrics');
+const DEFAULT_PROM_PORT = 9_464;
+const DEFAULT_MAX_PARALLEL = 6;
+const DEFAULT_SEED_BASE = 1_337;
+const DEFAULT_ADDRESS_BOOK = path.resolve(__dirname, 'address-book.json');
+
+export async function loadConfig(
+  argv = process.argv.slice(2),
+  env: NodeJS.ProcessEnv = process.env
+): Promise<MultiRunRuntimeConfig> {
+  const cli = parseCliOptions(argv);
+  const mode = resolveMode(cli.mode ?? env.MODE);
+  const logLevel = resolveLogLevel(cli.logLevel ?? env.LOG_LEVEL);
+  const runId = sanitizeRunId(cli.runId ?? env.RUN_ID ?? createDefaultRunId());
+
+  const settingsPath = path.resolve(cli.settings ?? env.SETTINGS_FILE ?? DEFAULT_SETTINGS_PATH);
+  const settings = await loadSettingsFile(settingsPath);
+  const runs = settings.runs.map((run, index) => normalizeRunSetting(run, index));
+  ensureUniqueRunIds(runs);
+
+  const benchmarks = resolveBenchmarks(cli.benchmarks ?? parseBenchmarksEnv(env.BENCHMARKS), settings.benchmarks) as BenchmarkId[];
+  if (benchmarks.length === 0) {
+    throw new Error('At least one benchmark must be specified via settings or CLI');
   }
-  return value.trim();
+
+  const pairLabels = deriveLabels(settings, env, mode);
+  const maxParallel = cli.maxParallel ?? parseInteger(env.MAX_PARALLEL, DEFAULT_MAX_PARALLEL);
+  const persistCsv = cli.persistCsv ?? parseBoolean(env.PERSIST_CSV, false);
+  const promPort = cli.promPort ?? parseInteger(env.PROM_PORT, DEFAULT_PROM_PORT);
+  const seedBase = cli.seedBase ?? parseInteger(env.SEED_BASE, DEFAULT_SEED_BASE);
+  const durationOverrideSec = cli.durationSec ?? parseOptionalInteger(env.DURATION_SEC);
+
+  const metricsRoot = path.resolve(cli.runRoot ?? env.METRICS_ROOT ?? DEFAULT_METRICS_ROOT);
+  const paths = buildRunnerPaths(metricsRoot, runId);
+
+  let chain: ChainRuntimeConfig | undefined;
+  let addressBookPath: string | undefined;
+  if (mode === 'live' || mode === 'fork') {
+    addressBookPath = path.resolve(cli.addressBook ?? env.ADDRESS_BOOK_JSON ?? DEFAULT_ADDRESS_BOOK);
+    const addressBook = await readAddressBook(addressBookPath);
+    const forkDeploy = await readForkDeployJson(env.FORK_DEPLOY_JSON);
+    chain = await buildChainRuntimeConfig({
+      mode,
+      env,
+      addressBook,
+      addressBookPath,
+      forkDeploy,
+      runs,
+      pairLabels
+    });
+  }
+
+  return {
+    runId,
+    mode,
+    logLevel,
+    benchmarks,
+    maxParallel,
+    persistCsv,
+    promPort,
+    seedBase,
+    durationOverrideSec,
+    pairLabels,
+    settings: { ...settings, runs },
+    runs,
+    paths,
+    chain,
+    mock: mode === 'mock' ? { mode: 'mock' } : undefined,
+    addressBookPath
+  };
+}
+
+function parseCliOptions(argv: readonly string[]): CliOptions {
+  const result: Record<string, unknown> = {};
+  let index = 0;
+  while (index < argv.length) {
+    const arg = argv[index];
+    if (!arg.startsWith('--')) {
+      index += 1;
+      continue;
+    }
+    const [flag, valuePart] = arg.split('=');
+    const key = flag.slice(2);
+    let value: string | undefined = valuePart;
+    if (!value && index + 1 < argv.length && !argv[index + 1].startsWith('--')) {
+      value = argv[index + 1];
+      index += 1;
+    }
+    switch (key) {
+      case 'mode':
+        result.mode = value;
+        break;
+      case 'run-id':
+        result.runId = value;
+        break;
+      case 'settings':
+        result.settings = value;
+        break;
+      case 'duration-sec':
+        result.durationSec = value ? parseInteger(value, undefined) : undefined;
+        break;
+      case 'max-parallel':
+        result.maxParallel = value ? parseInteger(value, undefined) : undefined;
+        break;
+      case 'seed-base':
+        result.seedBase = value ? parseInteger(value, undefined) : undefined;
+        break;
+      case 'benchmarks':
+        result.benchmarks = value ? value.split(',').map((item) => item.trim()).filter(Boolean) : [];
+        break;
+      case 'persist-csv':
+        result.persistCsv = value ? parseBoolean(value, true) : true;
+        break;
+      case 'no-persist-csv':
+        result.persistCsv = false;
+        break;
+      case 'prom-port':
+        result.promPort = value ? parseInteger(value, undefined) : undefined;
+        break;
+      case 'log-level':
+        result.logLevel = resolveLogLevel(value);
+        break;
+      case 'run-root':
+        result.runRoot = value;
+        break;
+      case 'address-book':
+        result.addressBook = value;
+        break;
+      default:
+        // ignore unknown flags to allow forward compatibility
+        break;
+    }
+    index += 1;
+  }
+  return result;
+}
+
+function resolveMode(raw?: string): ShadowBotMode {
+  if (!raw) return 'mock';
+  const lowered = raw.toLowerCase();
+  if (lowered === 'live' || lowered === 'fork' || lowered === 'mock') {
+    return lowered;
+  }
+  throw new Error(`Unsupported MODE value: ${raw}`);
+}
+
+function resolveLogLevel(raw?: string): 'info' | 'debug' {
+  if (!raw) return 'info';
+  return raw.toLowerCase() === 'debug' ? 'debug' : 'info';
+}
+
+function parseBenchmarksEnv(raw?: string): string[] | undefined {
+  if (!raw) return undefined;
+  return raw
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function resolveBenchmarks(cli: string[] | undefined, fromSettings: readonly string[] | undefined): string[] {
+  const source = cli && cli.length > 0 ? cli : fromSettings ?? [];
+  const allowed = new Set(['dnmm', 'cpmm', 'stableswap']);
+  return source.map((item) => item.toLowerCase()).filter((item) => {
+    if (!allowed.has(item)) {
+      throw new Error(`Unsupported benchmark requested: ${item}`);
+    }
+    return true;
+  });
+}
+
+function parseBoolean(raw: string | boolean | undefined, fallback: boolean): boolean {
+  if (typeof raw === 'boolean') return raw;
+  if (!raw) return fallback;
+  const lowered = raw.toLowerCase();
+  if (lowered === 'true' || lowered === '1' || lowered === 'yes') return true;
+  if (lowered === 'false' || lowered === '0' || lowered === 'no') return false;
+  return fallback;
+}
+
+function parseInteger(raw: string | number | undefined, fallback: number | undefined): number {
+  if (typeof raw === 'number') {
+    if (!Number.isFinite(raw)) throw new Error('Numeric value must be finite');
+    return Math.trunc(raw);
+  }
+  if (raw === undefined) {
+    if (fallback === undefined) throw new Error('Missing required integer value');
+    return fallback;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isNaN(parsed)) {
+    if (fallback === undefined) {
+      throw new Error(`Unable to parse integer from value: ${raw}`);
+    }
+    return fallback;
+  }
+  return parsed;
+}
+
+function parseOptionalInteger(raw: string | undefined): number | undefined {
+  if (!raw) return undefined;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
+function sanitizeRunId(runId: string): string {
+  return runId.replace(/[^a-zA-Z0-9_-]/g, '-');
+}
+
+function createDefaultRunId(): string {
+  const now = new Date();
+  return now.toISOString().replace(/[:.]/g, '-');
+}
+
+async function loadSettingsFile(settingsPath: string): Promise<SettingsFileSchema> {
+  try {
+    const contents = await fs.readFile(settingsPath, 'utf8');
+    const parsed = JSON.parse(contents) as SettingsFileSchema;
+    if (!parsed || typeof parsed !== 'object') {
+      throw new Error('Settings file must contain a JSON object');
+    }
+    if (!Array.isArray(parsed.runs) || parsed.runs.length === 0) {
+      throw new Error('Settings file must include a non-empty runs array');
+    }
+    return parsed;
+  } catch (error) {
+    throw new Error(`Failed to load settings file at ${settingsPath}: ${(error as Error).message}`);
+  }
+}
+
+function buildRunnerPaths(metricsRoot: string, runId: string): RunnerPaths {
+  const runRoot = path.join(metricsRoot, `run_${runId}`);
+  const tradesDir = path.join(runRoot, 'trades');
+  const quotesDir = path.join(runRoot, 'quotes');
+  const scoreboardPath = path.join(runRoot, 'scoreboard.csv');
+  return { runRoot, tradesDir, quotesDir, scoreboardPath };
+}
+
+function deriveLabels(settings: SettingsFileSchema, env: NodeJS.ProcessEnv, mode: ShadowBotMode): ShadowBotLabels {
+  const pair = settings.pair ?? env.PAIR ?? 'HYPE/USDC';
+  const [baseSymbolDefault, quoteSymbolDefault] = pair.includes('/')
+    ? pair.split('/')
+    : [settings.baseSymbol ?? 'HYPE', settings.quoteSymbol ?? 'USDC'];
+  const baseSymbol = settings.baseSymbol ?? env.BASE_SYMBOL ?? baseSymbolDefault;
+  const quoteSymbol = settings.quoteSymbol ?? env.QUOTE_SYMBOL ?? quoteSymbolDefault;
+  const chainLabel = env.CHAIN_LABEL ?? (mode === 'live' ? 'hyperEVM' : mode === 'fork' ? 'hyperEVM-fork' : 'mock');
+  return {
+    pair,
+    baseSymbol,
+    quoteSymbol,
+    chain: chainLabel
+  };
+}
+
+function ensureUniqueRunIds(runs: readonly RunSettingDefinition[]): void {
+  const ids = new Set<string>();
+  for (const run of runs) {
+    if (ids.has(run.id)) {
+      throw new Error(`Duplicate run id detected in settings: ${run.id}`);
+    }
+    ids.add(run.id);
+  }
+}
+
+function normalizeRunSetting(raw: RunSettingDefinition, index: number): RunSettingDefinition {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error(`Run definition at index ${index} is not an object`);
+  }
+  const id = requireString((raw as Record<string, unknown>).id, `runs[${index}].id`);
+  const label = requireString((raw as Record<string, unknown>).label, `runs[${index}].label`);
+  const featureFlags = normalizeFeatureFlags((raw as Record<string, unknown>).featureFlags, index);
+  const makerParams = normalizeMakerParams((raw as Record<string, unknown>).makerParams, index);
+  const inventoryParams = normalizeInventoryParams((raw as Record<string, unknown>).inventoryParams, index);
+  const aomqParams = normalizeAomqParams((raw as Record<string, unknown>).aomqParams, index);
+  const flow = normalizeFlowConfig((raw as Record<string, unknown>).flow, index);
+  const latency = normalizeLatency((raw as Record<string, unknown>).latency, index);
+  const router = normalizeRouter((raw as Record<string, unknown>).router, index);
+  return {
+    id,
+    label,
+    featureFlags,
+    makerParams,
+    inventoryParams,
+    aomqParams,
+    flow,
+    latency,
+    router
+  };
+}
+
+function normalizeFeatureFlags(raw: unknown, index: number): RunFeatureFlags {
+  const candidate = expectRecord(raw, `runs[${index}].featureFlags`);
+  return {
+    enableSoftDivergence: parseBoolean(candidate.enableSoftDivergence, true),
+    enableSizeFee: parseBoolean(candidate.enableSizeFee, false),
+    enableBboFloor: parseBoolean(candidate.enableBboFloor, true),
+    enableInvTilt: parseBoolean(candidate.enableInvTilt, true),
+    enableAOMQ: parseBoolean(candidate.enableAOMQ, false),
+    enableRebates: parseBoolean(candidate.enableRebates, false)
+  };
+}
+
+function normalizeMakerParams(raw: unknown, index: number): RunMakerParams {
+  const candidate = expectRecord(raw, `runs[${index}].makerParams`);
+  return {
+    betaFloorBps: toNumber(candidate.betaFloorBps, `runs[${index}].makerParams.betaFloorBps`),
+    alphaBboBps: toNumber(candidate.alphaBboBps, `runs[${index}].makerParams.alphaBboBps`),
+    s0Notional: toNumber(candidate.S0Notional ?? candidate.s0Notional, `runs[${index}].makerParams.S0Notional`)
+  };
+}
+
+function normalizeInventoryParams(raw: unknown, index: number): RunInventoryParams {
+  const candidate = expectRecord(raw, `runs[${index}].inventoryParams`);
+  return {
+    invTiltBpsPer1pct: toNumber(candidate.invTiltBpsPer1pct, `runs[${index}].inventoryParams.invTiltBpsPer1pct`),
+    invTiltMaxBps: toNumber(candidate.invTiltMaxBps, `runs[${index}].inventoryParams.invTiltMaxBps`),
+    tiltConfWeightBps: toNumber(candidate.tiltConfWeightBps, `runs[${index}].inventoryParams.tiltConfWeightBps`),
+    tiltSpreadWeightBps: toNumber(candidate.tiltSpreadWeightBps, `runs[${index}].inventoryParams.tiltSpreadWeightBps`)
+  };
+}
+
+function normalizeAomqParams(raw: unknown, index: number): RunAomqParams {
+  const candidate = expectRecord(raw, `runs[${index}].aomqParams`);
+  return {
+    minQuoteNotional: toNumber(candidate.minQuoteNotional, `runs[${index}].aomqParams.minQuoteNotional`),
+    emergencySpreadBps: toNumber(candidate.emergencySpreadBps, `runs[${index}].aomqParams.emergencySpreadBps`),
+    floorEpsilonBps: toNumber(candidate.floorEpsilonBps, `runs[${index}].aomqParams.floorEpsilonBps`)
+  };
+}
+
+function normalizeFlowConfig(raw: unknown, index: number): FlowPatternConfig {
+  const candidate = expectRecord(raw, `runs[${index}].flow`);
+  const patternRaw = requireString(candidate.pattern, `runs[${index}].flow.pattern`).toLowerCase();
+  const allowedPatterns: FlowPatternConfig['pattern'][] = [
+    'arb_constant',
+    'toxic',
+    'trend',
+    'mean_revert',
+    'benign_poisson',
+    'mixed'
+  ];
+  if (!(allowedPatterns as readonly string[]).includes(patternRaw)) {
+    throw new Error(`Unsupported flow pattern: ${patternRaw}`);
+  }
+  const pattern = patternRaw as FlowPatternConfig['pattern'];
+  const seconds = toNumber(candidate.seconds, `runs[${index}].flow.seconds`);
+  const seed = toNumber(candidate.seed, `runs[${index}].flow.seed`);
+  const txnRatePerMin = toNumber(candidate.txn_rate_per_min ?? candidate.txnRatePerMin, `runs[${index}].flow.txn_rate_per_min`);
+  const sizeDistRaw = (candidate.size_dist ?? candidate.sizeDist ?? 'lognormal') as FlowSizeDistributionKind;
+  const sizeParams = normalizeFlowSizeDistribution(sizeDistRaw, candidate.size_params ?? candidate.sizeParams, index);
+  const toxicity = candidate.toxicity ? normalizeFlowToxicity(candidate.toxicity, index) : undefined;
+  return {
+    pattern,
+    seconds,
+    seed,
+    txnRatePerMin,
+    size: sizeParams,
+    toxicity
+  };
+}
+
+function normalizeFlowSizeDistribution(
+  kindRaw: FlowSizeDistributionKind,
+  paramsRaw: unknown,
+  index: number
+): FlowSizeDistribution {
+  const kind = (kindRaw ?? 'lognormal').toLowerCase() as FlowSizeDistributionKind;
+  const params = expectRecord(paramsRaw, `runs[${index}].flow.size_params`);
+  const min = toNumber(params.min, `runs[${index}].flow.size_params.min`);
+  const max = toNumber(params.max ?? params.min, `runs[${index}].flow.size_params.max`);
+  if (kind === 'lognormal') {
+    return {
+      kind,
+      mu: toNumber(params.mu, `runs[${index}].flow.size_params.mu`),
+      sigma: toNumber(params.sigma, `runs[${index}].flow.size_params.sigma`),
+      min,
+      max
+    };
+  }
+  if (kind === 'pareto') {
+    return {
+      kind,
+      mu: toNumber(params.mu, `runs[${index}].flow.size_params.mu`),
+      sigma: toNumber(params.sigma ?? params.alpha ?? 1, `runs[${index}].flow.size_params.sigma`),
+      min,
+      max
+    };
+  }
+  if (kind === 'fixed') {
+    return {
+      kind,
+      min,
+      max
+    };
+  }
+  throw new Error(`Unsupported flow size distribution kind: ${kind}`);
+}
+
+function normalizeFlowToxicity(raw: unknown, index: number): FlowToxicityConfig {
+  const candidate = expectRecord(raw, `runs[${index}].flow.toxicity`);
+  return {
+    oracleLeadMs: toNumber(candidate.oracle_lead_ms ?? candidate.oracleLeadMs, `runs[${index}].flow.toxicity.oracle_lead_ms`),
+    edgeBpsMu: toNumber(candidate.edge_bps_mu ?? candidate.edgeBpsMu, `runs[${index}].flow.toxicity.edge_bps_mu`),
+    edgeBpsSigma: toNumber(candidate.edge_bps_sigma ?? candidate.edgeBpsSigma, `runs[${index}].flow.toxicity.edge_bps_sigma`)
+  };
+}
+
+function normalizeLatency(raw: unknown, index: number): LatencyProfile {
+  const candidate = expectRecord(raw, `runs[${index}].latency`);
+  return {
+    quoteToTxMs: toNumber(candidate.quote_to_tx_ms ?? candidate.quoteToTxMs, `runs[${index}].latency.quote_to_tx_ms`),
+    jitterMs: toNumber(candidate.jitter_ms ?? candidate.jitterMs, `runs[${index}].latency.jitter_ms`)
+  };
+}
+
+function normalizeRouter(raw: unknown, index: number): RouterConfig {
+  const candidate = expectRecord(raw, `runs[${index}].router`);
+  const policyRaw = requireString(candidate.minOut_policy ?? candidate.minOutPolicy, `runs[${index}].router.minOut_policy`).toLowerCase();
+  const allowedPolicies: RouterConfig['minOutPolicy'][] = ['preview', 'preview_ladder', 'fixed_margin'];
+  if (!allowedPolicies.includes(policyRaw as RouterConfig['minOutPolicy'])) {
+    throw new Error(`Unsupported router minOut policy: ${policyRaw}`);
+  }
+  return {
+    slippageBps: toNumber(candidate.slippage_bps ?? candidate.slippageBps, `runs[${index}].router.slippage_bps`),
+    ttlSec: toNumber(candidate.ttl_sec ?? candidate.ttlSec, `runs[${index}].router.ttl_sec`),
+    minOutPolicy: policyRaw as RouterConfig['minOutPolicy']
+  };
+}
+
+function expectRecord(value: unknown, label: string): Record<string, any> {
+  if (!value || typeof value !== 'object') {
+    throw new Error(`${label} must be an object`);
+  }
+  return value as Record<string, any>;
+}
+
+function requireString(value: unknown, label: string): string {
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value.trim();
+  }
+  throw new Error(`${label} must be a non-empty string`);
+}
+
+function toNumber(value: unknown, label: string): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const normalized = value.replace(/_/g, '');
+    const parsed = Number(normalized);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  throw new Error(`${label} must be numeric`);
 }
 
 async function readAddressBook(addressBookPath: string): Promise<AddressBookFile | undefined> {
@@ -64,7 +504,7 @@ async function readAddressBook(addressBookPath: string): Promise<AddressBookFile
     const data = await fs.readFile(addressBookPath, 'utf8');
     const parsed = JSON.parse(data) as AddressBookFile;
     if (!parsed || typeof parsed !== 'object' || !parsed.deployments) {
-      throw new Error('Invalid address-book.json schema');
+      throw new Error('Invalid address-book schema');
     }
     return parsed;
   } catch (error) {
@@ -75,346 +515,85 @@ async function readAddressBook(addressBookPath: string): Promise<AddressBookFile
   }
 }
 
-function ensureHex(address: string | undefined, label: string): string {
-  if (!address) {
-    throw new Error(`Missing required address for ${label}`);
-  }
-  if (!address.startsWith('0x')) {
-    throw new Error(`Address ${label} must be 0x-prefixed`);
-  }
-  return address;
-}
-
-function parseIntEnv(envName: string, fallback: number): number {
-  const value = getOptional(envName);
-  if (!value) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed)) {
-    throw new Error(`Environment variable ${envName} must be an integer`);
-  }
-  return parsed;
-}
-
-function parseFloatEnv(envName: string): number | undefined {
-  const value = getOptional(envName);
-  if (!value) return undefined;
-  const parsed = Number.parseFloat(value);
-  if (Number.isNaN(parsed)) {
-    throw new Error(`Environment variable ${envName} must be numeric`);
-  }
-  return parsed;
-}
-
-function parseLogLevel(): 'info' | 'debug' {
-  const level = getOptional('LOG_LEVEL');
-  if (!level) return 'info';
-  return level === 'debug' ? 'debug' : 'info';
-}
-
-function normalizeSizeToken(value: string): bigint {
-  const trimmed = value.trim();
-  if (/^0x[0-9a-fA-F]+$/.test(trimmed)) {
-    return BigInt(trimmed);
-  }
-  if (/^[0-9]+$/.test(trimmed)) {
-    return BigInt(trimmed);
-  }
-  if (/^[0-9]+(\.[0-9]+)?$/.test(trimmed)) {
-    return parseUnits(trimmed, 18);
-  }
-  const scientific = trimmed.match(/^([0-9]+(?:\.[0-9]+)?)e([+-]?[0-9]+)$/i);
-  if (scientific) {
-    const [, coeffStr, expStr] = scientific;
-    const exp = Number.parseInt(expStr, 10);
-    const [intPart, fracPart = ''] = coeffStr.split('.');
-    const digits = `${intPart}${fracPart}`;
-    const decimalPlaces = fracPart.length;
-    return BigInt(digits) * 10n ** BigInt(exp - decimalPlaces);
-  }
-  throw new Error(`Unable to parse size value '${value}' as WAD`);
-}
-
-function deriveSizeGrid(): { grid: bigint[]; source: string } {
-  const raw = getOptional('SIZES_WAD');
-  if (!raw) {
-    const defaults = ['0.1', '0.5', '1', '2', '5', '10'];
-    return { grid: defaults.map((entry) => parseUnits(entry, 18)), source: 'default' };
-  }
-  const values = raw.split(',').map((token) => token.trim()).filter(Boolean);
-  if (values.length === 0) {
-    throw new Error('SIZES_WAD provided but empty after parsing');
-  }
-  const grid = values.map(normalizeSizeToken);
-  return { grid, source: 'env' };
-}
-
-function resolveLabels(baseSymbol: string, quoteSymbol: string, pairLabel: string): ShadowBotLabels {
-  return {
-    baseSymbol,
-    quoteSymbol,
-    pair: pairLabel,
-    chain: 'HypeEVM'
-  };
-}
-
-function deriveHistogramBuckets(): HistogramBuckets {
-  const override = getOptional('HISTOGRAM_BUCKETS_JSON');
-  if (!override) return DEFAULT_HISTOGRAM_BUCKETS;
-  try {
-    const parsed = JSON.parse(override) as Partial<HistogramBuckets>;
-    return {
-      deltaBps: parsed.deltaBps ?? DEFAULT_HISTOGRAM_BUCKETS.deltaBps,
-      confBps: parsed.confBps ?? DEFAULT_HISTOGRAM_BUCKETS.confBps,
-      bboSpreadBps: parsed.bboSpreadBps ?? DEFAULT_HISTOGRAM_BUCKETS.bboSpreadBps,
-      quoteLatencyMs: parsed.quoteLatencyMs ?? DEFAULT_HISTOGRAM_BUCKETS.quoteLatencyMs,
-      feeBps: parsed.feeBps ?? DEFAULT_HISTOGRAM_BUCKETS.feeBps,
-      totalBps: parsed.totalBps ?? DEFAULT_HISTOGRAM_BUCKETS.totalBps
-    };
-  } catch (error) {
-    throw new Error(`Failed to parse HISTOGRAM_BUCKETS_JSON: ${(error as Error).message}`);
-  }
-}
-
-function parseMode(): ShadowBotMode {
-  const raw = (process.env.MODE ?? DEFAULT_MODE).toLowerCase();
-  if (raw === 'live' || raw === 'fork' || raw === 'mock') {
-    return raw;
-  }
-  throw new Error(`Unsupported MODE '${raw}'. Expected one of live | fork | mock.`);
-}
-
 interface ForkDeployJson {
   readonly chainId?: number;
   readonly poolAddress?: string;
   readonly hypeAddress?: string;
   readonly usdcAddress?: string;
   readonly pythAddress?: string;
+  readonly baseDecimals?: number;
+  readonly quoteDecimals?: number;
   readonly hcPxPrecompile?: string;
   readonly hcBboPrecompile?: string;
   readonly hcPxKey?: number;
   readonly hcBboKey?: number;
-  readonly baseDecimals?: number;
-  readonly quoteDecimals?: number;
   readonly wsUrl?: string;
 }
 
-function toMaybeString(value: unknown): string | undefined {
-  if (typeof value === 'string' && value.trim().length > 0) {
-    return value.trim();
-  }
-  return undefined;
-}
-
-function toMaybeNumber(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === 'string' && value.trim().length > 0) {
-    const parsed = Number.parseInt(value.trim(), 10);
-    if (!Number.isNaN(parsed)) {
-      return parsed;
-    }
-  }
-  return undefined;
-}
-
-function normalizeForkDeploy(raw: unknown): ForkDeployJson {
-  if (!raw || typeof raw !== 'object') {
-    throw new Error('fork deploy JSON is malformed');
-  }
-  const candidate = raw as Record<string, unknown>;
-  return {
-    chainId: toMaybeNumber(candidate.chainId ?? candidate.chain_id),
-    poolAddress: toMaybeString(candidate.poolAddress ?? candidate.pool ?? candidate.pool_addr),
-    hypeAddress: toMaybeString(candidate.hypeAddress ?? candidate.hype ?? candidate.hype_addr),
-    usdcAddress: toMaybeString(candidate.usdcAddress ?? candidate.usdc ?? candidate.usdc_addr),
-    pythAddress: toMaybeString(candidate.pythAddress ?? candidate.pyth ?? candidate.pyth_addr),
-    hcPxPrecompile: toMaybeString(candidate.hcPxPrecompile ?? candidate.hcPx ?? candidate.hc_px_precompile),
-    hcBboPrecompile: toMaybeString(candidate.hcBboPrecompile ?? candidate.hcBbo ?? candidate.hc_bbo_precompile),
-    hcPxKey: toMaybeNumber(candidate.hcPxKey ?? candidate.hc_px_key),
-    hcBboKey: toMaybeNumber(candidate.hcBboKey ?? candidate.hc_bbo_key),
-    baseDecimals: toMaybeNumber(candidate.baseDecimals ?? candidate.base_decimals),
-    quoteDecimals: toMaybeNumber(candidate.quoteDecimals ?? candidate.quote_decimals),
-    wsUrl: toMaybeString(candidate.wsUrl ?? candidate.ws_url)
-  };
-}
-
-async function readForkDeployJson(filePath?: string): Promise<ForkDeployJson | undefined> {
-  const resolved = filePath ?? DEFAULT_FORK_OUTPUT_PATH;
+async function readForkDeployJson(pathOrUndefined: string | undefined): Promise<ForkDeployJson | undefined> {
+  if (!pathOrUndefined) return undefined;
   try {
-    const content = await fs.readFile(resolved, 'utf8');
-    return normalizeForkDeploy(JSON.parse(content));
+    const contents = await fs.readFile(pathOrUndefined, 'utf8');
+    return JSON.parse(contents) as ForkDeployJson;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return undefined;
-    }
-    throw error;
+    throw new Error(`Failed to parse fork deploy JSON: ${(error as Error).message}`);
   }
 }
 
-function resolveAddressBookEntry(
-  addressBook: AddressBookFile | undefined,
-  chainId: number | undefined,
-  poolAddress: string | undefined
-): AddressBookEntry | undefined {
-  if (!addressBook) return undefined;
-  if (poolAddress) {
-    const key = Object.keys(addressBook.deployments).find(
-      (deploymentKey) => addressBook.deployments[deploymentKey].poolAddress?.toLowerCase() === poolAddress.toLowerCase()
-    );
-    if (key) return addressBook.deployments[key];
-  }
-  if (chainId !== undefined) {
-    const match = Object.values(addressBook.deployments).find((entry) => entry.chainId === chainId);
-    if (match) return match;
-  }
-  if (addressBook.defaultChainId !== undefined) {
-    const match = Object.values(addressBook.deployments).find((entry) => entry.chainId === addressBook.defaultChainId);
-    if (match) return match;
-  }
-  return undefined;
+interface ChainBuildParams {
+  readonly mode: 'live' | 'fork';
+  readonly env: NodeJS.ProcessEnv;
+  readonly addressBook?: AddressBookFile;
+  readonly addressBookPath: string;
+  readonly forkDeploy?: ForkDeployJson;
+  readonly runs: readonly RunSettingDefinition[];
+  readonly pairLabels: ShadowBotLabels;
 }
 
-export async function loadConfig(): Promise<ShadowBotConfig> {
-  const mode = parseMode();
+async function buildChainRuntimeConfig(params: ChainBuildParams): Promise<ChainRuntimeConfig> {
+  const { mode, env, addressBook, addressBookPath, forkDeploy } = params;
+  const rpcUrl = requireEnv(env, 'RPC_URL');
+  const wsUrl = env.WS_URL ?? forkDeploy?.wsUrl;
+  const chainId = parseOptionalInteger(env.CHAIN_ID) ?? forkDeploy?.chainId ?? addressBook?.defaultChainId;
 
-  const baseSymbol = getOptional('BASE_SYMBOL') ?? DEFAULT_BASE_SYMBOL;
-  const quoteSymbol = getOptional('QUOTE_SYMBOL') ?? DEFAULT_QUOTE_SYMBOL;
-  const pairLabel = getOptional('PAIR_LABEL') ?? DEFAULT_PAIR;
-  const labels = resolveLabels(baseSymbol, quoteSymbol, pairLabel);
+  const poolAddress = ensureHex(env.POOL_ADDR ?? env.DNMM_POOL_ADDRESS ?? forkDeploy?.poolAddress, 'POOL_ADDR');
+  const entry = resolveAddressBookEntry(addressBook, chainId, poolAddress);
 
-  const { grid: sizeGrid, source: sizesSource } = deriveSizeGrid();
-  const intervalMs = parseIntEnv('INTERVAL_MS', DEFAULT_INTERVAL_MS);
-  const snapshotMaxAgeSec = parseIntEnv('SNAPSHOT_MAX_AGE_SEC', DEFAULT_SNAPSHOT_MAX_AGE_SEC);
-  const histogramBuckets = deriveHistogramBuckets();
-  const promPort = parseIntEnv('PROM_PORT', DEFAULT_PROM_PORT);
-  const logLevel = parseLogLevel();
-  const csvDirectory = getOptional('CSV_DIR') ?? DEFAULT_CSV_DIR;
-  const jsonSummaryPath = getOptional('JSON_SUMMARY_PATH') ?? DEFAULT_SUMMARY_PATH;
-  const samplingTimeout = parseIntEnv('SAMPLING_TIMEOUT_MS', DEFAULT_TIMEOUT_MS);
-  const samplingBackoff = parseIntEnv('SAMPLING_BACKOFF_MS', DEFAULT_BACKOFF_MS);
-  const samplingAttempts = parseIntEnv('SAMPLING_RETRY_ATTEMPTS', DEFAULT_RETRIES);
-  const guaranteedMinOut = {
-    calmBps: parseIntEnv('MIN_OUT_CALM_BPS', 10),
-    fallbackBps: parseIntEnv('MIN_OUT_FALLBACK_BPS', 20),
-    clampMin: parseIntEnv('MIN_OUT_CLAMP_MIN', 5),
-    clampMax: parseIntEnv('MIN_OUT_CLAMP_MAX', 25)
-  } as const;
-  const sampling = {
-    intervalLabel: `${intervalMs}ms`,
-    timeoutMs: samplingTimeout,
-    retryBackoffMs: samplingBackoff,
-    retryAttempts: samplingAttempts
-  } as const;
-  const gasPriceGwei = parseFloatEnv('GAS_PRICE_GWEI');
-  const nativeUsd = parseFloatEnv('NATIVE_USD');
-  const pythPriceId = getOptional('PYTH_PRICE_ID') ?? getOptional('PYTH_PAIR_FEED_ID');
-
-  const baseCommon = {
-    mode,
-    labels,
-    sizeGrid,
-    intervalMs,
-    snapshotMaxAgeSec,
-    histogramBuckets,
-    promPort,
-    logLevel,
-    csvDirectory,
-    jsonSummaryPath,
-    sizesSource,
-    guaranteedMinOut,
-    sampling
-  } as const;
-
-  if (mode === 'mock') {
-    const baseDecimals = parseIntEnv('BASE_DECIMALS', 18);
-    const quoteDecimals = parseIntEnv('QUOTE_DECIMALS', 6);
-    const scenarioName = (getOptional('SCENARIO') ?? DEFAULT_SCENARIO).toLowerCase();
-    const scenarioFile = getOptional('SCENARIO_FILE');
-
-    const mockConfig: MockShadowBotConfig = {
-      ...baseCommon,
-      baseDecimals,
-      quoteDecimals,
-      scenarioName,
-      scenarioFile: scenarioFile ?? undefined
-    };
-
-    return mockConfig;
-  }
-
-  const addressBookPath = getOptional('ADDRESS_BOOK_JSON') ?? DEFAULT_ADDRESS_BOOK;
-  const addressBook = await readAddressBook(addressBookPath);
-  const forkOverrides = mode === 'fork' ? await readForkDeployJson(getOptional('FORK_DEPLOY_JSON')) : undefined;
-
-  const explicitChainId = getOptional('CHAIN_ID');
-  const resolvedChainId = explicitChainId
-    ? Number.parseInt(explicitChainId, 10)
-    : forkOverrides?.chainId ?? addressBook?.defaultChainId;
-  if (explicitChainId && Number.isNaN(resolvedChainId)) {
-    throw new Error('CHAIN_ID must be numeric');
-  }
-
-  const envPoolAddress = getOptional('POOL_ADDR') ?? getOptional('DNMM_POOL_ADDRESS');
-  const detectedEntry = resolveAddressBookEntry(
-    addressBook,
-    resolvedChainId ?? undefined,
-    envPoolAddress ?? forkOverrides?.poolAddress
-  );
-
-  const rpcUrl = must('RPC_URL');
-  const wsUrl = getOptional('WS_URL') ?? forkOverrides?.wsUrl ?? detectedEntry?.wsUrl;
-
-  const poolAddress = ensureHex(
-    envPoolAddress ?? forkOverrides?.poolAddress ?? detectedEntry?.poolAddress,
-    'POOL_ADDR'
-  );
-  const pythAddress = getOptional('PYTH_ADDR') ?? forkOverrides?.pythAddress ?? detectedEntry?.pyth;
   const hcPxPrecompile = ensureHex(
-    getOptional('HC_PX_PRECOMPILE') ?? forkOverrides?.hcPxPrecompile ?? detectedEntry?.hcPx ??
-      '0x0000000000000000000000000000000000000807',
+    env.HC_PX_PRECOMPILE ?? forkDeploy?.hcPxPrecompile ?? entry?.hcPx ?? '0x0000000000000000000000000000000000000807',
     'HC_PX_PRECOMPILE'
   );
   const hcBboPrecompile = ensureHex(
-    getOptional('HC_BBO_PRECOMPILE') ?? forkOverrides?.hcBboPrecompile ?? detectedEntry?.hcBbo ??
-      '0x000000000000000000000000000000000000080e',
+    env.HC_BBO_PRECOMPILE ?? forkDeploy?.hcBboPrecompile ?? entry?.hcBbo ?? '0x000000000000000000000000000000000000080e',
     'HC_BBO_PRECOMPILE'
   );
-  const hcPxKeyDefault = forkOverrides?.hcPxKey ?? 107;
-  const hcPxKey = parseIntEnv('HC_PX_KEY', hcPxKeyDefault);
-  const hcBboKey = parseIntEnv('HC_BBO_KEY', forkOverrides?.hcBboKey ?? hcPxKey);
-  const hcMarketType = (getOptional('HC_MARKET_TYPE') ?? 'spot').toLowerCase() === 'perp' ? 'perp' : 'spot';
-  const hcSizeDecimals = parseIntEnv('HC_SIZE_DECIMALS', 2);
+  const hcPxKey = parseInteger(env.HC_PX_KEY ?? forkDeploy?.hcPxKey ?? '107', 107);
+  const hcBboKey = parseInteger(env.HC_BBO_KEY ?? forkDeploy?.hcBboKey ?? hcPxKey, hcPxKey);
+  const hcMarketType = (env.HC_MARKET_TYPE ?? 'spot').toLowerCase() === 'perp' ? 'perp' : 'spot';
+  const hcSizeDecimals = parseInteger(env.HC_SIZE_DECIMALS ?? entry?.hcSizeDecimals, entry?.hcSizeDecimals ?? 2);
   const hcPxMultiplier = hcMarketType === 'spot'
     ? 10n ** BigInt(10 + hcSizeDecimals)
     : 10n ** BigInt(12 + hcSizeDecimals);
 
-  const baseTokenAddress = ensureHex(
-    getOptional('HYPE_ADDR') ?? forkOverrides?.hypeAddress ?? detectedEntry?.baseToken,
-    'HYPE_ADDR'
-  );
-  const quoteTokenAddress = ensureHex(
-    getOptional('USDC_ADDR') ?? forkOverrides?.usdcAddress ?? detectedEntry?.quoteToken,
-    'USDC_ADDR'
-  );
+  const baseTokenAddress = ensureHex(env.HYPE_ADDR ?? forkDeploy?.hypeAddress ?? entry?.baseToken, 'HYPE_ADDR');
+  const quoteTokenAddress = ensureHex(env.USDC_ADDR ?? forkDeploy?.usdcAddress ?? entry?.quoteToken, 'USDC_ADDR');
+  const baseDecimals = parseInteger(env.BASE_DECIMALS ?? forkDeploy?.baseDecimals ?? entry?.baseDecimals, entry?.baseDecimals ?? 18);
+  const quoteDecimals = parseInteger(env.QUOTE_DECIMALS ?? forkDeploy?.quoteDecimals ?? entry?.quoteDecimals, entry?.quoteDecimals ?? 6);
+  const pythAddress = env.PYTH_ADDR ?? forkDeploy?.pythAddress ?? entry?.pyth;
+  const pythPriceId = env.PYTH_PRICE_ID ?? env.PYTH_PAIR_FEED_ID ?? entry?.pythPriceId;
+  const gasPriceGwei = env.GAS_PRICE_GWEI ? Number(env.GAS_PRICE_GWEI) : undefined;
+  const nativeUsd = env.NATIVE_USD ? Number(env.NATIVE_USD) : undefined;
 
-  const baseDecimals = parseIntEnv(
-    'BASE_DECIMALS',
-    forkOverrides?.baseDecimals ?? detectedEntry?.baseDecimals ?? 18
-  );
-  const quoteDecimals = parseIntEnv(
-    'QUOTE_DECIMALS',
-    forkOverrides?.quoteDecimals ?? detectedEntry?.quoteDecimals ?? 6
-  );
-
-  const chainConfig: ChainBackedConfig = {
-    ...baseCommon,
-    baseDecimals,
-    quoteDecimals,
+  return {
+    mode,
     rpcUrl,
     wsUrl,
-    chainId: resolvedChainId ?? undefined,
+    chainId,
     poolAddress,
+    baseTokenAddress,
+    quoteTokenAddress,
+    baseDecimals,
+    quoteDecimals,
     pythAddress,
     hcPxPrecompile,
     hcBboPrecompile,
@@ -423,15 +602,41 @@ export async function loadConfig(): Promise<ShadowBotConfig> {
     hcMarketType,
     hcSizeDecimals,
     hcPxMultiplier,
-    baseTokenAddress,
-    quoteTokenAddress,
+    pythPriceId,
     gasPriceGwei,
     nativeUsd,
-    pythPriceId,
     addressBookSource: addressBook ? addressBookPath : undefined
   };
-
-  return chainConfig;
 }
 
-export type { ShadowBotConfig } from './types.js';
+function requireEnv(env: NodeJS.ProcessEnv, key: string): string {
+  const value = env[key];
+  if (!value || value.trim().length === 0) {
+    throw new Error(`Missing required environment variable ${key}`);
+  }
+  return value.trim();
+}
+
+function ensureHex(value: string | undefined, label: string): string {
+  if (!value) {
+    throw new Error(`Missing required value for ${label}`);
+  }
+  if (!value.startsWith('0x')) {
+    throw new Error(`${label} must be a 0x-prefixed hex string`);
+  }
+  return value;
+}
+
+function resolveAddressBookEntry(
+  addressBook: AddressBookFile | undefined,
+  chainId: number | undefined,
+  poolAddress: string
+): AddressBookEntry | undefined {
+  if (!addressBook) return undefined;
+  const deployments = Object.values(addressBook.deployments ?? {});
+  return deployments.find((deployment) => {
+    const matchesChain = chainId ? deployment.chainId === chainId : true;
+    const matchesPool = deployment.poolAddress?.toLowerCase() === poolAddress.toLowerCase();
+    return matchesChain && matchesPool;
+  });
+}

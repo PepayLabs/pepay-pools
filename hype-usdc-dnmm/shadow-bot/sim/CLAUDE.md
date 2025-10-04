@@ -1,8 +1,8 @@
-# DNMM Shadow Bot Implementation Guide
+# Shadow Bot Simulation Implementation Guide
 
-**Path**: `hype-usdc-dnmm/shadow-bot`
+**Path**: `hype-usdc-dnmm/shadow-bot/sim`
 
-**Description**: TypeScript multi-setting benchmark harness for HYPE/USDC DNMM, producing concurrent simulations, CSV traces, and Prometheus metrics across DNMM/CPMM/StableSwap comparators.
+**Description**: Lightweight adapters for fork/mock compatibility when on-chain contracts are unavailable, mirroring DNMM oracle and pool logic.
 
 ## Purpose
 - Capture the intent of this module/folder and its relationship to the broader HYPE/HyperEVM initiative.

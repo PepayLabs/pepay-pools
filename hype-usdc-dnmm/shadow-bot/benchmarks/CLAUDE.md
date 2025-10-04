@@ -1,8 +1,8 @@
-# DNMM Shadow Bot Implementation Guide
+# Shadow Bot Benchmarks Implementation Guide
 
-**Path**: `hype-usdc-dnmm/shadow-bot`
+**Path**: `hype-usdc-dnmm/shadow-bot/benchmarks`
 
-**Description**: TypeScript multi-setting benchmark harness for HYPE/USDC DNMM, producing concurrent simulations, CSV traces, and Prometheus metrics across DNMM/CPMM/StableSwap comparators.
+**Description**: Adapters that emulate DNMM and baseline AMMs (CPMM, StableSwap-like) for comparative simulations and scoring.
 
 ## Purpose
 - Capture the intent of this module/folder and its relationship to the broader HYPE/HyperEVM initiative.

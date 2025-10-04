@@ -20,7 +20,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 
-const parametersDefaultsJson = require('../config/parameters_default.json');
+const parametersDefaultsJson = require('../../config/parameters_default.json');
 
 const DEFAULT_PAIR = 'HYPE/USDC';
 const DEFAULT_BASE_SYMBOL = 'HYPE';

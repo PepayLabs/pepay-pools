@@ -434,7 +434,7 @@ Review these files to ground your recommendations in reality:
 # Documentation (understand architecture)
 /home/xnik/pepayPools/hype-usdc-dnmm/docs/FEES_AND_INVENTORY.md
 /home/xnik/pepayPools/hype-usdc-dnmm/docs/ORACLE.md
-/home/xnik/pepayPools/hype-usdc-dnmm/docs/architecture.md
+/home/xnik/pepayPools/hype-usdc-dnmm/docs/ARCHITECTURE.md
 
 # Current improvements (target to optimize)
 /home/xnik/pepayPools/hype-usdc-dnmm/docs/IMPROVEMENTS_ENTERPRISE_2025.md

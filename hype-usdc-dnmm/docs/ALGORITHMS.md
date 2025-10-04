@@ -1,7 +1,7 @@
 ---
 title: "Algorithm Reference"
 version: "8e6f14e"
-last_updated: "2025-10-03"
+last_updated: "2025-10-04"
 ---
 
 # Algorithm Reference
@@ -9,6 +9,7 @@ last_updated: "2025-10-03"
 ## Table of Contents
 
 - [Size-Aware Fee](#size-aware-fee)
+- [LVR Fee Surcharge](#lvr-fee-surcharge)
 - [Inventory Tilt](#inventory-tilt)
 - [BBO-Aware Fee Floor](#bbo-aware-fee-floor)
 - [Always-On Micro Quotes (AOMQ)](#always-on-micro-quotes-aomq)
@@ -26,8 +27,25 @@ fee_size_bps = min(fee_size_bps, size_fee_cap_bps)
 - Inputs: `gammaSizeLinBps`, `gammaSizeQuadBps`, `sizeFeeCapBps`, `maker.S0Notional`.
 - Complexity: O(1).
 - Gas: < 3k gas inside `_applyFeePipeline` when enabled (no storage reads beyond config pack).
-- Implementation: `contracts/lib/FeePolicy.sol:117-156`, `contracts/DnmPool.sol:1736`.
+- Implementation: `contracts/lib/FeePolicy.sol:120-170`, `contracts/DnmPool.sol:1738-1751`.
 - Tests: `test/unit/SizeFeeCurveTest.t.sol`.
+
+## LVR Fee Surcharge
+
+Pseudocode:
+
+```text
+sigma_bps = outcome.sigmaBps
+ttl_sec = maker.ttlMs / 1000
+toxicity_bias = aomqActive ? emergencySpreadBps : 0
+fee_lvr_bps = kappaLvrBps * (sigma_bps * sqrt(ttl_sec) + toxicity_bias)
+fee_lvr_bps = min(fee_lvr_bps, cap_bps)
+```
+- Inputs: `fee.kappaLvrBps`, maker TTL, blended sigma, AOMQ emergency spread.
+- Complexity: O(1) per quote.
+- Gas: ≈2.3k gas incremental when enabled (math-only, no storage IO).
+- Implementation: `contracts/DnmPool.sol:1753-1799`, `contracts/lib/FeePolicy.sol:120-170`, `contracts/lib/FixedPointMath.sol:73-86`.
+- Tests: `test/unit/LvrFee_Monotonic.t.sol`, `test/unit/LvrFee_RespectsCaps.t.sol`, `test/integration/LvrFee_FloorInvariant.t.sol`.
 
 ## Inventory Tilt
 
@@ -42,7 +60,7 @@ tilt_bps = clamp(tilt_weighted_bps, -tiltMaxBps, +tiltMaxBps)
 - Inputs: `inventory.invTiltBpsPer1pct`, weights, `invTiltMaxBps`.
 - Complexity: O(1) per quote.
 - Gas: ≈5k gas w/ all flags on (mainly math operations).
-- Implementation: `contracts/DnmPool.sol:1483-1524`, `contracts/lib/Inventory.sol:25-40`.
+- Implementation: `contracts/DnmPool.sol:1496-1537`, `contracts/lib/Inventory.sol:25-40`.
 - Tests: `test/unit/InventoryTiltTest.t.sol`.
 
 ## BBO-Aware Fee Floor
@@ -57,7 +75,7 @@ final_fee_bps = max(final_fee_bps, min_floor_bps)
 - Inputs: `maker.alphaBboBps`, `maker.betaFloorBps`, live spread from HyperCore.
 - Complexity: O(1).
 - Gas: Negligible; executed only when `enableBboFloor` true.
-- Implementation: `contracts/DnmPool.sol:1467-1479`.
+- Implementation: `contracts/DnmPool.sol:1481-1493`.
 - Tests: `test/unit/BboFloorTest.t.sol`.
 
 ## Always-On Micro Quotes (AOMQ)
@@ -71,10 +89,10 @@ if degraded_state and enableAOMQ:
 else:
   normal size/fees
 ```
-- Degraded triggers: soft divergence, fallback usage, floor proximity (`contracts/DnmPool.sol:1280-1338`).
+- Degraded triggers: soft divergence, fallback usage, floor proximity (`contracts/DnmPool.sol:1295-1353`).
 - Complexity: O(1) conditional per swap.
 - Gas: Adds ~7k gas when triggered due to extra Inventory lookups.
-- Implementation: `_evaluateAomq` and `_applyFeePipeline` (`contracts/DnmPool.sol:1261-1370`).
+- Implementation: `_evaluateAomq` and `_applyFeePipeline` (`contracts/DnmPool.sol:1276-1416`).
 - Tests: `test/integration/Scenario_AOMQ.t.sol`, `test/integration/Scenario_Preview_AOMQ.t.sol`.
 
 ## Preview Snapshot
@@ -86,8 +104,9 @@ On quote/swap: persist snapshot { mid, conf_bps, spread_bps, mode, ts, flags }
 previewFees(sizes[]) reads snapshot and recomputes fees (view-only)
 previewFresh optionally re-reads adapters without mutating state
 ```
-- Snapshot fields: `midWad`, `divergenceBps`, `flags`, `blockNumber`, `timestamp` (`contracts/DnmPool.sol:1864-1896`).
-- Staleness guards: `PreviewSnapshotStale`, `PreviewSnapshotCooldown` errors when conditions violated (`contracts/DnmPool.sol:1045-1140`).
+- Snapshot fields: `midWad`, `divergenceBps`, `flags`, `blockNumber`, `timestamp` (`contracts/DnmPool.sol:1877-1916`).
+- Staleness guards: `PreviewSnapshotStale`, `PreviewSnapshotCooldown` errors when conditions violated (`contracts/DnmPool.sol:1045-1153`).
 - Complexity: Snapshot persistence O(1); preview ladder O(n) over size array length.
 - Gas: Snapshot persist ≈15k gas (event + struct write). `previewFees` read-only.
-- Tests: `test/unit/PreviewFees_Parity.t.sol`, `test/integration/Scenario_Preview_AOMQ.t.sol`.
+- Telemetry: When `featureFlags.debugEmit` true, `_emitPreviewLadderDebug` emits `PreviewLadderServed` with rung/TTL payload for router parity checks (`contracts/DnmPool.sol:1999-2051`).
+- Tests: `test/unit/PreviewFees_Parity.t.sol`, `test/integration/Scenario_Preview_AOMQ.t.sol`, `test/integration/FirmLadder_TIFHonored.t.sol`.

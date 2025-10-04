@@ -1,7 +1,7 @@
 ---
 title: "Metrics Glossary"
 version: "8e6f14e"
-last_updated: "2025-10-03"
+last_updated: "2025-10-04"
 ---
 
 # Metrics Glossary
@@ -15,13 +15,15 @@ last_updated: "2025-10-03"
 ## Contract Signals
 Name | Type | Labels | Unit | Description | Source
 --- | --- | --- | --- | --- | ---
-`PreviewSnapshotRefreshed` | Event | `caller` | - | Snapshot persisted with mid, divergence, flags. | `contracts/DnmPool.sol:292`
-`TargetBaseXstarUpdated` | Event | `oldTarget,newTarget,mid` | base WAD | Recenter executed. | `contracts/DnmPool.sol:288`
-`DivergenceHaircut` | Event | `deltaBps,feeBps` | bps | Soft divergence haircut applied. | `contracts/DnmPool.sol:308`
-`DivergenceRejected` | Event | `deltaBps` | bps | Hard divergence triggered; swap reverted. | `contracts/DnmPool.sol:309`
-`ManualRebalanceExecuted` | Event | `caller,price` | WAD | Manual recenter completed. | `contracts/DnmPool.sol:289`
+`PreviewSnapshotRefreshed` | Event | `caller` | - | Snapshot persisted with mid, divergence, flags. | `contracts/DnmPool.sol:297`
+`PreviewLadderServed` | Event | `snapId,rungs,feeBps,ttlMs` | - | Debug ladder telemetry for router parity. | `contracts/DnmPool.sol:300`
+`LvrFeeApplied` | Event | `caller,isBaseIn,lvrFeeBps` | bps | Volatility surcharge applied during swap/quote. | `contracts/DnmPool.sol:312`
+`TargetBaseXstarUpdated` | Event | `oldTarget,newTarget,mid` | base WAD | Recenter executed. | `contracts/DnmPool.sol:293`
+`ManualRebalanceExecuted` | Event | `caller,price` | WAD | Manual recenter completed. | `contracts/DnmPool.sol:294`
+`DivergenceHaircut` | Event | `deltaBps,feeBps` | bps | Soft divergence haircut applied. | `contracts/DnmPool.sol:315`
+`DivergenceRejected` | Event | `deltaBps` | bps | Hard divergence triggered; swap reverted. | `contracts/DnmPool.sol:316`
 `QuoteFilled` | Event | `taker,isBaseIn,actualAmountIn,actualAmountOut` | token units | RFQ quote settled with partial fill info. | `contracts/quotes/QuoteRFQ.sol:55`
-`AggregatorDiscountUpdated` | Event | `executor,discountBps` | bps | Rebate schedule change. | `contracts/DnmPool.sol:283`
+`AggregatorDiscountUpdated` | Event | `executor,discountBps` | bps | Rebate allowlist change (3 bps cap). | `contracts/DnmPool.sol:318`
 
 ## Shadow Bot Metrics
 Name | Type | Labels | Unit | Description | Source
@@ -36,8 +38,9 @@ Name | Type | Labels | Unit | Description | Source
 `dnmm_delta_bps` | Histogram | `pair,chain,mode` | bps | HyperCore vs Pyth divergence. | `shadow-bot/metrics.ts:279`
 `dnmm_conf_bps` | Histogram | `pair,chain,mode` | bps | Confidence value fed to fees. | `shadow-bot/metrics.ts:284`
 `dnmm_bbo_spread_bps` | Histogram | `pair,chain,mode` | bps | HyperCore spread. | `shadow-bot/metrics.ts:289`
-`dnmm_fee_bps` | Histogram | `pair,chain,mode,side,rung,regime` | bps | Fee pipeline output. | `shadow-bot/metrics.ts:294`
-`dnmm_total_bps` | Histogram | `pair,chain,mode,side,rung,regime` | bps | Fee minus rebates. | `shadow-bot/metrics.ts:300`
+`dnmm_fee_bps` | Histogram | `pair,chain,mode,side,rung,regime` | bps | Fee pipeline output prior to rebate/LVR adjustments. | `shadow-bot/metrics.ts:294`
+`dnmm_lvr_fee_bps` | Histogram | `pair,chain,mode,side,rung` | bps | LVR surcharge contribution emitted via `LvrFeeApplied`. | `shadow-bot/metrics.ts:306`
+`dnmm_total_bps` | Histogram | `pair,chain,mode,side,rung,regime` | bps | Final fee after rebates and floors. | `shadow-bot/metrics.ts:300`
 
 ### Multi-run Benchmark Metrics (`shadow.*`)
 Name | Type | Labels | Unit | Description | Source
@@ -71,11 +74,12 @@ Two-sided uptime | `avg_over_time(dnmm_two_sided_uptime_pct[15m])` | ≥ 99.5%
 Adverse selection | `avg(dnmm_total_bps) - avg(dnmm_fee_bps)` (when AOMQ inactive) | ≥ -10 bps (positive preferred)
 Divergence breach rate | `sum(dnmm_quotes_total{result="error"}) / sum(dnmm_quotes_total)` | ≤ 0.5%
 Preview staleness | `dnmm_preview_stale_reverts_total` trend | Flat; revisit if slope positive
+LVR capture | `avg(dnmm_lvr_fee_bps)` | Track ≥ 5 bps during toxic flow spikes; investigate < 2 bps if toxicity > 60
 
 ## Dashboards Index
 File | Purpose
 --- | ---
-`shadow-bot/dashboards/dnmm_shadow_metrics.json` | Executive overview; pair summary.
+`shadow-bot/dashboards/dnmm_shadow_metrics.json` | Executive overview; pair summary with LVR vs toxicity pane.
 `shadow-bot/dashboards/oracle-health.json` | Divergence, provider errors, TTL compliance.
 `shadow-bot/dashboards/inventory-rebalancing.json` | Tilt, recenter cooldown, floor proximity.
 `shadow-bot/dashboards/quote-health.json` | RFQ vs pool parity, AOMQ triggers, latency.

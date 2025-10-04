@@ -55,6 +55,7 @@ Core-4 introduces a **loss-vs-reprice (LVR)** surcharge that scales with blended
 - Global cap `fee.capBps` bounds the pipeline (default `150` bps).
 - BBO-aware floor enforces maker minimum via `_computeBboFloor` (see [Caps & Floors](#caps--floors)).
 - Aggregator rebates (`enableRebates`) subtract pre-approved discounts registered with `setAggregatorRouter` while preserving the floor and overall cap (`contracts/DnmPool.sol:1731-1769`).
+- Governance should stage allowlist updates before production and confirm rebate analytics reconcile with treasury accruals.
 
 ## Inventory Tilt Math
 Given reserves `(B, Q)`, mid price `m`, and target `x*`:

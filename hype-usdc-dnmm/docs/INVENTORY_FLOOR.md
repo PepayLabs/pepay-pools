@@ -1,7 +1,7 @@
 ---
 title: "Inventory Floor Guarantees"
 version: "8e6f14e"
-last_updated: "2025-10-03"
+last_updated: "2025-10-04"
 ---
 
 # Inventory Floor Guarantees
@@ -15,7 +15,7 @@ last_updated: "2025-10-03"
 - [Code & Test References](#code--test-references)
 
 ## Overview
-Floors bound how much inventory the pool is willing to sell on either side. The solver clamps trades so reserves never drop below governance-configured thresholds, even when AOMQ or rebates are active.
+Floors bound how much inventory the pool is willing to sell on either side. The solver clamps trades so reserves never drop below governance-configured thresholds, even when AOMQ, LVR surcharge, or aggregator rebates are active.
 
 ## Floor Types
 - **Quote-side floor (`floorQuote`):** Derived from `inventory.floorBps` applied to quote reserves (`contracts/lib/Inventory.sol:16`).
@@ -28,9 +28,10 @@ Floors bound how much inventory the pool is willing to sell on either side. The 
 - Preview responses highlight partials via `QuoteResult.partial` flag (`contracts/interfaces/IDnmPool.sol:130`).
 
 ## AOMQ Integration
-- When AOMQ is enabled (`featureFlags.enableAOMQ`), `_applyFeePipeline` can tighten spread or clamp size but still delegates to Inventory library for floor enforcement (`contracts/DnmPool.sol:1620`).
-- AOMQ decisions encode ask/bid clamps in `AomqDecision` bitflags preserved in preview snapshots (`contracts/DnmPool.sol:1880`).
+- When AOMQ is enabled (`featureFlags.enableAOMQ`), `_applyFeePipeline` can tighten spread or clamp size but still delegates to Inventory library for floor enforcement (`contracts/DnmPool.sol:1713-1778`).
+- AOMQ decisions encode ask/bid clamps in `AomqDecision` bitflags preserved in preview snapshots (`contracts/DnmPool.sol:1877-1916`).
 - Emergency spread widening (`aomq.emergencySpreadBps`) never bypasses floors; clamps occur before swap settlement and emit `AomqDecision` telemetry for shadow bot metrics (`test/integration/Scenario_AOMQ.t.sol:21`).
+- LVR surcharge and aggregator rebates are applied before the BBO floor clamp; the final fee is `max(base + surcharge - rebate, floor)` ensuring solver math still leaves reserves ≥ floor (`contracts/DnmPool.sol:1747-1778`).
 
 ## Property Tests & Invariants
 - **Partial fill parity:** `Scenario_FloorPartialFill.t.sol` asserts returned remainder matches requested minus applied fill.
@@ -40,6 +41,6 @@ Floors bound how much inventory the pool is willing to sell on either side. The 
 ## Code & Test References
 - Inventory library: `contracts/lib/Inventory.sol:16-168`
 - Errors: `contracts/lib/Errors.sol:11`
-- Swap integration: `contracts/DnmPool.sol:884-1250`
-- AOMQ flags: `contracts/DnmPool.sol:1620-1880`
-- Tests: `test/integration/Scenario_FloorPartialFill.t.sol:18`, `test/integration/Scenario_AOMQ.t.sol:21`, `test/integration/Scenario_Preview_AOMQ.t.sol:21`
+- Swap integration: `contracts/DnmPool.sol:884-1416`
+- AOMQ & floor pipeline: `contracts/DnmPool.sol:1713-1778`, `contracts/DnmPool.sol:1295-1416`
+- Tests: `test/integration/Scenario_FloorPartialFill.t.sol:18`, `test/integration/Scenario_AOMQ.t.sol:21`, `test/integration/Scenario_Preview_AOMQ.t.sol:21`, `test/integration/LvrFee_FloorInvariant.t.sol:18`

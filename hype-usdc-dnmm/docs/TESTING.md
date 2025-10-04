@@ -34,6 +34,7 @@ Command | Purpose
 `forge test --match-contract LvrFeeMonotonicTest` | Validate σ/TTL monotonicity of the LVR term.
 `forge test --match-contract FirmLadderTIFHonoredTest` | Audit ladder parity, TTL propagation, and stale preview reverts.
 `FOUNDRY_PROFILE=gas forge test --gas-report` | Regenerate gas report before updating docs.
+`forge test --match-contract LvrFee_RespectsCapsTest` | Asserts surcharge never exceeds configured cap and floor invariants hold.
 `yarn --cwd shadow-bot test` | Run shadow-bot Jest suite.
 
 ## Gas Snapshots

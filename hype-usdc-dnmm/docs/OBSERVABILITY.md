@@ -83,6 +83,7 @@ Condition | Threshold | Action
 `dnmm_aomq_clamps_total` sustained > 0.1 per second | Critical | Review divergence soft gate and available inventory.
 `dnmm_two_sided_uptime_pct < 99%` over 15 min | Warning | Inspect floors, auto recenter health, and AOMQ clamps.
 `avg(dnmm_lvr_fee_bps) < 2` while `dnmm_toxicity_score` > 60 | Warning | Validate LVR config (`fee.kappaLvrBps`) and review maker TTL.
+`dnmm_total_bps - dnmm_fee_bps < -3` for allow-listed executor | Warning | Check rebate configuration and confirm allowlist (`setAggregatorRouter`) matches treasury roster.
 
 ## Event → Metric Mapping
 Event | Metrics to Watch | Notes

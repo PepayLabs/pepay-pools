@@ -34,12 +34,12 @@ This folder is self-contained and does not yet wire into CI/CD. After review, li
 
 ## Documentation Map
 
-- `docs/architecture.md` – High-level design overview.
+- `docs/ARCHITECTURE.md` – High-level design overview.
 - `docs/CONFIG.md` – Parameter and ID management reference.
 - `docs/ORACLE.md` – Oracle wiring, fallback, divergence policy.
 - `docs/FEES_AND_INVENTORY.md` – Fee surface + inventory constraints.
 - `docs/OBSERVABILITY.md` – Metrics and dashboard guidance.
 - `docs/BYTECODE_ALIGNMENT.md` – Mapping to Lifinity Solana bytecode.
-- `docs/rfq_spec.md` – RFQ message + settlement flow.
+- `docs/RFQ.md` – RFQ message, TTL/min-out guidance, and settlement flow.
 - `docs/TESTING.md` – Test suite layout and CI guidance.
 - `RUNBOOK.md` / `SECURITY.md` – Ops + threat model.

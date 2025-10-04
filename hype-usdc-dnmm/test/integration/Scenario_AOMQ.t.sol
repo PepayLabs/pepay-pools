@@ -107,9 +107,7 @@ contract ScenarioAomqTest is BaseTest {
         (uint128 s0Notional,,,) = pool.makerConfig();
         uint256 expectedFloor = Inventory.floorAmount(uint256(quoteReserveBefore), floorBps);
         uint256 availableQuote = Inventory.availableInventory(uint256(quoteReserveBefore), floorBps);
-        uint256 slackBps = s0Notional > 0
-            ? FixedPointMath.toBps(availableQuote, uint256(s0Notional))
-            : 0;
+        uint256 slackBps = s0Notional > 0 ? FixedPointMath.toBps(availableQuote, uint256(s0Notional)) : 0;
         assertLe(slackBps, 900, "inventory near floor");
 
         hype.transfer(bob, 50_000 ether);

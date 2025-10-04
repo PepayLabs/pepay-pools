@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {DnmPool} from "../../contracts/DnmPool.sol";
 import {IDnmPool} from "../../contracts/interfaces/IDnmPool.sol";
-import {Errors} from "../../contracts/lib/Errors.sol";
 import {FeePolicy} from "../../contracts/lib/FeePolicy.sol";
 import {BaseTest} from "../utils/BaseTest.sol";
 
@@ -38,19 +37,22 @@ contract RebatesFloorPreserveTest is BaseTest {
         vm.expectEmit(true, false, false, true, address(pool));
         emit DnmPool.AggregatorDiscountUpdated(alice, 3);
         vm.prank(gov);
-        pool.setAggregatorDiscount(alice, 3);
+        pool.setAggregatorRouter(alice, true);
         assertEq(pool.aggregatorDiscount(alice), 3, "rebate recorded");
     }
 
-    function test_rebateCannotExceedCap() public {
-        vm.prank(gov);
-        vm.expectRevert(abi.encodeWithSelector(Errors.RebateTooLarge.selector, uint16(4), uint16(3)));
-        pool.setAggregatorDiscount(alice, 4);
+    function test_disableClearsDiscount() public {
+        vm.startPrank(gov);
+        pool.setAggregatorRouter(alice, true);
+        pool.setAggregatorRouter(alice, false);
+        vm.stopPrank();
+
+        assertEq(pool.aggregatorDiscount(alice), 0, "discount cleared");
     }
 
     function test_discountAppliedButNotBelowFloor() public {
         vm.prank(gov);
-        pool.setAggregatorDiscount(alice, 3);
+        pool.setAggregatorRouter(alice, true);
 
         DnmPool.QuoteResult memory noRebate = _quoteFor(bob);
         DnmPool.QuoteResult memory withRebate = _quoteFor(alice);
@@ -61,7 +63,7 @@ contract RebatesFloorPreserveTest is BaseTest {
 
     function test_floorClampsRebateWhenHigher() public {
         vm.prank(gov);
-        pool.setAggregatorDiscount(alice, 3);
+        pool.setAggregatorRouter(alice, true);
 
         DnmPool.MakerConfig memory makerCfg = defaultMakerConfig();
         makerCfg.alphaBboBps = 0;
@@ -75,7 +77,7 @@ contract RebatesFloorPreserveTest is BaseTest {
 
     function test_flagMustBeEnabled() public {
         vm.prank(gov);
-        pool.setAggregatorDiscount(alice, 3);
+        pool.setAggregatorRouter(alice, true);
 
         DnmPool.FeatureFlags memory flags = getFeatureFlags();
         flags.enableRebates = false;

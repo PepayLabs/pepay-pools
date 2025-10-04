@@ -29,7 +29,8 @@ contract FeePolicyCapBoundsTest is Test {
             decayPctPerBlock: 10,
             gammaSizeLinBps: 0,
             gammaSizeQuadBps: 0,
-            sizeFeeCapBps: 0
+            sizeFeeCapBps: 0,
+            kappaLvrBps: 0
         });
     }
 

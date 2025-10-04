@@ -1,7 +1,7 @@
 ---
 title: "Router Integration"
 version: "8e6f14e"
-last_updated: "2025-10-03"
+last_updated: "2025-10-04"
 ---
 
 # Router Integration
@@ -9,6 +9,7 @@ last_updated: "2025-10-03"
 ## Table of Contents
 - [Overview](#overview)
 - [MinOut Calculation](#minout-calculation)
+- [Preview Ladder Telemetry](#preview-ladder-telemetry)
 - [TTL & Slippage Recommendations](#ttl--slippage-recommendations)
 - [Rebates (F09)](#rebates-f09)
 - [Floor Preservation Contract](#floor-preservation-contract)
@@ -19,23 +20,32 @@ last_updated: "2025-10-03"
 This guide targets routers/aggregators integrating DNMM quotes off-chain. Use pool preview APIs to derive deterministic outputs and honour inventory floors while respecting TTL and divergence gates.
 
 ## MinOut Calculation
-1. Call `previewLadder([S0, 2S0, 5S0, 10S0])` to retrieve fees per rung (`contracts/DnmPool.sol:1071-1288`).
-2. Derive `amountOutPreview` for the target size.
-3. Compute `minOut = amountOutPreview - slippageBuffer` where `slippageBuffer` maps to size bucket (see below).
-4. Include `minOut` in signed quote payload (`QuoteRFQ` or router transaction) and surface to downstream takers.
-5. Rebuild previews after any snapshot refresh or when `dnmm_snapshot_age_sec` exceeds configured threshold.
+1. Call `previewLadder([S0, 2S0, 5S0, 10S0])` to retrieve fee bps per rung plus clamp flags (`contracts/DnmPool.sol:1103-1235`).
+2. On refresh, `PreviewLadderServed` emits (when `featureFlags.debugEmit` is enabled) with zipped `[ask0, bid0, ask1, bid1...]` fees and the active `maker.ttlMs`. Use this telemetry to audit router parity.
+3. Derive `amountOutPreview` using the returned fee for the requested rung.
+4. Compute `minOut = amountOutPreview - slippageBuffer[rung]` (see buffers below) and embed in RFQ or direct router transaction.
+5. Snapshots older than one second (`preview.maxAgeSec = 1`) revert; refresh proactively on every price poll or when `dnmm_snapshot_age_sec` > 0.8s to avoid last-second failures.
+
+## Preview Ladder Telemetry
+- **Event:** `PreviewLadderServed(bytes32 snapId, uint8[] rungs, uint16[] feeBps, uint32 tifMs)` (debug mode only).
+- **Rungs:** Always `[1, 2, 5, 10]` representing `{S0, 2S0, 5S0, 10S0}` multiples.
+- **Fees:** Zipped array `[ask0, bid0, ask1, bid1, ...]` in bps; align with `previewLadder` output.
+- **TTL:** `tifMs` mirrors `maker.ttlMs`; routers should cap on-chain TTL ≤ this value.
+- **Correlate:** Use `snapId` (`keccak` of snapshot metadata) to tie preview telemetries to downstream swaps or RFQs.
 
 ## TTL & Slippage Recommendations
-Bucket | Size Range | TTL Guidance | Slippage Buffer | Notes
+Rung | Size Multiple | TTL Guidance | Slippage Buffer | Notes
 --- | --- | --- | --- | ---
-Tier 0 | `≤ S0` (5k quote) | 300 ms max | ≥5 bps | Expect minimal clamps; default TTL matches `maker.ttlMs`.
-Tier 1 | `S0 .. 5S0` | 300 ms | ≥15 bps | Wider buffer to absorb potential AOMQ spread floors.
-Tier 2 | `> 5S0` | 150 ms | ≥30 bps | Coordinate with maker desk; consider splitting orders.
+`S0` | `1 × maker.S0Notional` | 300 ms | 5 bps | Baseline; use as health probe.
+`2S0` | `≈ 2 × S0` | 300 ms | 15 bps | Allows for transient spread moves.
+`5S0` | `≈ 5 × S0` | 300 ms | 15 bps | Stays within standard maker risk appetite.
+`10S0` | `≈ 10 × S0` | 300 ms (hard max) | 30 bps | Coordinate with desk; expect clamps under AOMQ.
 - Always propagate TTL from `QuoteRFQ` signatures; expire quotes client-side 50 ms before on-chain deadline.
 
 ## Rebates (F09)
-- When `featureFlags.enableRebates` and `enableRebates` allowlist active, pool applies per-executor discounts via `aggregatorDiscount` (`contracts/DnmPool.sol:617`).
-- Router must set `executor` address to receive discount; monitor `AggregatorDiscountUpdated` event.
+- When `featureFlags.enableRebates` is `true` and the executor is allow-listed, the pool subtracts a fixed 3 bps rebate (`contracts/DnmPool.sol:1753-1766`).
+- Governance manages the allowlist with `setAggregatorRouter(executor, allowed)`; updates emit `AggregatorDiscountUpdated` with either `3` or `0` bps.
+- Routers must submit transactions from the allow-listed executor to receive the rebate.
 - Discounts never bypass floors; final fee is `max(feePipeline - rebate, minFloor)`.
 
 ## Floor Preservation Contract
@@ -55,6 +65,7 @@ Tier 2 | `> 5S0` | 150 ms | ≥30 bps | Coordinate with maker desk; consider spl
 
 ## Code & Test References
 - Pool preview APIs: `contracts/DnmPool.sol:1071-1288`
+- Preview ladder event: `contracts/DnmPool.sol:1903-1954`, `test/integration/FirmLadder_TIFHonored.t.sol`
 - RFQ settlement: `contracts/quotes/QuoteRFQ.sol:88-145`
-- Rebates: `contracts/DnmPool.sol:1606`, `test/unit/Rebates_FloorPreserve.t.sol:19`
+- Rebates: `contracts/DnmPool.sol:1753-1766`, `test/unit/Rebates_FloorPreserve.t.sol`
 - AOMQ scenarios: `test/integration/Scenario_AOMQ.t.sol:21`, `test/integration/Scenario_Preview_AOMQ.t.sol:21`

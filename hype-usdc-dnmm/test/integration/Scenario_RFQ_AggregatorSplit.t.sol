@@ -184,7 +184,8 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
         vm.recordLogs();
         DnmPool.QuoteResult memory calmQuote = quote(orderSize, true, IDnmPool.OracleMode.Spot);
         emit log_named_uint("calmQuote_fee", calmQuote.feeBpsUsed);
-        EventRecorder.ConfidenceDebugEvent[] memory calmDebug = EventRecorder.decodeConfidenceDebug(vm.getRecordedLogs());
+        EventRecorder.ConfidenceDebugEvent[] memory calmDebug =
+            EventRecorder.decodeConfidenceDebug(vm.getRecordedLogs());
         if (calmDebug.length > 0) {
             emit log_named_uint("calm_conf", calmDebug[0].confBlendedBps);
             emit log_named_uint("calm_feeBase", calmDebug[0].feeBaseBps);

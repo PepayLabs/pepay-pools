@@ -117,7 +117,7 @@ contract InventoryTiltTest is BaseTest {
         uint16 invTiltBpsPer1pct;
         uint16 invTiltMaxBps;
         uint16 tiltSpreadWeightBps;
-        (, , , invTiltBpsPer1pct, invTiltMaxBps, , tiltSpreadWeightBps) = pool.inventoryConfig();
+        (,,, invTiltBpsPer1pct, invTiltMaxBps,, tiltSpreadWeightBps) = pool.inventoryConfig();
 
         uint256 tiltBase = FixedPointMath.mulDivDown(deltaBps, invTiltBpsPer1pct, 100);
 

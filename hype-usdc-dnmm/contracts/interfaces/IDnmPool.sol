@@ -87,7 +87,7 @@ interface IDnmPool {
 
     function cancelParams(ParamKind kind) external;
 
-    function setAggregatorDiscount(address executor, uint16 discountBps) external;
+    function setAggregatorRouter(address executor, bool allowed) external;
 
     function aggregatorDiscount(address executor) external view returns (uint16);
 
@@ -107,10 +107,7 @@ interface IDnmPool {
             uint256 quoteScale
         );
 
-    function getSoftDivergenceState()
-        external
-        view
-        returns (bool active, uint16 lastDeltaBps, uint8 healthyStreak);
+    function getSoftDivergenceState() external view returns (bool active, uint16 lastDeltaBps, uint8 healthyStreak);
 
     function baseTokenAddress() external view returns (address);
 

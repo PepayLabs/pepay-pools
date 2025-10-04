@@ -48,6 +48,19 @@ library FixedPointMath {
         return value / 10 ** (18 - decimals);
     }
 
+    function sqrt(uint256 x) internal pure returns (uint256 result) {
+        if (x == 0) {
+            return 0;
+        }
+
+        uint256 z = (x + 1) >> 1;
+        result = x;
+        while (z < result) {
+            result = z;
+            z = (x / z + z) >> 1;
+        }
+    }
+
     function _mulDiv(uint256 x, uint256 y, uint256 denominator, bool roundUp) private pure returns (uint256 result) {
         if (denominator == 0) revert MathZeroDivision();
 

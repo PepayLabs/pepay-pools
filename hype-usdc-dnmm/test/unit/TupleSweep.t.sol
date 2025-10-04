@@ -104,14 +104,11 @@ contract TupleSweepTest is Test {
             decayPctPerBlock: 20,
             gammaSizeLinBps: 0,
             gammaSizeQuadBps: 0,
-            sizeFeeCapBps: 0
+            sizeFeeCapBps: 0,
+            kappaLvrBps: 0
         });
-        DnmPool.MakerConfig memory makerCfg = DnmPool.MakerConfig({
-            s0Notional: uint128(1_000 * baseScale),
-            ttlMs: 200,
-            alphaBboBps: 0,
-            betaFloorBps: 0
-        });
+        DnmPool.MakerConfig memory makerCfg =
+            DnmPool.MakerConfig({s0Notional: uint128(1_000 * baseScale), ttlMs: 200, alphaBboBps: 0, betaFloorBps: 0});
         DnmPool.AomqConfig memory aomqCfg =
             DnmPool.AomqConfig({minQuoteNotional: 0, emergencySpreadBps: 0, floorEpsilonBps: 0});
         DnmPool.PreviewConfig memory previewCfg = DnmPool.PreviewConfig({
@@ -145,7 +142,8 @@ contract TupleSweepTest is Test {
                 enableInvTilt: false,
                 enableAOMQ: false,
                 enableRebates: false,
-                enableAutoRecenter: false
+                enableAutoRecenter: false,
+                enableLvrFee: false
             }),
             guardians
         );

@@ -34,10 +34,11 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
+- 2025-10-04: Added LVR-aware fee term (`fee.kappaLvrBps`, `enableLvrFee`), ladder telemetry (`PreviewLadderServed`), toxicity-aware surcharge biasing, and governance-managed router allowlist via `setAggregatorRouter` with consolidated rebate cap enforcement.
 - 2025-10-02: Collapsed fee-pipeline decoding into lightweight cached params, deferred full config unpacking to debug-only paths, and tightened adapter gating so `quote_hc` lands at ~127k gas with features disabled while preserving flag-off behaviour.
 - 2025-10-02: Relaxed preview config bounds to allow `maxAgeSec = 0` (no stale reverts) unless governance opts in, guarded `_loadSnapshotValidated` against zero max-age, and updated deploy defaults accordingly while keeping swap/preview semantics intact.
 - 2025-10-02: Tightened HyperCore/Pyth divergence guard for spot quotes via peek-based fallback, restored `DosEconomics` fail-closed expectations, and cached fee state loads to trim quote/preview gas.
-- 2025-10-02: Landed F09 rebates (`setAggregatorDiscount`, capped 3 bps) + pipeline integration and eventing; swap/preview now honor allow-listed discounts without breaching floors.
+- 2025-10-02: Landed F09 rebates (initial `setAggregatorDiscount` helper, now replaced by `setAggregatorRouter`) capped at 3 bps; swap/preview honor allow-listed discounts without breaching floors.
 - 2025-10-02: Hardened governance (F11) with timelock queue/execute/cancel, pending payload storage, helper label hashes, and `setPauser` for autopause delegations.
 - 2025-10-02: Fixed oracle fail-closed semantics by bubbling `Errors.MidUnset` for both swap/preview and kept `previewFeesFresh` view-only via shared `_readOracleView` helper.
 - 2025-10-01: Implemented AOMQ micro-quote pipeline (F07) in `DnmPool`: soft-divergence/floor/fallback triggers, clamp-to-min quote sizing, spread floors, and activation telemetry.

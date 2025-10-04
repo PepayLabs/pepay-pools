@@ -16,8 +16,7 @@ library EventRecorder {
         keccak256("ConfidenceDebug(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)");
     bytes32 internal constant ORACLE_SNAPSHOT_SIG =
         keccak256("OracleSnapshot(bytes32,uint256,uint256,uint256,uint256,uint256,bool,bool,bool)");
-    bytes32 internal constant AOMQ_ACTIVATED_SIG =
-        keccak256("AomqActivated(bytes32,bool,uint256,uint256,uint16)");
+    bytes32 internal constant AOMQ_ACTIVATED_SIG = keccak256("AomqActivated(bytes32,bool,uint256,uint256,uint16)");
 
     bytes32 internal constant REASON_NONE = bytes32(0);
     bytes32 internal constant REASON_FLOOR = bytes32("FLOOR");

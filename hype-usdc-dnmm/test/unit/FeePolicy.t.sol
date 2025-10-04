@@ -20,7 +20,8 @@ contract FeePolicyTest is Test {
             decayPctPerBlock: 20,
             gammaSizeLinBps: 0,
             gammaSizeQuadBps: 0,
-            sizeFeeCapBps: 0
+            sizeFeeCapBps: 0,
+            kappaLvrBps: 800
         });
     }
 
@@ -77,6 +78,7 @@ contract FeePolicyTest is Test {
         assertEq(unpacked.gammaSizeLinBps, cfg.gammaSizeLinBps, "gamma lin");
         assertEq(unpacked.gammaSizeQuadBps, cfg.gammaSizeQuadBps, "gamma quad");
         assertEq(unpacked.sizeFeeCapBps, cfg.sizeFeeCapBps, "size cap");
+        assertEq(unpacked.kappaLvrBps, cfg.kappaLvrBps, "kappa");
     }
 
     function test_preview_packed_matches_struct() public {

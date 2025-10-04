@@ -180,7 +180,8 @@ abstract contract BaseTest is MathAsserts {
             decayPctPerBlock: 20,
             gammaSizeLinBps: 0,
             gammaSizeQuadBps: 0,
-            sizeFeeCapBps: 0
+            sizeFeeCapBps: 0,
+            kappaLvrBps: 0
         });
     }
 
@@ -195,17 +196,13 @@ abstract contract BaseTest is MathAsserts {
             decayPctPerBlock: 10,
             gammaSizeLinBps: 0,
             gammaSizeQuadBps: 0,
-            sizeFeeCapBps: 0
+            sizeFeeCapBps: 0,
+            kappaLvrBps: 0
         });
     }
 
     function defaultMakerConfig() internal pure returns (DnmPool.MakerConfig memory) {
-        return DnmPool.MakerConfig({
-            s0Notional: 5_000 ether,
-            ttlMs: 300,
-            alphaBboBps: 0,
-            betaFloorBps: 0
-        });
+        return DnmPool.MakerConfig({s0Notional: 5_000 ether, ttlMs: 300, alphaBboBps: 0, betaFloorBps: 0});
     }
 
     function defaultAomqConfig() internal pure returns (DnmPool.AomqConfig memory) {
@@ -214,9 +211,9 @@ abstract contract BaseTest is MathAsserts {
 
     function defaultPreviewConfig() internal pure returns (DnmPool.PreviewConfig memory) {
         return DnmPool.PreviewConfig({
-            maxAgeSec: 0,
+            maxAgeSec: 1,
             snapshotCooldownSec: 0,
-            revertOnStalePreview: false,
+            revertOnStalePreview: true,
             enablePreviewFresh: false
         });
     }
@@ -232,7 +229,8 @@ abstract contract BaseTest is MathAsserts {
             enableInvTilt: false,
             enableAOMQ: false,
             enableRebates: false,
-            enableAutoRecenter: false
+            enableAutoRecenter: false,
+            enableLvrFee: false
         });
     }
 
@@ -247,7 +245,8 @@ abstract contract BaseTest is MathAsserts {
             bool enableInvTilt,
             bool enableAOMQ,
             bool enableRebates,
-            bool enableAutoRecenter
+            bool enableAutoRecenter,
+            bool enableLvrFee
         ) = pool.featureFlags();
 
         flags = DnmPool.FeatureFlags({
@@ -260,7 +259,8 @@ abstract contract BaseTest is MathAsserts {
             enableInvTilt: enableInvTilt,
             enableAOMQ: enableAOMQ,
             enableRebates: enableRebates,
-            enableAutoRecenter: enableAutoRecenter
+            enableAutoRecenter: enableAutoRecenter,
+            enableLvrFee: enableLvrFee
         });
     }
 

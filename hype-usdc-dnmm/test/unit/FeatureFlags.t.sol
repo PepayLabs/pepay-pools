@@ -22,7 +22,8 @@ contract FeatureFlagsTest is BaseTest {
             bool enableInvTilt,
             bool enableAOMQ,
             bool enableRebates,
-            bool enableAutoRecenter
+            bool enableAutoRecenter,
+            bool enableLvrFee
         ) = pool.featureFlags();
 
         assertFalse(blendOn, "blendOn should default disabled");
@@ -35,6 +36,7 @@ contract FeatureFlagsTest is BaseTest {
         assertFalse(enableAOMQ, "AOMQ flag default");
         assertFalse(enableRebates, "rebates flag default");
         assertFalse(enableAutoRecenter, "auto recenter flag default");
+        assertFalse(enableLvrFee, "LVR fee flag default");
     }
 
     function test_governanceCanToggleFeatureFlags() public {
@@ -48,7 +50,8 @@ contract FeatureFlagsTest is BaseTest {
             enableInvTilt: true,
             enableAOMQ: true,
             enableRebates: true,
-            enableAutoRecenter: true
+            enableAutoRecenter: true,
+            enableLvrFee: true
         });
 
         vm.prank(gov);
@@ -64,7 +67,8 @@ contract FeatureFlagsTest is BaseTest {
             bool enableInvTilt,
             bool enableAOMQ,
             bool enableRebates,
-            bool enableAutoRecenter
+            bool enableAutoRecenter,
+            bool enableLvrFee
         ) = pool.featureFlags();
 
         assertTrue(blendOn, "blendOn enabled");
@@ -77,15 +81,15 @@ contract FeatureFlagsTest is BaseTest {
         assertTrue(enableAOMQ, "AOMQ enabled");
         assertTrue(enableRebates, "rebates enabled");
         assertTrue(enableAutoRecenter, "auto recenter enabled");
+        assertTrue(enableLvrFee, "LVR fee enabled");
     }
 
     function test_debugEmitFlagGatesConfidenceEvent() public {
         vm.recordLogs();
         quote(10 ether, true, IDnmPool.OracleMode.Spot);
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 debugSig = keccak256(
-            "ConfidenceDebug(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)"
-        );
+        bytes32 debugSig =
+            keccak256("ConfidenceDebug(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)");
         bool found;
         for (uint256 i = 0; i < logs.length; ++i) {
             if (logs[i].topics[0] == debugSig) {

@@ -16,7 +16,9 @@ contract DnmPoolGovernanceTimelockTest is BaseTest {
 
     function test_queueExecuteAfterDelay() public {
         vm.prank(gov);
-        pool.updateParams(IDnmPool.ParamKind.Governance, abi.encode(DnmPool.GovernanceConfig({timelockDelaySec: DELAY})));
+        pool.updateParams(
+            IDnmPool.ParamKind.Governance, abi.encode(DnmPool.GovernanceConfig({timelockDelaySec: DELAY}))
+        );
 
         FeePolicy.FeeConfig memory newCfg = defaultFeeConfig();
         newCfg.baseBps = 25;
@@ -38,7 +40,7 @@ contract DnmPoolGovernanceTimelockTest is BaseTest {
         vm.prank(gov);
         pool.executeParams(IDnmPool.ParamKind.Fee);
 
-        (uint16 baseBps,,,,,,,,,) = pool.feeConfig();
+        (uint16 baseBps,,,,,,,,,,) = pool.feeConfig();
         assertEq(baseBps, newCfg.baseBps, "timelocked update applied");
     }
 
@@ -50,13 +52,15 @@ contract DnmPoolGovernanceTimelockTest is BaseTest {
         uint40 eta = pool.queueParams(IDnmPool.ParamKind.Fee, abi.encode(newCfg));
         assertEq(eta, 0, "no timelock: eta zero");
 
-        (uint16 baseBps,,,,,,,,,) = pool.feeConfig();
+        (uint16 baseBps,,,,,,,,,,) = pool.feeConfig();
         assertEq(baseBps, newCfg.baseBps, "update applied immediately");
     }
 
     function test_cancelClearsPending() public {
         vm.prank(gov);
-        pool.updateParams(IDnmPool.ParamKind.Governance, abi.encode(DnmPool.GovernanceConfig({timelockDelaySec: DELAY})));
+        pool.updateParams(
+            IDnmPool.ParamKind.Governance, abi.encode(DnmPool.GovernanceConfig({timelockDelaySec: DELAY}))
+        );
 
         FeePolicy.FeeConfig memory newCfg = defaultFeeConfig();
         newCfg.baseBps = 28;

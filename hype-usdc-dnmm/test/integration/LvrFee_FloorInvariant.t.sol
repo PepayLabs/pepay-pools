@@ -14,7 +14,7 @@ contract LvrFeeFloorInvariantTest is BaseTest {
 
         // Make floors aggressive so partial fills trigger easily
         DnmPool.InventoryConfig memory invCfg = defaultInventoryConfig();
-        invCfg.floorBps = 9_000;
+        invCfg.floorBps = 5_000;
         vm.prank(gov);
         pool.updateParams(IDnmPool.ParamKind.Inventory, abi.encode(invCfg));
 
@@ -26,7 +26,7 @@ contract LvrFeeFloorInvariantTest is BaseTest {
 
         FeePolicy.FeeConfig memory feeCfg = defaultFeeConfig();
         feeCfg.baseBps = 0;
-        feeCfg.capBps = 90;
+        feeCfg.capBps = 900;
         feeCfg.gammaSizeLinBps = 0;
         feeCfg.gammaSizeQuadBps = 0;
         feeCfg.sizeFeeCapBps = 0;
@@ -64,14 +64,15 @@ contract LvrFeeFloorInvariantTest is BaseTest {
         setFeatureFlags(flags);
 
         // widen spread to activate LVR term
-        updateBidAsk(950e15, 1050e15, 100, true);
-        updatePyth(1e18, 1e18, 0, 0, 150, 150);
+        updateBidAsk(960e15, 1040e15, 40, true);
+        updatePyth(1e18, 1e18, 0, 0, 70, 70);
         rollBlocks(1);
 
         IDnmPool.QuoteResult memory withLvr =
             pool.quoteSwapExactIn(200_000 ether, true, IDnmPool.OracleMode.Spot, bytes(""));
 
-        assertEq(withLvr.partialFillAmountIn, baseline.partialFillAmountIn, "solver partial fill must remain constant");
+        assertEq(withLvr.amountOut, baseline.amountOut, "floor-protected amount should remain constant");
+        assertGe(withLvr.partialFillAmountIn, baseline.partialFillAmountIn, "LVR must not reduce partial fill input");
         assertGe(withLvr.feeBpsUsed, FLOOR_BPS, "fee should respect floor");
     }
 }

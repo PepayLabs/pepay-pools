@@ -35,14 +35,15 @@ fee_size_bps = min(fee_size_bps, size_fee_cap_bps)
 Pseudocode:
 
 ```text
-sigma_bps = outcome.sigmaBps
-ttl_sec = maker.ttlMs / 1000
-toxicity_bias = aomqActive ? emergencySpreadBps : 0
-fee_lvr_bps = kappaLvrBps * (sigma_bps * sqrt(ttl_sec) + toxicity_bias) * LVR_SCALE
+sigma_wad = sigma_bps * 1e14
+dt_wad = maker.ttlMs * 1e18 / 1000
+sqrt_dt_wad = sqrt(dt_wad) * 1e9     # convert back to WAD scale
+term_wad = mulDivUp(sigma_wad, sqrt_dt_wad, 1e18) + toxicity_bias_wad
+fee_lvr_bps = mulDivUp(kappa_lvr_bps, term_wad, 1e18)
 fee_lvr_bps = min(fee_lvr_bps, cap_bps)
 ```
-- Inputs: `fee.kappaLvrBps`, maker TTL, blended sigma, AOMQ emergency spread.
-- `LVR_SCALE` equals `1 / 5e17` (see `contracts/DnmPool.sol:260`) to translate the σ√Δt term into basis points.
+- Inputs: `fee.kappaLvrBps`, maker TTL, blended sigma, AOMQ emergency spread (`toxicity_bias_wad`).
+- Final rounding occurs only in the last `mulDivUp` so σ√Δt remains monotonic when TTL or volatility increase.
 - Complexity: O(1) per quote.
 - Gas: ≈2.3k gas incremental when enabled (math-only, no storage IO).
 - Implementation: `contracts/DnmPool.sol:1753-1799`, `contracts/lib/FeePolicy.sol:120-170`, `contracts/lib/FixedPointMath.sol:73-86`.

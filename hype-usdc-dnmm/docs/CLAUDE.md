@@ -34,7 +34,7 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2025-10-04: Documented Core-4 upgrades—LVR fee term, ladder TTL telemetry, 1s preview freshness, governance playbooks, and observability metrics—and refreshed every doc under `docs/` to align with `elite-core-4-to-do` requirements.
+- 2025-10-04: Documented Core-4 upgrades—LVR fee term (with explicit WAD math), ladder TTL telemetry, 1s preview freshness, governance playbooks, and observability metrics—and refreshed every doc under `docs/` to align with `elite-core-4-to-do` requirements.
 - 2025-10-03: Regenerated architecture, rebalancing, fees, inventory floor, oracle, RFQ, observability, operations, divergence, config, and testing docs; added `ALGORITHMS.md`, `METRICS_GLOSSARY.md`, `GOVERNANCE_AND_TIMELOCK.md`, `GAS_OPTIMIZATION_GUIDE.md`, and `DOCS_INDEX.md` with updated feature matrices and front matter.
 - 2025-10-02: Noted spot-mode fallback reliance on Pyth peeks in `RFQ.md` and extended `OBSERVABILITY.md` oracle-health guidance with `pyth_peek_failures_total` alerting to match new tests.
 - 2025-10-02: Clarified preview snapshot defaults (`maxAgeSec = 0`, opt-in staleness reverts) across `ARCHITECTURE.md`, `RFQ.md`, `REBALANCING_IMPLEMENTATION.md`, and `OBSERVABILITY.md`; documented `Errors.MidUnset` fail-closed semantics in `DIVERGENCE_POLICY.md`.

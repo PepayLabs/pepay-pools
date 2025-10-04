@@ -1,9 +1,9 @@
 operation,gas_used
-quote_hc,127134
-quote_ema,120201
-quote_pyth,119571
-swap_base_hc,301177
-swap_quote_hc,301168
-rfq_verify_swap,459964
-preview_fees,55826
-preview_ladder,95581
+quote_hc,128680
+quote_ema,121747
+quote_pyth,121117
+swap_base_hc,302949
+swap_quote_hc,302940
+rfq_verify_swap,461860
+preview_fees,57823
+preview_ladder,99856

@@ -1,0 +1,365 @@
+{
+   "meta": {
+     "name": "DNMM Elite – Comprehensive Code & Logic Review Context",
+     "version": "1.0.0",
+     "scope": "HYPE/USDC DNMM (contracts + tests + ops + docs)",
+     "objectives": [
+       "Detect and prevent logical fallacies that degrade safety, PnL, or router UX",
+       "Prove fee pipeline semantics, floors, oracle guards, RFQ strictness, and preview determinism",
+       "Ensure runtime knobs are governed, bounded, and gas-aware",
+       "Guarantee parity between previews and settlement under all regimes"
+     ],
+     "non_functional": {
+       "gas_budgets": {
+         "quote_hc_max": 130000,
+         "swap_base_hc_max": 305000,
+         "rfq_verify_swap_max": 470000
+       },
+       "uptime_target_pct": 99.5,
+       "preview_parity_required": true
+     }
+   },
+ 
+   "sources_of_truth": {
+     "docs": [
+       "docs/ALGORITHMS.md",
+       "docs/ARCHITECTURE.md",
+       "docs/FEES_AND_INVENTORY.md",
+       "docs/INVENTORY_FLOOR.md",
+       "docs/OBSERVABILITY.md",
+       "docs/ORACLE.md",
+       "docs/RFQ.md",
+       "docs/rfq_spec.md",
+       "docs/GAS_OPTIMIZATION_GUIDE.md",
+       "docs/REBALANCING_IMPLEMENTATION.md",
+       "docs/DIVERGENCE_POLICY.md",
+       "docs/TIER_STRUCTURE_ANALYSIS.md"
+     ],
+     "refs": [
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       ""
+     ]
+   },
+ 
+   "risk_priorities": {
+     "severity": ["P0_BLOCKER", "P1_HIGH", "P2_MED", "P3_LOW"],
+     "themes": [
+       "Fee pipeline ordering & units",
+       "Floors & partial fills correctness",
+       "Oracle freshness/divergence gates",
+       "Preview determinism & TIF",
+       "RFQ strict mode",
+       "Governance & timelock",
+       "Gas-driven masking of logic",
+       "Router and aggregator correctness",
+       "Inventory/rebalancing safety",
+       "Event & memory patterns (tests)"
+     ]
+   },
+ 
+   "controls": [
+     {
+       "id": "CTRL-FEE-ORDER-UNITS",
+       "title": "Fee pipeline ordering & unit-safety",
+       "intent": "Prevent negative or masked fees; ensure consistent WAD/BPS math and LVR placement.",
+       "checks": [
+         "Static: Find the pipeline composition function (e.g., `_applyFeePipeline`) and assert the exact order: base + (confidence if blendOn) + size + invTilt + LVR → cap → BBO floor → rebates.",
+         "Static: Confirm all terms use WAD internally and convert to bps once, at the end; no hidden denominators.",
+         "Static: LVR term uses WAD sqrt for √Δt and is gated by `featureFlags.enableLvrFee`.",
+         "Dynamic: Unit tests for monotonicity (σ↑ ⇒ fee↑; TTL↑ ⇒ fee↑) before floor clamp."
+       ],
+       "pass_criteria": [
+         "Order is exactly as documented.",
+         "No integer-precision loss in LVR math.",
+         "Monotonic tests pass with strict `assertGt`."
+       ],
+       "fail_examples": [
+         "LVR added after floor clamp",
+         "Fee rounding applied multiple times",
+         "TTL deltas not affecting LVR because of integer sqrt"
+       ],
+       "severity": "P0_BLOCKER",
+       "refs": [""]
+     },
+     {
+       "id": "CTRL-FLOOR-PARTIALS",
+       "title": "Floors & partial-fills invariants",
+       "intent": "Guarantee reserves never breach floors and partials return correct remainders under clamps/AOMQ.",
+       "checks": [
+         "Static: Verify `floorBps` bounds (≤ 5000 bps) and errors on misconfig.",
+         "Static: Ensure Inventory solver returns (amountOut, appliedAmountIn, isPartial) and is called on all paths.",
+         "Dynamic: Invariant tests — final fee ≥ floor; partial fill parity; AOMQ never bypasses floors."
+       ],
+       "pass_criteria": [
+         "`floorBps` ≤ 5000 enforced",
+         "All swap paths route through solver",
+         "Invariants green under fuzz"
+       ],
+       "severity": "P0_BLOCKER",
+       "refs": [""]
+     },
+     {
+       "id": "CTRL-ORACLE-GATES",
+       "title": "Oracle freshness & divergence",
+       "intent": "Avoid stale/invalid mids; honor strict vs relaxed modes; minimize unnecessary reads.",
+       "checks": [
+         "Static: Relaxed mode gates Pyth fetch with `needsPythConfidence/needsPythDivergence`.",
+         "Static: Strict mode (RFQ verify) always enforces tight `pyth.maxAgeSec`.",
+         "Dynamic: Preview freshness (`preview.maxAgeSec`, `revertOnStalePreview`) reverts stale ladders."
+       ],
+       "pass_criteria": [
+         "Strict RFQ always consults Pyth within 5–10s max-age",
+         "Relaxed path conditionally fetches Pyth",
+         "Preview freshness enforced"
+       ],
+       "severity": "P0_BLOCKER",
+       "refs": ["", ""]
+     },
+     {
+       "id": "CTRL-PREVIEW-DETERMINISM",
+       "title": "Preview determinism & TIF",
+       "intent": "Ensure ladders are deterministic against the stored snapshot, with explicit TIF/minOut hints.",
+       "checks": [
+         "Static: `previewLadder` replays against the last snapshot; no hidden state.",
+         "Dynamic: Test: ladder outputs remain identical if called twice within freshness window.",
+         "Dynamic: TIF/minOut computed consistently with router slippage table."
+       ],
+       "severity": "P1_HIGH",
+       "refs": ["", ""]
+     },
+     {
+       "id": "CTRL-RFQ-STRICT",
+       "title": "RFQ strict verification",
+       "intent": "Prevent overfills/underpricing; bind quotes to pool preview deterministically.",
+       "checks": [
+         "Static: `verifyAndSwap` checks caller/taker, TTL, and pool parity; rejects if maker quote < pool preview.",
+         "Dynamic: Reject stale or diverged oracle snapshots in strict mode."
+       ],
+       "severity": "P0_BLOCKER",
+       "refs": ["", ""]
+     },
+     {
+       "id": "CTRL-AOMQ-SIGNAL",
+       "title": "AOMQ signal-driven clamps",
+       "intent": "Ensure degraded states clamp size/spread without bypassing floors; avoid unnecessary global pauses.",
+       "checks": [
+         "Static: AOMQ never short-circuits the Inventory solver.",
+         "Dynamic: Toxicity-score → clamp thresholds mapping; correlates with clamps and uptime.",
+         "Dynamic: Two-sided uptime ≥ target during volatility spikes."
+       ],
+       "severity": "P1_HIGH",
+       "refs": ["", ""]
+     },
+     {
+       "id": "CTRL-REBATES-AGG",
+       "title": "Aggregator recognition & rebates safety",
+       "intent": "3 bps router discount must not create negative fees or bypass floors; keep gas low.",
+       "checks": [
+         "Static: Apply rebate after floor and cap; `finalFeeBps` saturates at 0 (never negative).",
+         "Static: `isAggregatorRouter` SLOAD only; no extra volume tracking on that path.",
+         "Dynamic: Weighted gas stays ~+2.3% vs baseline; finalFee never < floor"
+       ],
+       "severity": "P1_HIGH",
+       "refs": [""]
+     },
+     {
+       "id": "CTRL-GOV-TIMELOCK",
+       "title": "Governance & timelock",
+       "intent": "Ensure sensitive flips and allowlists are timelocked and auditable.",
+       "checks": [
+         "Static: `setAggregatorRouter`, `featureFlags.enable*`, `preview.*` behind governance; timelock required.",
+         "Dynamic: Negative tests for unauthorized config changes."
+       ],
+       "severity": "P0_BLOCKER",
+       "refs": [""]
+     },
+     {
+       "id": "CTRL-GAS-EARLYOUT",
+       "title": "Gas-aware early outs & packing",
+       "intent": "Prevent regressions that mask logic or break budgets.",
+       "checks": [
+         "Static: Feature flags and configs are packed; no duplicate SLOADs in hot paths.",
+         "Static: Early-out paths in AOMQ when disabled or size==0.",
+         "Dynamic: Gas snapshots within budgets for all hot paths."
+       ],
+       "severity": "P2_MED",
+       "refs": [""]
+     },
+     {
+       "id": "CTRL-REBALANCE-SAFETY",
+       "title": "Rebalancing thresholds, cooldown, and divergence guards",
+       "intent": "Auto/Manual recenter executes safely; never chases noise; respects cooldown & timelock.",
+       "checks": [
+         "Static: Hysteresis and cooldown honored; divergence haircuts disable recenter until healthy.",
+         "Dynamic: Tests for `RecenterCooldown`, timelock, and oracle freshness on recenter."
+       ],
+       "severity": "P1_HIGH",
+       "refs": [""]
+     },
+     {
+       "id": "CTRL-EVENT-PATTERNS",
+       "title": "Event/memory safety in tests",
+       "intent": "Avoid Foundry 0x41 panics and hidden OOG via dynamic array events.",
+       "checks": [
+         "Static: No dynamic array fields in high-frequency events OR gated under debug flag.",
+         "Dynamic: Tests assert previews directly instead of decoding large event payloads."
+       ],
+       "severity": "P2_MED",
+       "refs": [""]
+     }
+   ],
+ 
+   "static_analysis_rules": [
+     {
+       "id": "SAR-ORDER-LVR",
+       "pattern": "apply.*Lvr.*after.*floor|floor.*before.*cap",
+       "explanation": "LVR must be added before cap/floor; floor must be last among clamps",
+       "severity": "P0_BLOCKER"
+     },
+     {
+       "id": "SAR-MAGIC-DENOM",
+       "pattern": "LVR_DENOMINATOR|\\b5e17\\b",
+       "explanation": "Replace magic denominators with explicit WAD math for σ√Δt",
+       "severity": "P1_HIGH"
+     },
+     {
+       "id": "SAR-DYN-ARRAY-EVENT",
+       "pattern": "event\\s+\\w+\\(.*\\[\\]\\)",
+       "explanation": "Dynamic arrays in events can trigger decode panics; prefer fixed-length or debug-only",
+       "severity": "P2_MED"
+     },
+     {
+       "id": "SAR-NEG-FEE",
+       "pattern": "finalFeeBps\\s*=\\s*.*-\\s*.*;|int.*makerRebate.*",
+       "explanation": "Ensure final fee never goes negative after rebates; clamp at zero after floor",
+       "severity": "P0_BLOCKER"
+     },
+     {
+       "id": "SAR-FLOOR-100",
+       "pattern": "floorBps\\s*>\\s*10000",
+       "explanation": "Do not allow 100% floors; keep ≤5000 to avoid soft-bricking liquidity",
+       "severity": "P1_HIGH"
+     },
+     {
+       "id": "SAR-PYTH-STRICT",
+       "pattern": "OracleMode\\.Strict",
+       "explanation": "RFQ verify path must always enforce tight Pyth maxAge; flag missing conditional fetch",
+       "severity": "P0_BLOCKER"
+     }
+   ],
+ 
+   "dynamic_test_matrix": {
+     "unit": [
+       "LvrFee_Monotonic (σ↑, TTL↑ ⇒ fee↑, before floor clamp)",
+       "LvrFee_RespectsCaps (cap respected under extreme σ/TTL)",
+       "FeeOrder_ClampOrder (assert pipeline order by observation)",
+       "AggregatorDiscount_FloorPreserve (rebate never violates floor)"
+     ],
+     "integration": [
+       "Scenario_Preview_AOMQ (parity & clamps; floors preserved)",
+       "Scenario_RFQ_AggregatorSplit (strict oracle + TTL; ≥5S0 notional)",
+       "Scenario_StalePreview (reverts when freshness enabled)",
+       "Scenario_RecenterThreshold (cooldown/hysteresis/timelock)"
+     ],
+     "invariants": [
+       "final_fee_bps >= bbo_floor_bps",
+       "fee_bps <= cap_bps",
+       "no swap path bypasses Inventory solver",
+       "strict RFQ cannot settle if maker quote < pool preview"
+     ],
+     "gas_snapshots": [
+       "quote_hc ≤ 130k",
+       "swap_base_hc ≤ 305k",
+       "rfq_verify_swap ≤ 470k"
+     ],
+     "refs": [
+       "",
+       "",
+       "",
+       ""
+     ]
+   },
+ 
+   "observability_requirements": {
+     "must_emit": [
+       "dnmm_fee_bps",
+       "dnmm_total_bps",
+       "dnmm_lvr_fee_bps",
+       "dnmm_bbo_spread_bps",
+       "dnmm_delta_bps",
+       "dnmm_two_sided_uptime_pct",
+       "dnmm_aomq_clamps_total",
+       "dnmm_preview_stale_reverts_total"
+     ],
+     "dashboards": [
+       "quote-health.json",
+       "oracle-health.json",
+       "inventory-rebalancing.json",
+       "dnmm_shadow_metrics.json"
+     ],
+     "refs": [""]
+   },
+ 
+   "governance_and_rollout": {
+     "timelock_required": [
+       "featureFlags.enableLvrFee",
+       "featureFlags.enableAOMQ",
+       "featureFlags.enableRebates",
+       "preview.*",
+       "rebates.allowlist"
+     ],
+     "negative_tests": [
+       "Unauthorized config updates revert",
+       "Timelock delay enforced on sensitive flips",
+       "Batch of config updates preserves invariants"
+     ],
+     "refs": ["", ""]
+   },
+ 
+   "router_and_rfq": {
+     "policies": [
+       "Firm ladder JSON exposes {rung, fee_bps, amountOut, minOut, tif_ms}",
+       "RFQ Strict: always consult Pyth with maxAge ≤ 10s",
+       "Client TTL expiry 50ms before maker TTL"
+     ],
+     "refs": ["", "", ""]
+   },
+ 
+   "tier_pricing_and_gas": {
+     "aggregator_path": {
+       "rule": "No volume tracking on aggregator routes; only SLOAD allowlist + constant discount",
+       "target_gas": "≈ +2k over baseline; weighted avg ≈ +2.3%",
+       "refs": [""]
+     }
+   },
+ 
+   "outputs": {
+     "reports": [
+       "Static analysis findings (by control id)",
+       "Invariant violations (if any) with repro seeds",
+       "Gas diff report vs baseline snapshot",
+       "Preview parity report (pass/fail by pair)",
+       "Governance action diff (params touched + timelock evidence)"
+     ],
+     "autofix_suggestions": true
+   },
+ 
+   "acceptance_criteria": [
+     "All P0/P1 controls pass; no outstanding P0/P1 issues",
+     "All invariants green across fuzz campaigns",
+     "Gas budgets respected",
+     "Preview parity holds with freshness enabled",
+     "Governance-sensitive changes pass timelock tests"
+   ]
+ }
+ 

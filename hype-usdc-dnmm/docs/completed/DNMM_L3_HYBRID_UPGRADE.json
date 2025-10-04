@@ -1,0 +1,126 @@
+{
+  "version": "8e6f14e",
+  "last_updated": "2025-10-04",
+  "features": [
+    {
+      "id": "F01",
+      "status": "present",
+      "code_refs": ["contracts/DnmPool.sol:766", "contracts/DnmPool.sol:1567"],
+      "test_refs": ["test/unit/DnmPool_Rebalance.t.sol:20", "test/integration/Scenario_RecenterThreshold.t.sol:18"],
+      "doc_refs": ["docs/REBALANCING_IMPLEMENTATION.md"],
+      "notes": "Auto/manual recenter with cooldown + hysteresis gated by enableAutoRecenter (default false)."
+    },
+    {
+      "id": "F02",
+      "status": "present",
+      "code_refs": ["contracts/oracle/OracleAdapterHC.sol:1", "contracts/DnmPool.sol:2097"],
+      "test_refs": ["test/integration/ForkParity.t.sol:42", "test/integration/Scenario_StaleOracle_and_Fallbacks.t.sol:20"],
+      "doc_refs": ["docs/ORACLE.md", "docs/ARCHITECTURE.md"],
+      "notes": "HyperCore scaling + fallback ladder with divergence guards."
+    },
+    {
+      "id": "F03",
+      "status": "present",
+      "code_refs": ["contracts/DnmPool.sol:2090", "contracts/DnmPool.sol:2333"],
+      "test_refs": ["test/unit/SoftDivergenceTest.t.sol:18", "test/integration/Scenario_DivergenceTripwire.t.sol:22"],
+      "doc_refs": ["docs/DIVERGENCE_POLICY.md"],
+      "notes": "Soft divergence haircut with hysteresis; defaults keep flag off."
+    },
+    {
+      "id": "F04",
+      "status": "present",
+      "code_refs": ["contracts/lib/FeePolicy.sol:48", "contracts/DnmPool.sol:1736"],
+      "test_refs": ["test/unit/SizeFeeCurveTest.t.sol:17"],
+      "doc_refs": ["docs/FEES_AND_INVENTORY.md", "docs/ALGORITHMS.md"] ,
+      "notes": "Size-aware fee pipeline; defaults zero coefficients."
+    },
+    {
+      "id": "F05",
+      "status": "present",
+      "code_refs": ["contracts/DnmPool.sol:1485"],
+      "test_refs": ["test/unit/BboFloorTest.t.sol:15"],
+      "doc_refs": ["docs/FEES_AND_INVENTORY.md", "docs/ALGORITHMS.md"],
+      "notes": "BBO-aware floor gating final fees."
+    },
+    {
+      "id": "F06",
+      "status": "present",
+      "code_refs": ["contracts/DnmPool.sol:1501", "contracts/lib/Inventory.sol:25"],
+      "test_refs": ["test/unit/InventoryTiltTest.t.sol:16"],
+      "doc_refs": ["docs/FEES_AND_INVENTORY.md", "docs/ALGORITHMS.md"],
+      "notes": "Inventory tilt adjustments with spread/conf weights."
+    },
+    {
+      "id": "F07",
+      "status": "present",
+      "code_refs": ["contracts/DnmPool.sol:1279", "contracts/DnmPool.sol:1752"],
+      "test_refs": ["test/integration/Scenario_AOMQ.t.sol:21", "test/integration/Scenario_Preview_AOMQ.t.sol:21"],
+      "doc_refs": ["docs/ALGORITHMS.md", "docs/ROUTER_INTEGRATION.md", "docs/INVENTORY_FLOOR.md"],
+      "notes": "Always-On Micro Quotes clamp behaviour with floor-preserving fills."
+    },
+    {
+      "id": "F08",
+      "status": "present",
+      "code_refs": ["contracts/DnmPool.sol:1071", "contracts/DnmPool.sol:1877", "contracts/DnmPool.sol:1092"],
+      "test_refs": ["test/unit/PreviewFees_Parity.t.sol", "test/integration/Scenario_Preview_AOMQ.t.sol:21"],
+      "doc_refs": ["docs/ARCHITECTURE.md", "docs/RFQ.md", "docs/ALGORITHMS.md"],
+      "notes": "Preview snapshot pipeline with deterministic ladder; raw snapshot accessible via previewSnapshotRaw()."
+    },
+    {
+      "id": "F09",
+      "status": "present",
+      "code_refs": ["contracts/DnmPool.sol:661", "contracts/DnmPool.sol:1780"],
+      "test_refs": ["test/unit/Rebates_FloorPreserve.t.sol:19"],
+      "doc_refs": ["docs/ROUTER_INTEGRATION.md", "docs/FEES_AND_INVENTORY.md"],
+      "notes": "Aggregator discounts with 3 bps cap; defaults disabled."
+    },
+    {
+      "id": "F10",
+      "status": "partial",
+      "code_refs": ["contracts/quotes/QuoteRFQ.sol:88", "contracts/DnmPool.sol:421"],
+      "test_refs": ["test/integration/Scenario_RFQ_AggregatorSplit.t.sol:18"],
+      "doc_refs": ["docs/RFQ.md", "docs/ROUTER_INTEGRATION.md"],
+      "notes": "Router integration docs refreshed; outstanding work: aggregator acceptance tests for large notional."
+    },
+    {
+      "id": "F11",
+      "status": "present",
+      "code_refs": ["contracts/DnmPool.sol:606", "contracts/DnmPool.sol:747"],
+      "test_refs": ["test/unit/DnmPool_GovernanceTimelock.t.sol:15"],
+      "doc_refs": ["docs/GOVERNANCE_AND_TIMELOCK.md", "docs/CONFIG.md"],
+      "notes": "Timelock queue/execute/cancel with preview/governance hard gating."
+    },
+    {
+      "id": "F12",
+      "status": "present",
+      "code_refs": ["contracts/observer/OracleWatcher.sol:200", "contracts/observer/DnmPauseHandler.sol:22"],
+      "test_refs": ["test/integration/OracleWatcher_PauseHandler.t.sol:19"],
+      "doc_refs": ["docs/OPERATIONS.md", "RUNBOOK.md"] ,
+      "notes": "Autopause watcher + handler pipeline documented."
+    },
+    {
+      "id": "F13",
+      "status": "present",
+      "code_refs": ["contracts/DnmPool.sol:1753", "contracts/lib/FeePolicy.sol:27", "contracts/lib/FixedPointMath.sol:73"],
+      "test_refs": ["test/unit/LvrFee_Monotonic.t.sol:1", "test/unit/LvrFee_RespectsCaps.t.sol:1", "test/integration/LvrFee_FloorInvariant.t.sol:18"],
+      "doc_refs": ["docs/FEES_AND_INVENTORY.md", "docs/ALGORITHMS.md", "docs/OPERATIONS.md", "docs/TESTING.md"],
+      "notes": "Loss-vs-Reprice surcharge gated by enableLvrFee and fee.kappaLvrBps; clamps to cap and emits telemetry."
+    }
+  ],
+  "config_defaults": {
+    "file": "config/parameters_default.json",
+    "fields": [
+      {"field": "maker.ttlMs", "default": 300, "unit": "milliseconds"},
+      {"field": "preview.maxAgeSec", "default": 1, "unit": "seconds"},
+      {"field": "featureFlags.enableAutoRecenter", "default": false, "unit": "bool"},
+      {"field": "featureFlags.enableAOMQ", "default": false, "unit": "bool"},
+      {"field": "featureFlags.enableLvrFee", "default": false, "unit": "bool"},
+      {"field": "fee.kappaLvrBps", "default": 0, "unit": "bps"}
+    ]
+  },
+  "known_gaps": [
+    "Add aggregator integration tests covering >5S0 notional (F10).",
+    "Refresh gas baselines after enabling LVR + size-fee once coefficients tuned (update gas-snapshots.txt).",
+    "Backfill dashboard JSON for new preview metrics in production."
+  ]
+}

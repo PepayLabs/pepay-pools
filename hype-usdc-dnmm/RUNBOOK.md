@@ -8,14 +8,14 @@
 - Foundry dependencies installed (`terragon-forge.sh install` invocations as required).
 
 ## 1. Parameter Review
-1. Validate `config/parameters_default.json` against latest risk sign-off.
+1. Validate `config/parameters_default.json` against latest risk sign-off (confirm `fee.kappaLvrBps = 0` and `featureFlags.enableLvrFee = false` by default).
 2. Confirm token addresses/decimals in `config/tokens.hyper.json`.
 3. Document any overrides in release notes and update `docs/CONFIG.md` if defaults evolve.
 
 ## 2. Contract Deployment
 1. `terragon-forge.sh script script/Deploy.s.sol --broadcast --rpc-url <RPC>`
 2. Record deployed addresses in the release sheet.
-3. Assign governance/pauser roles via constructor parameters or `updateParams`.
+3. Assign governance/pauser roles via constructor parameters or `updateParams`. Queue any initial fee overrides (e.g., non-zero `kappaLvrBps`) but defer execution until post-cutover monitoring is live.
 
 ## 3. Seeding Liquidity
 1. Transfer HYPE and USDC into the pool contract proportionally to desired inventory.
@@ -27,7 +27,7 @@
 - Run `terragon-forge.sh test --match-test testSwapBaseForQuoteHappyPath`.
 - Submit manual swaps with small size via fork RPC.
 - Verify events through explorer or local indexer; confirm `feeBps` / `reason` values align with expectations.
-- Trigger `refreshPreviewSnapshot(IDnmPool.OracleMode.Spot, bytes(""))` once swaps are live. Call `previewFees([1 ether, 2 ether])` and `previewLadder(0)` to confirm routers observe the same fee ordering (AOMQ clamp flags should be `false` in healthy conditions).
+- Trigger `refreshPreviewSnapshot(IDnmPool.OracleMode.Spot, bytes(""))` once swaps are live. Call `previewFees([1 ether, 2 ether])` and `previewLadder(0)` to confirm routers observe the same fee ordering (AOMQ clamp flags should be `false` in healthy conditions). If parity needs manual inspection, read `previewSnapshotRaw()` to capture the exact snapshot struct (mid/sigma/divergence flags) before tuning parameters.
 
 ## 5. RFQ Enablement (Optional)
 1. Deploy `QuoteRFQ` with maker key.
@@ -36,7 +36,7 @@
 
 ## 6. Observability Bring-Up
 - Connect indexer to `SwapExecuted`, `QuoteServed`, `ParamsUpdated`, `Paused`, `Unpaused`, `ManualRebalanceExecuted`, `RecenterCooldownSet`.
-- Publish Grafana dashboard using metrics defined in `docs/OBSERVABILITY.md`; use mitigation steps in `docs/OPERATIONS.md` when alerts breach thresholds.
+- Publish Grafana dashboard using metrics defined in `docs/OBSERVABILITY.md`; use mitigation steps in `docs/OPERATIONS.md` when alerts breach thresholds. Include `dnmm_lvr_fee_bps` vs `dnmm_fee_bps` panels to validate the surcharge once `enableLvrFee` is activated.
 - Persist test artifacts from `metrics/` (CSV/JSON) and `gas-snapshots.txt` into the monitoring pipeline for historical comparisons.
 - Add preview health panels: `dnmm_preview_snapshot_age_sec`, `dnmm_preview_stale_reverts_total`, ladder ask/bid series by bucket, and clamp gauges. Alert when snapshot age > `previewMaxAgeSec` or stale reverts increase.
 - Wire the parity freshness check after any long invariant run: execute `script/run_invariants.sh` (or `script/check_invariants_and_parity.sh`) and verify `reports/metrics/freshness_report.json` reports `status=pass` for all parity CSVs.

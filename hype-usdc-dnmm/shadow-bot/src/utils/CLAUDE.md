@@ -1,8 +1,8 @@
-# DNMM Shadow Bot Implementation Guide
+# Shadow Bot Utils Implementation Guide
 
-**Path**: `hype-usdc-dnmm/shadow-bot`
+**Path**: `hype-usdc-dnmm/shadow-bot/src/utils`
 
-**Description**: TypeScript monitoring and simulation suite for the HYPE/USDC DNMM, combining the legacy single-run shadow bot with the new multi-setting benchmark harness (DNMM/CPMM/StableSwap comparators, CSV exports, and Prometheus telemetry).
+**Description**: Shared utility helpers (e.g., deterministic RNG/hash functions) for simulation and reporting components.
 
 ## Purpose
 - Capture the intent of this module/folder and its relationship to the broader HYPE/HyperEVM initiative.
@@ -34,4 +34,4 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2025-10-04: Multi-run pipeline now persists checkpoints, emits scoreboard JSON/Markdown reports, surfaces derived KPIs + DNMM import metrics, and wires risk scenario-aware oracle simulations (spread/sigma/pyth degradations) into mock runs.
+- 2025-10-04: Introduced deterministic RNG utilities for flow/oracle simulations and hash helpers.

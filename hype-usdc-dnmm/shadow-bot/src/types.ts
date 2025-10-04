@@ -216,6 +216,7 @@ export interface HcOracleSample {
   readonly askWad?: bigint;
   readonly spreadBps?: number;
   readonly ageSec?: number;
+  readonly sigmaBps?: number;
   readonly statusDetail?: string;
 }
 

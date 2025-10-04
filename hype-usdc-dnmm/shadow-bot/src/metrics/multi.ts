@@ -17,7 +17,7 @@ const SLIPPAGE_BUCKETS = [0.1, 0.5, 1, 2, 5, 10, 25, 50, 75, 100];
 const WAD = 10n ** 18n;
 
 interface MetricsContext {
-  recordOracle(sample: { mid: bigint; spreadBps?: number; confBps?: number }): void;
+  recordOracle(sample: { mid: bigint; spreadBps?: number; confBps?: number; sigmaBps?: number }): void;
   recordQuote(sample: BenchmarkQuoteSample): void;
   recordTrade(result: BenchmarkTradeResult): void;
   recordReject(): void;
@@ -162,13 +162,16 @@ class MetricsContextImpl implements MetricsContext {
     private readonly histograms: ReturnType<typeof createHistograms>
   ) {}
 
-  recordOracle(sample: { mid: bigint; spreadBps?: number; confBps?: number }): void {
+  recordOracle(sample: { mid: bigint; spreadBps?: number; confBps?: number; sigmaBps?: number }): void {
     this.gauges.mid.set(this.labels, wadToFloat(sample.mid));
     if (sample.spreadBps !== undefined) {
       this.gauges.spread.set(this.labels, sample.spreadBps);
     }
     if (sample.confBps !== undefined) {
       this.gauges.conf.set(this.labels, sample.confBps);
+    }
+    if (sample.sigmaBps !== undefined) {
+      this.gauges.sigma.set(this.labels, sample.sigmaBps);
     }
   }
 
@@ -244,6 +247,12 @@ function createGauges(register: Registry) {
     labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
     registers: [register]
   });
+  const sigma = new Gauge({
+    name: 'shadow_sigma_bps',
+    help: 'Implied sigma (bps)',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
   const uptime = new Gauge({
     name: 'shadow_uptime_two_sided_pct',
     help: 'Two-sided uptime percentage',
@@ -314,6 +323,7 @@ function createGauges(register: Registry) {
     mid,
     spread,
     conf,
+    sigma,
     uptime,
     pnlTotal,
     pnlRate,

@@ -272,6 +272,14 @@ function normalizeRunSetting(raw: unknown, index: number): RunSettingDefinition 
   const flow = normalizeFlow(record.flow, index);
   const latency = normalizeLatency(record.latency, index);
   const router = normalizeRouter(record.router, index);
+  const riskScenarioId = requireOptionalString(
+    record.riskScenario ?? record.risk_scenario ?? record.riskScenarioId,
+    `runs[${index}].riskScenario`
+  );
+  const tradeFlowId = requireOptionalString(
+    record.tradeFlow ?? record.trade_flow ?? record.tradeFlowId,
+    `runs[${index}].tradeFlow`
+  );
   const sweepIds = normalizeOptionalStringArray(
     record.settingIds ?? record.settings ?? record.sweeps,
     `runs[${index}].settings`
@@ -280,6 +288,8 @@ function normalizeRunSetting(raw: unknown, index: number): RunSettingDefinition 
     id,
     label,
     settingSweepIds: sweepIds,
+    riskScenarioId: riskScenarioId ?? undefined,
+    tradeFlowId: tradeFlowId ?? undefined,
     featureFlags,
     makerParams,
     inventoryParams,
@@ -298,6 +308,16 @@ function normalizeOptionalStringArray(raw: unknown, pointer: string): string[] |
     throw new Error(`${pointer} must be an array of strings when provided`);
   }
   return raw.map((entry, idx) => requireString(entry, `${pointer}[${idx}]`));
+}
+
+function requireOptionalString(raw: unknown, pointer: string): string | undefined {
+  if (raw === undefined || raw === null) {
+    return undefined;
+  }
+  if (typeof raw !== 'string' || raw.trim().length === 0) {
+    throw new Error(`${pointer} must be a non-empty string when provided`);
+  }
+  return raw.trim();
 }
 
 function requireStringArray(raw: unknown, pointer: string): string[] {

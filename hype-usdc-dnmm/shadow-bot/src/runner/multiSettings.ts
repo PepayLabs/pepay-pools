@@ -16,6 +16,7 @@ import {
   ScoreboardRow,
   TradeCsvRecord,
   TradeIntent,
+  RiskScenarioDefinition,
   isChainBackedConfig,
   ChainBackedConfig,
   MockShadowBotConfig,
@@ -34,6 +35,7 @@ import { LiveOracleReader } from '../oracleReader.js';
 import { SimPoolClient } from '../sim/simPool.js';
 import { SimOracleReader } from '../sim/simOracle.js';
 import { generateScoreboardArtifacts } from '../reports/scoreboard.js';
+import { hashStringToSeed } from '../utils/random.js';
 
 const DEFAULT_TICK_MS = defaultTickMs();
 const CHECKPOINT_VERSION = 1;
@@ -101,7 +103,7 @@ export async function runMultiSettings(config: MultiRunRuntimeConfig): Promise<R
   const ctx: RunnerContext = { runtime: config, metrics, csv, scoreboard, checkpoint };
   const pendingRuns = config.runs.filter((run) => !checkpoint.completed.has(run.id));
   if (pendingRuns.length > 0) {
-    const tasks = pendingRuns.map((run) => () => runSingleSetting(ctx, run));
+  const tasks = pendingRuns.map((run) => () => runSingleSetting(ctx, run));
     await executeWithConcurrency(tasks, config.maxParallel);
   }
 
@@ -135,22 +137,24 @@ export async function runMultiSettings(config: MultiRunRuntimeConfig): Promise<R
 
 async function runSingleSetting(ctx: RunnerContext, setting: RunSettingDefinition): Promise<void> {
   const { runtime } = ctx;
+  const scenario = resolveRiskScenario(runtime, setting.riskScenarioId);
+  const effectiveSetting = applyRiskScenario(setting, scenario);
   const durationSec = runtime.durationOverrideSec
-    ? Math.min(setting.flow.seconds, runtime.durationOverrideSec)
-    : setting.flow.seconds;
+    ? Math.min(effectiveSetting.flow.seconds, runtime.durationOverrideSec)
+    : effectiveSetting.flow.seconds;
   const durationMs = durationSec * 1_000;
   const tickMs = DEFAULT_TICK_MS;
   const startMs = Date.now();
-  const engine = buildFlowEngine(setting, startMs, durationMs);
+  const engine = buildFlowEngine(effectiveSetting, startMs, durationMs);
 
   const benchmarks = runtime.benchmarks.length > 0 ? runtime.benchmarks : BENCHMARK_IDS;
-  const tickResources = await prepareAdapters(runtime, setting, benchmarks);
+  const tickResources = await prepareAdapters(runtime, effectiveSetting, benchmarks, scenario, tickMs);
 
   try {
     let timestampMs = startMs;
     while (!engine.isComplete(timestampMs)) {
       const intents = engine.next(timestampMs);
-      await processTick(ctx, setting, tickResources, intents, timestampMs);
+      await processTick(ctx, effectiveSetting, tickResources, intents, timestampMs);
       timestampMs += tickMs;
     }
   } finally {
@@ -184,7 +188,8 @@ async function processTick(
       metricsContext.recordOracle({
         mid: oracle.hc.midWad ?? 0n,
         spreadBps: oracle.hc.spreadBps,
-        confBps: oracle.pyth?.confBps
+        confBps: oracle.pyth?.confBps,
+        sigmaBps: oracle.hc.sigmaBps ?? poolState.sigmaBps
       });
 
       const quotes = await sampleQuotes(adapter, setting, timestampMs);
@@ -241,16 +246,45 @@ function buildFlowEngine(
   return createFlowEngine(setting.flow, options);
 }
 
+function resolveRiskScenario(
+  runtime: MultiRunRuntimeConfig,
+  scenarioId: string | undefined
+): RiskScenarioDefinition | undefined {
+  if (!scenarioId || !runtime.riskScenarios) {
+    return undefined;
+  }
+  return runtime.riskScenarios.find((scenario) => scenario.id === scenarioId);
+}
+
+function applyRiskScenario(
+  setting: RunSettingDefinition,
+  scenario: RiskScenarioDefinition | undefined
+): RunSettingDefinition {
+  if (!scenario) {
+    return setting;
+  }
+  const latency =
+    scenario.quoteLatencyMs !== undefined
+      ? { ...setting.latency, quoteToTxMs: scenario.quoteLatencyMs }
+      : setting.latency;
+  return {
+    ...setting,
+    latency
+  };
+}
+
 async function prepareAdapters(
   config: MultiRunRuntimeConfig,
   setting: RunSettingDefinition,
-  benchmarks: readonly BenchmarkId[]
+  benchmarks: readonly BenchmarkId[],
+  scenario: RiskScenarioDefinition | undefined,
+  tickMs: number
 ): Promise<PreparedTickResources> {
   if (isChainBackedConfig(config.baseConfig) && config.chainConfig) {
     return prepareChainAdapters(config.chainConfig, config, setting, benchmarks);
   }
   if (!isChainBackedConfig(config.baseConfig)) {
-    return prepareMockAdapters(config.baseConfig, config, setting, benchmarks);
+    return prepareMockAdapters(config.baseConfig, config, setting, benchmarks, scenario, tickMs);
   }
   throw new Error('Unsupported configuration for multi-run execution');
 }
@@ -327,13 +361,20 @@ async function prepareMockAdapters(
   mockConfig: MockShadowBotConfig,
   runtime: MultiRunRuntimeConfig,
   setting: RunSettingDefinition,
-  benchmarks: readonly BenchmarkId[]
+  benchmarks: readonly BenchmarkId[],
+  scenario: RiskScenarioDefinition | undefined,
+  tickMs: number
 ): Promise<PreparedTickResources> {
   const poolClient = new SimPoolClient({
     baseDecimals: mockConfig.baseDecimals,
     quoteDecimals: mockConfig.quoteDecimals
   });
-  const oracleReader = new SimOracleReader();
+  const oracleReader = new SimOracleReader({
+    baseMidWad: 1_000_000_000_000_000_000n,
+    seed: hashStringToSeed(`${runtime.seedBase}_${setting.id}`),
+    scenario,
+    tickMs
+  });
 
   const adapters: BenchmarkAdapter[] = [];
   const placeholderChain: ChainRuntimeConfig = {

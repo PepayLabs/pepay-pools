@@ -34,4 +34,4 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2025-10-04: Added scoreboard KPI gauges, latency histogram wiring, and DNMM live snapshot import for fork/live runs.
+- 2025-10-04: Added scoreboard KPI gauges, latency histogram wiring, DNMM live snapshot import for fork/live runs, and sigma gauge support tied to risk scenarios.

@@ -257,6 +257,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     uint256 private constant FEE_GAMMA_QUAD_OFFSET = 160;
     uint256 private constant FEE_SIZE_CAP_OFFSET = 176;
     uint256 private constant FEE_KAPPA_LVR_OFFSET = 192;
+    uint256 private constant LVR_DENOMINATOR = 5e17; // calibrates σ√Δt to BPS scale
 
     uint256 private constant FLAG_BLEND_ON = 1 << 0;
     uint256 private constant FLAG_PARITY_CI_ON = 1 << 8;
@@ -697,7 +698,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         } else if (kind == IDnmPool.ParamKind.Inventory) {
             InventoryConfig memory oldCfg = inventoryConfig;
             InventoryConfig memory newCfg = abi.decode(data, (InventoryConfig));
-            if (newCfg.floorBps > 5000) revert Errors.InvalidConfig();
+            if (newCfg.floorBps > BPS) revert Errors.InvalidConfig();
             if (newCfg.invTiltBpsPer1pct > BPS) revert Errors.InvalidConfig();
             if (newCfg.invTiltMaxBps > BPS) revert Errors.InvalidConfig();
             if (newCfg.tiltConfWeightBps > BPS) revert Errors.InvalidConfig();
@@ -1086,6 +1087,11 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
         if (snap.timestamp == 0) revert PreviewSnapshotUnset();
         snapshotTimestamp = snap.timestamp;
         ageSec = snapshotTimestamp > 0 ? block.timestamp - snapshotTimestamp : 0;
+    }
+
+    function previewSnapshotRaw() external view returns (PreviewSnapshot memory snap) {
+        snap = _previewSnapshot;
+        if (snap.timestamp == 0) revert PreviewSnapshotUnset();
     }
 
     function previewFees(uint256[] calldata sizesBaseWad)
@@ -1917,10 +1923,11 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             return 0;
         }
 
-        uint256 sqrtDtWad = FixedPointMath.sqrt(ttlWad);
-        if (sqrtDtWad == 0) {
+        uint256 sqrtDtRaw = FixedPointMath.sqrt(ttlWad);
+        if (sqrtDtRaw == 0) {
             return 0;
         }
+        uint256 sqrtDtWad = sqrtDtRaw * 1e9; // promote sqrt to WAD scale
 
         uint256 sigmaWad = sigmaBps * 1e14;
         uint256 eAbsWad = FixedPointMath.mulDivDown(sigmaWad, sqrtDtWad, 1e18);
@@ -1940,7 +1947,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             return 0;
         }
 
-        uint256 feeLvr = FixedPointMath.mulDivDown(uint256(kappaLvrBps), eAbsWad, 1e18);
+        uint256 feeLvr = FixedPointMath.mulDivUp(uint256(kappaLvrBps), eAbsWad, LVR_DENOMINATOR);
         if (feeLvr > capBps) {
             feeLvr = capBps;
         }

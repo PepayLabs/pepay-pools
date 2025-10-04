@@ -61,10 +61,10 @@
     {
       "id": "F08",
       "status": "present",
-      "code_refs": ["contracts/DnmPool.sol:1071", "contracts/DnmPool.sol:1877"],
+      "code_refs": ["contracts/DnmPool.sol:1071", "contracts/DnmPool.sol:1877", "contracts/DnmPool.sol:1092"],
       "test_refs": ["test/unit/PreviewFees_Parity.t.sol", "test/integration/Scenario_Preview_AOMQ.t.sol:21"],
       "doc_refs": ["docs/ARCHITECTURE.md", "docs/RFQ.md", "docs/ALGORITHMS.md"],
-      "notes": "Preview snapshot pipeline with deterministic ladder."
+      "notes": "Preview snapshot pipeline with deterministic ladder; raw snapshot accessible via previewSnapshotRaw()."
     },
     {
       "id": "F09",

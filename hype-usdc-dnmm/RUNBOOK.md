@@ -1,3 +1,9 @@
+---
+title: "Deployment Runbook"
+version: "8e6f14e"
+last_updated: "2025-10-04"
+---
+
 # Deployment Runbook
 
 ## Prerequisites

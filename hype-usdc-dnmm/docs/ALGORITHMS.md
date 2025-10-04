@@ -27,7 +27,7 @@ fee_size_bps = min(fee_size_bps, size_fee_cap_bps)
 - Inputs: `gammaSizeLinBps`, `gammaSizeQuadBps`, `sizeFeeCapBps`, `maker.S0Notional`.
 - Complexity: O(1).
 - Gas: < 3k gas inside `_applyFeePipeline` when enabled (no storage reads beyond config pack).
-- Implementation: `contracts/lib/FeePolicy.sol:120-170`, `contracts/DnmPool.sol:1738-1751`.
+- Implementation: `contracts/lib/FeePolicy.sol:120-170`, `contracts/DnmPool.sol:1721-1783`.
 - Tests: `test/unit/SizeFeeCurveTest.t.sol`.
 
 ## LVR Fee Surcharge
@@ -46,7 +46,7 @@ fee_lvr_bps = min(fee_lvr_bps, cap_bps)
 - Final rounding occurs only in the last `mulDivUp` so σ√Δt remains monotonic when TTL or volatility increase.
 - Complexity: O(1) per quote.
 - Gas: ≈2.3k gas incremental when enabled (math-only, no storage IO).
-- Implementation: `contracts/DnmPool.sol:1753-1799`, `contracts/lib/FeePolicy.sol:120-170`, `contracts/lib/FixedPointMath.sol:73-86`.
+- Implementation: `contracts/DnmPool.sol:1903-1957`, `contracts/lib/FeePolicy.sol:120-170`, `contracts/lib/FixedPointMath.sol:73-86`.
 - Tests: `test/unit/LvrFee_Monotonic.t.sol`, `test/unit/LvrFee_RespectsCaps.t.sol`, `test/integration/LvrFee_FloorInvariant.t.sol`.
 
 ## Inventory Tilt
@@ -62,7 +62,7 @@ tilt_bps = clamp(tilt_weighted_bps, -tiltMaxBps, +tiltMaxBps)
 - Inputs: `inventory.invTiltBpsPer1pct`, weights, `invTiltMaxBps`.
 - Complexity: O(1) per quote.
 - Gas: ≈5k gas w/ all flags on (mainly math operations).
-- Implementation: `contracts/DnmPool.sol:1496-1537`, `contracts/lib/Inventory.sol:25-40`.
+- Implementation: `contracts/DnmPool.sol:1488-1564`, `contracts/lib/Inventory.sol:25-40`.
 - Tests: `test/unit/InventoryTiltTest.t.sol`.
 
 ## BBO-Aware Fee Floor
@@ -77,7 +77,7 @@ final_fee_bps = max(final_fee_bps, min_floor_bps)
 - Inputs: `maker.alphaBboBps`, `maker.betaFloorBps`, live spread from HyperCore.
 - Complexity: O(1).
 - Gas: Negligible; executed only when `enableBboFloor` true.
-- Implementation: `contracts/DnmPool.sol:1481-1493`.
+- Implementation: `contracts/DnmPool.sol:1476-1498`.
 - Tests: `test/unit/BboFloorTest.t.sol`.
 
 ## Always-On Micro Quotes (AOMQ)
@@ -91,10 +91,10 @@ if degraded_state and enableAOMQ:
 else:
   normal size/fees
 ```
-- Degraded triggers: soft divergence, fallback usage, floor proximity (`contracts/DnmPool.sol:1295-1353`).
+- Degraded triggers: soft divergence, fallback usage, floor proximity (`contracts/DnmPool.sol:1288-1372`).
 - Complexity: O(1) conditional per swap.
 - Gas: Adds ~7k gas when triggered due to extra Inventory lookups.
-- Implementation: `_evaluateAomq` and `_applyFeePipeline` (`contracts/DnmPool.sol:1276-1416`).
+- Implementation: `_evaluateAomq` and `_applyFeePipeline` (`contracts/DnmPool.sol:1269-1814`).
 - Tests: `test/integration/Scenario_AOMQ.t.sol`, `test/integration/Scenario_Preview_AOMQ.t.sol`.
 
 ## Preview Snapshot
@@ -106,9 +106,9 @@ On quote/swap: persist snapshot { mid, conf_bps, spread_bps, mode, ts, flags }
 previewFees(sizes[]) reads snapshot and recomputes fees (view-only)
 previewFresh optionally re-reads adapters without mutating state
 ```
-- Snapshot fields: `midWad`, `divergenceBps`, `flags`, `blockNumber`, `timestamp` (`contracts/DnmPool.sol:1877-1916`).
-- Staleness guards: `PreviewSnapshotStale`, `PreviewSnapshotCooldown` errors when conditions violated (`contracts/DnmPool.sol:1045-1153`).
+- Snapshot fields: `midWad`, `divergenceBps`, `flags`, `blockNumber`, `timestamp` (`contracts/DnmPool.sol:1960-1991`).
+- Staleness guards: `PreviewSnapshotStale`, `PreviewSnapshotCooldown` errors when conditions violated (`contracts/DnmPool.sol:1045-1159`).
 - Complexity: Snapshot persistence O(1); preview ladder O(n) over size array length.
 - Gas: Snapshot persist ≈15k gas (event + struct write). `previewFees` read-only.
-- Telemetry: When `featureFlags.debugEmit` true, `_emitPreviewLadderDebug` emits `PreviewLadderServed` with rung/TTL payload for router parity checks (`contracts/DnmPool.sol:1999-2051`).
+- Telemetry: When `featureFlags.debugEmit` true, `_emitPreviewLadderDebug` emits `PreviewLadderServed` with rung/TTL payload for router parity checks (`contracts/DnmPool.sol:1998-2050`).
 - Tests: `test/unit/PreviewFees_Parity.t.sol`, `test/integration/Scenario_Preview_AOMQ.t.sol`, `test/integration/FirmLadder_TIFHonored.t.sol`.

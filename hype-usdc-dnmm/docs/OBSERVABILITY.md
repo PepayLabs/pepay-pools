@@ -85,6 +85,8 @@ Condition | Threshold | Action
 `avg(dnmm_lvr_fee_bps) < 2` while `dnmm_toxicity_score` > 60 | Warning | Validate LVR config (`fee.kappaLvrBps`) and review maker TTL.
 `dnmm_total_bps - dnmm_fee_bps < -3` for allow-listed executor | Warning | Check rebate configuration and confirm allowlist (`setAggregatorRouter`) matches treasury roster.
 
+For manual debugging, `previewSnapshotRaw()` exposes the latest persisted snapshot (mid, sigma, divergence flags) without mutating state—pull it alongside Grafana panels before tuning parameters.
+
 ## Event → Metric Mapping
 Event | Metrics to Watch | Notes
 --- | --- | ---

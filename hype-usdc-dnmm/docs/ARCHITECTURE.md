@@ -40,9 +40,9 @@ The HYPE/USDC DNMM stack combines HyperCore order-book data with fallback oracle
 - **Telemetry:** When debug mode is enabled, `PreviewLadderServed` surfaces ladder parity + TTL for routers, and `LvrFeeApplied` reports volatility surcharge hits to Prometheus ingesters (`contracts/DnmPool.sol:300-313`, `contracts/DnmPool.sol:2037-2051`).
 - **RFQ integration:** `QuoteRFQ.verifyAndSwap` verifies EIP-712 signed quotes, checks TTL, and dispatches to pool swap functions (`contracts/quotes/QuoteRFQ.sol:162`).
 
-## Preview Snapshot & Determinism
 - **Snapshot capture:** `_persistPreviewSnapshot` now records AOMQ state, volatility inputs, and caller metadata so preview ladders stay router-aligned (`contracts/DnmPool.sol:1877-1916`).
 - **Preview APIs:** `previewFees` / `previewLadder` replay the pipeline against the stored snapshot, expose clamp flags, and honor LVR/allowlist states to keep parity with swaps (`contracts/DnmPool.sol:1296-1416`).
+- **Raw inspection:** `previewSnapshotRaw()` returns the latest persisted snapshot for operators and observability tooling (`contracts/DnmPool.sol:1163-1167`).
 - **Staleness guards:** `preview.maxAgeSec` defaults to 1 second with `revertOnStalePreview=true`, forcing routers to refresh snapshots; stale reads revert with `PreviewSnapshotStale(age, maxAge)`.
 
 ## Recenter & Inventory Governance

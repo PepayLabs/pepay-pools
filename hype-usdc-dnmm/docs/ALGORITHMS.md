@@ -38,10 +38,11 @@ Pseudocode:
 sigma_bps = outcome.sigmaBps
 ttl_sec = maker.ttlMs / 1000
 toxicity_bias = aomqActive ? emergencySpreadBps : 0
-fee_lvr_bps = kappaLvrBps * (sigma_bps * sqrt(ttl_sec) + toxicity_bias)
+fee_lvr_bps = kappaLvrBps * (sigma_bps * sqrt(ttl_sec) + toxicity_bias) * LVR_SCALE
 fee_lvr_bps = min(fee_lvr_bps, cap_bps)
 ```
 - Inputs: `fee.kappaLvrBps`, maker TTL, blended sigma, AOMQ emergency spread.
+- `LVR_SCALE` equals `1 / 5e17` (see `contracts/DnmPool.sol:260`) to translate the σ√Δt term into basis points.
 - Complexity: O(1) per quote.
 - Gas: ≈2.3k gas incremental when enabled (math-only, no storage IO).
 - Implementation: `contracts/DnmPool.sol:1753-1799`, `contracts/lib/FeePolicy.sol:120-170`, `contracts/lib/FixedPointMath.sol:73-86`.

@@ -39,8 +39,8 @@ contract FirmLadderTIFHonoredTest is BaseTest {
         bool sawLadder;
         for (uint256 i = 0; i < logs.length; ++i) {
             if (logs[i].topics[0] != LADDER_SIG) continue;
-            (, uint8[] memory rungs, uint16[] memory feeBps, uint32 ttlMs) =
-                abi.decode(logs[i].data, (bytes32, uint8[], uint16[], uint32));
+            (uint8[] memory rungs, uint16[] memory feeBps, uint32 ttlMs) =
+                abi.decode(logs[i].data, (uint8[], uint16[], uint32));
             sawLadder = true;
             assertEq(ttlMs, defaultMakerConfig().ttlMs, "ttl propagated");
             assertEq(rungs.length, 4, "rung count");

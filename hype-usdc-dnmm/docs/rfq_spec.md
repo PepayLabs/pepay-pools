@@ -1,3 +1,9 @@
+---
+title: "RFQ Specification"
+version: "8e6f14e"
+last_updated: "2025-10-04"
+---
+
 # RFQ Specification
 
 ## EIP-712 Domain
@@ -30,6 +36,17 @@ Quote(
 4. Unused input balances refunded; output transferred to taker.
 5. `QuoteFilled` event emitted with consumed input/output and salt.
 
+TTL expectations:
+- `maker.ttlMs` defaults to 300 ms; quotes SHOULD expire client-side ≥50 ms before on-chain expiry.
+- Core-4 enables preview freshness (snapshots expire after 1 second). Makers MUST refresh `previewLadder`/`previewFees` immediately before signing to guarantee parity.
+- When `kappaLvrBps` is set and `enableLvrFee` activated, the fee term already includes the TTL in σ√Δt; do not “double tax” clients off-chain.
+
+MinOut calculation:
+1. Call `previewLadder([S0, 2S0, 5S0, 10S0])` (or `previewFees` for arbitrary sizes) after refreshing the snapshot.
+2. Choose the rung matching your quote size and compute `minAmountOut = previewAmountOut - slippage_buffer[rung]` (buffer defaults: `[5, 15, 15, 30]` bps; governance may tune per partner).
+3. Embed `minAmountOut` in the signed payload and propagate to takers.
+4. Align `expiry` with the same TTL window; snapshots older than 1s will revert swaps with `PreviewSnapshotStale`.
+
 ## Signing Guidance
 - Maker services should derive the struct hash via `QuoteRFQ.hashQuote(params)` and the signable digest via `QuoteRFQ.hashTypedDataV4(params)` (or mirror the domain/struct hashes above).
 - Set `RFQ_SIGNER_PK` / `RFQ_SIGNER_ADDR` in CI or Terragon env vars; unit tests automatically pick up the values and assert key/address alignment.
@@ -39,5 +56,6 @@ Quote(
 - Maker key rotation via `setMakerKey` (owner-only).
 - Pausing handled upstream at pool level; RFQ call reverts if pool paused.
 - Oracle data reused from pool (e.g. includes HyperCore payload, Pyth update bundle).
+- `setAggregatorRouter` governs allow-listed executors; ensure RFQ relays use the approved executor address to receive the 3 bps rebate when the feature is enabled.
 
 Refer to `docs/OBSERVABILITY.md` for telemetry fields captured per RFQ fill.

@@ -1,3 +1,9 @@
+---
+title: "Tier Structure Analysis"
+version: "8e6f14e"
+last_updated: "2025-10-04"
+---
+
 # Volume Tier Structure Analysis - Aggregator-Focused Design
 
 ## Problem with Original Tiers

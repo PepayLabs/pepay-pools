@@ -90,10 +90,10 @@ For manual debugging, `previewSnapshotRaw()` exposes the latest persisted snapsh
 ## Event → Metric Mapping
 Event | Metrics to Watch | Notes
 --- | --- | ---
-`PreviewSnapshotRefreshed` (`contracts/DnmPool.sol:292`) | `dnmm_snapshot_age_sec`, `dnmm_regime_bits` | Ensure age resets and flags match emitted decision.
-`TargetBaseXstarUpdated` (`contracts/DnmPool.sol:288`) | `dnmm_recenter_commits_total`, `dnmm_last_rebalance_price_wad` | Confirm recenter increments counter and price stored.
-`ManualRebalanceExecuted` (`contracts/DnmPool.sol:289`) | `dnmm_recenter_commits_total` | Manual runs should be rare; alert if >1 per hour.
+`PreviewSnapshotRefreshed` (`contracts/DnmPool.sol:297`) | `dnmm_snapshot_age_sec`, `dnmm_regime_bits` | Ensure age resets and flags match emitted decision.
+`TargetBaseXstarUpdated` (`contracts/DnmPool.sol:293`) | `dnmm_recenter_commits_total`, `dnmm_last_rebalance_price_wad` | Confirm recenter increments counter and price stored.
+`ManualRebalanceExecuted` (`contracts/DnmPool.sol:294`) | `dnmm_recenter_commits_total` | Manual runs should be rare; alert if >1 per hour.
 `QuoteFilled` (`contracts/quotes/QuoteRFQ.sol:55`) | `dnmm_quotes_total{result="ok"}` | Compare taker fill rate vs pool parity via shadow bot.
-`AggregatorDiscountUpdated` (`contracts/DnmPool.sol:311`) | `dnmm_fee_bps`, `dnmm_total_bps` | Validate discount effect on observed fees.
+`AggregatorDiscountUpdated` (`contracts/DnmPool.sol:318`) | `dnmm_fee_bps`, `dnmm_total_bps` | Validate discount effect on observed fees.
 `PreviewSnapshotStale` (revert) | `dnmm_preview_stale_reverts_total` | Align with preview config changes.
-`LvrFeeApplied` (`contracts/DnmPool.sol:315`) | `dnmm_lvr_fee_bps`, `dnmm_fee_bps` | Ensure surcharge fires during high-volatility frames.
+`LvrFeeApplied` (`contracts/DnmPool.sol:312`) | `dnmm_lvr_fee_bps`, `dnmm_fee_bps` | Ensure surcharge fires during high-volatility frames.

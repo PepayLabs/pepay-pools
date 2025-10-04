@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// forge-lint: ignore asm-keccak256 -- EIP-712 hashing kept explicit for readability; gas SLOs met
 pragma solidity ^0.8.24;
 
 import {IQuoteRFQ} from "../interfaces/IQuoteRFQ.sol";

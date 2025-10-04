@@ -113,8 +113,8 @@ contract DivergencePolicyTest is Test {
             DnmPool.Guardians({governance: GOV, pauser: PAUSER})
         );
 
-        baseToken.transfer(address(pool), 100_000 ether);
-        quoteToken.transfer(address(pool), 10_000_000000);
+        require(baseToken.transfer(address(pool), 100_000 ether), "ERC20: transfer failed");
+        require(quoteToken.transfer(address(pool), 10_000_000000), "ERC20: transfer failed");
         pool.sync();
 
         _primeHyperCore(1e18, 5, 900e15, 1_100e15, 25);

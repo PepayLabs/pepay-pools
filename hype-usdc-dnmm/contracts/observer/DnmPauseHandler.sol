@@ -5,7 +5,7 @@ import {IDnmPool} from "../interfaces/IDnmPool.sol";
 
 /// @notice Mediates OracleWatcher auto-pause signals with governance supervision and cooldowns.
 contract DnmPauseHandler {
-    IDnmPool public immutable pool;
+    IDnmPool private immutable POOL;
 
     address public governance;
     address public watcher;
@@ -24,9 +24,13 @@ contract DnmPauseHandler {
 
     constructor(IDnmPool pool_, address governance_, uint32 cooldownSec_) {
         if (address(pool_) == address(0) || governance_ == address(0)) revert InvalidAddress();
-        pool = pool_;
+        POOL = pool_;
         governance = governance_;
         cooldownSec = cooldownSec_;
+    }
+
+    function pool() public view returns (IDnmPool) {
+        return POOL;
     }
 
     modifier onlyGovernance() {
@@ -65,7 +69,7 @@ contract DnmPauseHandler {
             if (block.timestamp < nextAllowed) revert CooldownActive(nextAllowed);
         }
 
-        pool.pause();
+        POOL.pause();
         lastPauseAt = uint64(block.timestamp);
         emit AutoPaused(msg.sender, reason, lastPauseAt);
     }

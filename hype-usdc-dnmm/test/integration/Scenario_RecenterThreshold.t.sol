@@ -13,7 +13,7 @@ contract ScenarioRecenterThresholdTest is BaseTest {
 
     function test_recenter_reduces_inventory_fee() public {
         // skew inventory by adding base
-        hype.transfer(address(pool), 20_000 ether);
+        require(hype.transfer(address(pool), 20_000 ether), "ERC20: transfer failed");
         pool.sync();
 
         DnmPool.QuoteResult memory beforeQuote = quote(10_000 ether, true, IDnmPool.OracleMode.Spot);

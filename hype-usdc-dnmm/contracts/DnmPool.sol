@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// forge-lint: ignore asm-keccak256 -- readable snapshot hashing kept for auditability; gas SLOs met
 pragma solidity ^0.8.24;
 
 import {IDnmPool} from "./interfaces/IDnmPool.sol";

@@ -21,7 +21,7 @@ contract ScenarioRFQAggregatorSplitTest is BaseTest {
         approveAll(bob);
         approveAll(carol);
 
-        hype.transfer(alice, 20_000 ether);
+        require(hype.transfer(alice, 20_000 ether), "ERC20: transfer failed");
 
         rfq = new QuoteRFQ(address(pool), vm.addr(makerKey));
         dex = new MockCurveDEX(address(hype), address(usdc));

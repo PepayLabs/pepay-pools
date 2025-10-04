@@ -86,14 +86,14 @@ contract PreviewFeesParityTest is BaseTest {
         pool.swapExactIn(1_000_000000, 0, false, IDnmPool.OracleMode.Spot, bytes(""), block.timestamp + 1);
 
         // Trim quote reserves near the inventory floor to guarantee AOMQ clamps for large ladders.
-        usdc.transfer(address(pool), 500_000000);
+        require(usdc.transfer(address(pool), 500_000000), "ERC20: transfer failed");
         pool.sync();
         (, uint128 quoteReserveBefore) = pool.reserves();
         uint256 targetQuoteReserves = 150_000000;
         if (quoteReserveBefore > targetQuoteReserves) {
             uint256 burnAmount = uint256(quoteReserveBefore) - targetQuoteReserves;
             vm.prank(address(pool));
-            usdc.transfer(address(0xdead), burnAmount);
+            require(usdc.transfer(address(0xdead), burnAmount), "ERC20: transfer failed");
             pool.sync();
         }
         (, uint128 quoteReserve) = pool.reserves();

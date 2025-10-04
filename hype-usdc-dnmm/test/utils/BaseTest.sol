@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {DnmPool} from "../../contracts/DnmPool.sol";
@@ -76,8 +75,8 @@ abstract contract BaseTest is MathAsserts {
     }
 
     function _seedUser(address user, uint256 baseAmount, uint256 quoteAmount) internal {
-        hype.transfer(user, baseAmount);
-        usdc.transfer(user, quoteAmount);
+        require(hype.transfer(user, baseAmount), "ERC20: transfer failed");
+        require(usdc.transfer(user, quoteAmount), "ERC20: transfer failed");
     }
 
     function _deployPool(
@@ -276,8 +275,8 @@ abstract contract BaseTest is MathAsserts {
     }
 
     function seedPOL(DeployConfig memory cfg) internal {
-        hype.transfer(address(pool), cfg.baseLiquidity);
-        usdc.transfer(address(pool), cfg.quoteLiquidity);
+        require(hype.transfer(address(pool), cfg.baseLiquidity), "ERC20: transfer failed");
+        require(usdc.transfer(address(pool), cfg.quoteLiquidity), "ERC20: transfer failed");
         pool.sync();
 
         vm.prank(gov);

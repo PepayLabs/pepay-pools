@@ -18,8 +18,8 @@ contract DnmPoolSwapTest is BaseTest {
         setUpBase();
         approveAll(alice);
         approveAll(bob);
-        hype.transfer(alice, 500_000 ether);
-        usdc.transfer(bob, 5_000_000000);
+        require(hype.transfer(alice, 500_000 ether), "ERC20: transfer failed");
+        require(usdc.transfer(bob, 5_000_000000), "ERC20: transfer failed");
     }
 
     function test_swap_base_in_normal() public {
@@ -118,8 +118,8 @@ contract DnmPoolSwapTest is BaseTest {
             DnmPool.Guardians({governance: gov, pauser: pauser})
         );
 
-        baseToken.transfer(address(poolLocal), 100_000 ether);
-        quoteToken.transfer(address(poolLocal), 10_000_000000);
+        require(baseToken.transfer(address(poolLocal), 100_000 ether), "ERC20: transfer failed");
+        require(quoteToken.transfer(address(poolLocal), 10_000_000000), "ERC20: transfer failed");
         poolLocal.sync();
 
         MaliciousReceiver attacker = new MaliciousReceiver();
@@ -127,8 +127,8 @@ contract DnmPoolSwapTest is BaseTest {
         attacker.setAttackSide(true);
         quoteToken.setHook(address(attacker));
 
-        baseToken.transfer(address(attacker), 10_000 ether);
-        quoteToken.transfer(address(attacker), 1_000_000000);
+        require(baseToken.transfer(address(attacker), 10_000 ether), "ERC20: transfer failed");
+        require(quoteToken.transfer(address(attacker), 1_000_000000), "ERC20: transfer failed");
         attacker.setTrigger(true);
 
         vm.prank(address(attacker));

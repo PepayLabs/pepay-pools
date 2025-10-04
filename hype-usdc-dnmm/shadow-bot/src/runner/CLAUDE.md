@@ -34,4 +34,4 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2025-10-04: Added 30-minute checkpointing/resume support, scoreboard artifact generation (CSV/JSON/MD), derived KPI metric emission, and risk-scenario aware oracle/latency adjustments for the multi-runner.
+- 2025-10-04: Added 30-minute checkpointing/resume support, scoreboard artifact generation (CSV/JSON/MD), derived KPI metric emission, risk-scenario aware oracle/latency adjustments, TTL scaling from `ttl_expiry_rate_target`, and strict Pyth freshness enforcement with Prometheus counters.

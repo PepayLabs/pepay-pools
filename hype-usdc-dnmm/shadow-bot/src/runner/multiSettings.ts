@@ -62,6 +62,8 @@ interface RunnerContext {
   readonly csv: MultiCsvWriter;
   readonly scoreboard: ScoreboardAggregator;
   readonly checkpoint: CheckpointManager;
+  readonly scenarioMap: Map<string, RiskScenarioDefinition | undefined>;
+  readonly scenarioMeta: Map<string, RiskScenarioDefinition | undefined>;
 }
 
 interface PreparedTickResources {
@@ -97,13 +99,27 @@ export async function runMultiSettings(config: MultiRunRuntimeConfig): Promise<R
     scoreboard
   );
 
+  const scenarioMap = new Map<string, RiskScenarioDefinition | undefined>();
+  for (const run of config.runs) {
+    scenarioMap.set(run.id, resolveRiskScenario(config, run.riskScenarioId));
+  }
+  const scenarioMeta = new Map<string, RiskScenarioDefinition | undefined>();
+
   await metrics.start();
   await csv.init();
 
-  const ctx: RunnerContext = { runtime: config, metrics, csv, scoreboard, checkpoint };
+  const ctx: RunnerContext = {
+    runtime: config,
+    metrics,
+    csv,
+    scoreboard,
+    checkpoint,
+    scenarioMap,
+    scenarioMeta
+  };
   const pendingRuns = config.runs.filter((run) => !checkpoint.completed.has(run.id));
   if (pendingRuns.length > 0) {
-  const tasks = pendingRuns.map((run) => () => runSingleSetting(ctx, run));
+    const tasks = pendingRuns.map((run) => () => runSingleSetting(ctx, run));
     await executeWithConcurrency(tasks, config.maxParallel);
   }
 
@@ -119,7 +135,8 @@ export async function runMultiSettings(config: MultiRunRuntimeConfig): Promise<R
     mode: config.runtime.mode,
     rows,
     benchmarks,
-    reports: config.reports
+    reports: config.reports,
+    scenarioMeta: Object.fromEntries(ctx.scenarioMeta)
   });
 
   await Promise.all([
@@ -137,8 +154,10 @@ export async function runMultiSettings(config: MultiRunRuntimeConfig): Promise<R
 
 async function runSingleSetting(ctx: RunnerContext, setting: RunSettingDefinition): Promise<void> {
   const { runtime } = ctx;
-  const scenario = resolveRiskScenario(runtime, setting.riskScenarioId);
+  const baseScenario = ctx.scenarioMap.get(setting.id);
+  const scenario = baseScenario ?? resolveRiskScenario(runtime, setting.riskScenarioId);
   const effectiveSetting = applyRiskScenario(setting, scenario);
+  ctx.scenarioMeta.set(effectiveSetting.id, scenario);
   const durationSec = runtime.durationOverrideSec
     ? Math.min(effectiveSetting.flow.seconds, runtime.durationOverrideSec)
     : effectiveSetting.flow.seconds;
@@ -163,7 +182,7 @@ async function runSingleSetting(ctx: RunnerContext, setting: RunSettingDefinitio
     await tickResources.cleanup();
   }
 
-  await ctx.checkpoint.markCompleted(setting.id);
+  await ctx.checkpoint.markCompleted(effectiveSetting.id);
 }
 
 async function processTick(
@@ -233,7 +252,7 @@ async function recordTradeResult(
   if (result.success) {
     metricsContext.recordTrade(result);
   } else {
-    metricsContext.recordReject();
+    metricsContext.recordReject(result.rejectReason);
   }
   scoreboard.recordTrade(setting.id, benchmark, result);
   const record = tradeResultToCsv(setting.id, benchmark, result);
@@ -283,15 +302,39 @@ function applyRiskScenario(
     durationSeconds !== setting.flow.seconds
       ? { ...setting.flow, seconds: durationSeconds }
       : setting.flow;
+  const ttlFactor = scenario.ttlExpiryRateTarget !== undefined
+    ? Math.max(0.1, 1 - Math.min(Math.max(scenario.ttlExpiryRateTarget, 0), 0.9))
+    : undefined;
+  const makerParams =
+    ttlFactor !== undefined
+      ? {
+          ...setting.makerParams,
+          ttlMs: Math.max(250, Math.round(setting.makerParams.ttlMs * ttlFactor))
+        }
+      : setting.makerParams;
+  const router =
+    ttlFactor !== undefined
+      ? {
+          ...setting.router,
+          ttlSec: Math.max(1, Math.round(setting.router.ttlSec * ttlFactor))
+        }
+      : setting.router;
 
-  if (latency === setting.latency && flow === setting.flow) {
+  if (
+    latency === setting.latency &&
+    flow === setting.flow &&
+    makerParams === setting.makerParams &&
+    router === setting.router
+  ) {
     return setting;
   }
 
   return {
     ...setting,
     latency,
-    flow
+    flow,
+    makerParams,
+    router
   };
 }
 
@@ -303,7 +346,7 @@ async function prepareAdapters(
   tickMs: number
 ): Promise<PreparedTickResources> {
   if (isChainBackedConfig(config.baseConfig) && config.chainConfig) {
-    return prepareChainAdapters(config.chainConfig, config, setting, benchmarks);
+    return prepareChainAdapters(config.chainConfig, config, setting, benchmarks, scenario, tickMs);
   }
   if (!isChainBackedConfig(config.baseConfig)) {
     return prepareMockAdapters(config.baseConfig, config, setting, benchmarks, scenario, tickMs);
@@ -315,7 +358,9 @@ async function prepareChainAdapters(
   chainConfig: ChainBackedConfig,
   runtime: MultiRunRuntimeConfig,
   setting: RunSettingDefinition,
-  benchmarks: readonly BenchmarkId[]
+  benchmarks: readonly BenchmarkId[],
+  _scenario: RiskScenarioDefinition | undefined,
+  _tickMs: number
 ): Promise<PreparedTickResources> {
   const chainClient = createLiveChainClient(chainConfig);
   const poolClient = new LivePoolClient(chainConfig, chainClient);

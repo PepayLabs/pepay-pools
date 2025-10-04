@@ -39,8 +39,6 @@ export class SimOracleReader implements OracleReaderAdapter {
 
   private readonly outageDurationTicks: number;
 
-  private readonly observedMidMu: number;
-
   private readonly tickMs: number;
 
   private tickIndex = 0;
@@ -66,7 +64,6 @@ export class SimOracleReader implements OracleReaderAdapter {
           cooldownTicks: 0
         }
       : undefined;
-    this.observedMidMu = Number(baseMid) / Number(10n ** 18n);
   }
 
   async sample(): Promise<OracleSnapshot> {

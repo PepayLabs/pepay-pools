@@ -177,6 +177,11 @@ async function processTick(
   const oracle = await resources.fetchOracle();
   const poolState = await resources.fetchPoolState();
 
+  const strictMaxAgeSec = runtime.baseConfig.parameters.oracle.pyth.maxAgeSecStrict ?? 0;
+  const pythAgeSec = computePythAgeSec(oracle, timestampMs);
+  const isStrictStale =
+    strictMaxAgeSec > 0 && (oracle.pyth?.status !== 'ok' || pythAgeSec === undefined || pythAgeSec > strictMaxAgeSec);
+
   if (runtime.runtime.mode !== 'mock') {
     metrics.recordDnmmSnapshot(setting.id, { oracle, poolState });
   }
@@ -197,7 +202,11 @@ async function processTick(
       scoreboard.recordTwoSided(setting.id, adapter.id, twoSided);
 
       for (const intent of intents) {
-        const result = await adapter.simulateTrade(intent);
+        const baseResult = await adapter.simulateTrade(intent);
+        const result =
+          adapter.id === 'dnmm'
+            ? applyPythStrictPolicy(baseResult, isStrictStale, setting.latency.quoteToTxMs)
+            : baseResult;
         await recordTradeResult(
           runtime,
           metricsContext,
@@ -267,9 +276,22 @@ function applyRiskScenario(
     scenario.quoteLatencyMs !== undefined
       ? { ...setting.latency, quoteToTxMs: scenario.quoteLatencyMs }
       : setting.latency;
+  const durationSeconds = scenario.durationMin
+    ? Math.max(setting.flow.seconds, scenario.durationMin * 60)
+    : setting.flow.seconds;
+  const flow =
+    durationSeconds !== setting.flow.seconds
+      ? { ...setting.flow, seconds: durationSeconds }
+      : setting.flow;
+
+  if (latency === setting.latency && flow === setting.flow) {
+    return setting;
+  }
+
   return {
     ...setting,
-    latency
+    latency,
+    flow
   };
 }
 
@@ -543,6 +565,46 @@ function quoteSampleToCsv(settingId: string, benchmark: BenchmarkId, sample: Ben
     spreadBps: sample.spreadBps,
     confBps: sample.confBps,
     aomqActive: sample.aomqActive
+  };
+}
+
+function computePythAgeSec(oracle: OracleSnapshot, timestampMs: number): number | undefined {
+  if (!oracle.pyth || oracle.pyth.publishTimeSec === undefined) {
+    return undefined;
+  }
+  const publishMs = oracle.pyth.publishTimeSec * 1_000;
+  return publishMs > 0 ? Math.max(0, (timestampMs - publishMs) / 1_000) : undefined;
+}
+
+function applyPythStrictPolicy(
+  result: BenchmarkTradeResult,
+  enforceStale: boolean,
+  latencyMs: number
+): BenchmarkTradeResult {
+  if (!enforceStale) {
+    return result;
+  }
+  if (!result.success && result.rejectReason && result.rejectReason.toLowerCase().includes('stale')) {
+    return result;
+  }
+  return {
+    ...result,
+    success: false,
+    amountIn: 0n,
+    amountOut: 0n,
+    feePaid: result.feePaid ?? 0n,
+    feeLvrPaid: result.feeLvrPaid ?? 0n,
+    rebatePaid: result.rebatePaid ?? 0n,
+    aomqClamped: false,
+    aomqUsed: false,
+    floorEnforced: false,
+    minOut: undefined,
+    slippageBpsVsMid: 0,
+    pnlQuote: 0,
+    latencyMs,
+    rejectReason: result.rejectReason
+      ? `${result.rejectReason}|PythStaleStrict`
+      : 'PythStaleStrict'
   };
 }
 

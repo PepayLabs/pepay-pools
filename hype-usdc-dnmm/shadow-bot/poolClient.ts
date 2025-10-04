@@ -1,7 +1,7 @@
 import { Contract } from 'ethers';
 import { IDNM_POOL_ABI } from './abis.js';
 import {
-  ChainBackedConfig,
+  ChainRuntimeConfig,
   ChainClient,
   FeatureFlagsState,
   FeeConfigState,
@@ -26,7 +26,7 @@ export class LivePoolClient implements PoolClientAdapter {
   private configCache?: PoolConfig;
 
   constructor(
-    private readonly runtime: ChainBackedConfig,
+    private readonly runtime: ChainRuntimeConfig,
     private readonly chainClient: ChainClient,
     contractOverride?: Contract
   ) {
@@ -244,10 +244,11 @@ export class LivePoolClient implements PoolClientAdapter {
   }
 
   computeGuaranteedMinOutBps(flags: RegimeFlags): number {
-    const { calmBps, fallbackBps, clampMin, clampMax } = this.runtime.guaranteedMinOut;
     const needsFallback = flags.asArray.includes('Fallback') || flags.asArray.includes('AOMQ');
+    const calmBps = 15;
+    const fallbackBps = 120;
     const unclamped = needsFallback ? fallbackBps : calmBps;
-    return Math.min(Math.max(unclamped, clampMin), clampMax);
+    return unclamped;
   }
 }
 

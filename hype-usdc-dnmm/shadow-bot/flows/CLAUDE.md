@@ -1,8 +1,8 @@
-# DNMM Shadow Bot Implementation Guide
+# Shadow Bot Flows Implementation Guide
 
-**Path**: `hype-usdc-dnmm/shadow-bot`
+**Path**: `hype-usdc-dnmm/shadow-bot/flows`
 
-**Description**: TypeScript multi-setting benchmark harness for HYPE/USDC DNMM, producing concurrent simulations, CSV traces, and Prometheus metrics across DNMM/CPMM/StableSwap comparators.
+**Description**: Deterministic trade-flow generators for multi-pattern simulations (arb, toxic, trend, mean-revert, benign, mixed).
 
 ## Purpose
 - Capture the intent of this module/folder and its relationship to the broader HYPE/HyperEVM initiative.

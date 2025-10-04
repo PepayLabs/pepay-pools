@@ -1,8 +1,8 @@
-# DNMM Shadow Bot Implementation Guide
+# Shadow Bot Runner Implementation Guide
 
-**Path**: `hype-usdc-dnmm/shadow-bot`
+**Path**: `hype-usdc-dnmm/shadow-bot/runner`
 
-**Description**: TypeScript multi-setting benchmark harness for HYPE/USDC DNMM, producing concurrent simulations, CSV traces, and Prometheus metrics across DNMM/CPMM/StableSwap comparators.
+**Description**: Orchestration layer for multi-setting benchmarking, concurrency control, scoreboard aggregation, and CLI entrypoints.
 
 ## Purpose
 - Capture the intent of this module/folder and its relationship to the broader HYPE/HyperEVM initiative.

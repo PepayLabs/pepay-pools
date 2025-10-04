@@ -1,24 +1,135 @@
 import http from 'http';
+import { Counter, Gauge, Histogram, Registry, collectDefaultMetrics } from 'prom-client';
 import {
-  Counter,
-  Gauge,
-  Histogram,
-  Registry,
-  collectDefaultMetrics
-} from 'prom-client';
-import {
-  OracleSnapshot,
-  PoolState,
-  ProbeQuote,
-  ProviderHealthSample,
-  RegimeFlags,
-  RollingUptimeTracker,
-  ShadowBotConfig
+  BenchmarkQuoteSample,
+  BenchmarkTradeResult,
+  MultiRunRuntimeConfig,
+  PrometheusLabelSet
 } from './types.js';
 
-const TWO_SIDED_WINDOW_MS = 15 * 60 * 1000;
+const QUOTE_LATENCY_BUCKETS = [1, 5, 10, 20, 50, 100, 200, 500, 1_000];
+const TRADE_SIZE_BUCKETS = [0.001, 0.01, 0.1, 1, 5, 10, 25, 50, 100, 250, 500];
+const SLIPPAGE_BUCKETS = [0.1, 0.5, 1, 2, 5, 10, 25, 50, 75, 100];
 
-class RollingUptime implements RollingUptimeTracker {
+interface MetricsContext {
+  recordQuote(sample: BenchmarkQuoteSample): void;
+  recordTrade(result: BenchmarkTradeResult): void;
+  recordReject(): void;
+  recordTwoSided(timestampMs: number, twoSided: boolean): void;
+}
+
+export class MetricsManager {
+  private readonly registry = new Registry();
+  private readonly server?: http.Server;
+  private readonly contexts = new Map<string, MetricsContextImpl>();
+  private readonly config: MultiRunRuntimeConfig;
+
+  private readonly gauges = createGauges(this.registry);
+  private readonly counters = createCounters(this.registry);
+  private readonly histograms = createHistograms(this.registry);
+
+  constructor(config: MultiRunRuntimeConfig) {
+    this.config = config;
+    collectDefaultMetrics({ register: this.registry });
+    this.server = http.createServer(async (_req, res) => {
+      res.setHeader('Content-Type', this.registry.contentType);
+      res.end(await this.registry.metrics());
+    });
+  }
+
+  async start(): Promise<void> {
+    if (!this.server || this.config.promPort <= 0) return;
+    await new Promise<void>((resolve) => this.server!.listen(this.config.promPort, resolve));
+  }
+
+  async stop(): Promise<void> {
+    if (!this.server || this.config.promPort <= 0) return;
+    await new Promise<void>((resolve, reject) => {
+      this.server!.close((error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+  }
+
+  context(settingId: string, benchmark: string): MetricsContext {
+    const key = `${settingId}::${benchmark}`;
+    let ctx = this.contexts.get(key);
+    if (!ctx) {
+      const labels: PrometheusLabelSet = {
+        run_id: this.config.runId,
+        setting_id: settingId,
+        benchmark: benchmark as any,
+        pair: this.config.pairLabels.pair
+      };
+      ctx = new MetricsContextImpl(labels, this.gauges, this.counters, this.histograms);
+      this.contexts.set(key, ctx);
+    }
+    return ctx;
+  }
+
+  recordRecenter(settingId: string, benchmark: string): void {
+    const labels: PrometheusLabelSet = {
+      run_id: this.config.runId,
+      setting_id: settingId,
+      benchmark: benchmark as any,
+      pair: this.config.pairLabels.pair
+    };
+    this.counters.recenter.inc(labels);
+  }
+}
+
+class MetricsContextImpl implements MetricsContext {
+  private readonly uptime = new RollingUptime(5 * 60 * 1_000);
+  private lastPnl = 0;
+  private lastTimestamp = Date.now();
+
+  constructor(
+    private readonly labels: PrometheusLabelSet,
+    private readonly gauges: ReturnType<typeof createGauges>,
+    private readonly counters: ReturnType<typeof createCounters>,
+    private readonly histograms: ReturnType<typeof createHistograms>
+  ) {}
+
+  recordQuote(sample: BenchmarkQuoteSample): void {
+    const quoteLabels = { ...this.labels, side: sample.side } as const;
+    this.counters.quotes.inc(quoteLabels);
+    this.histograms.quoteLatency.observe(quoteLabels, 10);
+    this.gauges.mid.set(this.labels, Number(sample.mid));
+    this.gauges.spread.set(this.labels, sample.spreadBps);
+    if (sample.confBps !== undefined) {
+      this.gauges.conf.set(this.labels, sample.confBps);
+    }
+  }
+
+  recordTrade(result: BenchmarkTradeResult): void {
+    this.counters.trades.inc(this.labels);
+    this.histograms.tradeSize.observe(this.labels, Number(result.amountIn));
+    this.histograms.tradeSlippage.observe(this.labels, result.slippageBpsVsMid);
+    if (result.aomqClamped) {
+      this.counters.aomq.inc(this.labels);
+    }
+    const now = Date.now();
+    this.lastPnl += result.pnlQuote;
+    this.gauges.pnlTotal.set(this.labels, this.lastPnl);
+    const elapsedMinutes = (now - this.lastTimestamp) / 60_000;
+    if (elapsedMinutes > 0) {
+      this.gauges.pnlRate.set(this.labels, this.lastPnl / elapsedMinutes);
+    }
+    this.lastTimestamp = now;
+  }
+
+  recordReject(): void {
+    this.counters.rejects.inc(this.labels);
+  }
+
+  recordTwoSided(timestampMs: number, twoSided: boolean): void {
+    this.uptime.addSample(timestampMs, twoSided);
+    this.gauges.uptime.set(this.labels, this.uptime.getUptimePct(timestampMs));
+  }
+}
+
+class RollingUptime {
   private readonly samples: { timestampMs: number; twoSided: boolean }[] = [];
 
   constructor(private readonly windowMs: number) {}
@@ -31,8 +142,8 @@ class RollingUptime implements RollingUptimeTracker {
   getUptimePct(nowMs: number): number {
     this.evict(nowMs);
     if (this.samples.length === 0) return 0;
-    const twoSidedCount = this.samples.filter((sample) => sample.twoSided).length;
-    return (twoSidedCount / this.samples.length) * 100;
+    const satisfied = this.samples.filter((sample) => sample.twoSided).length;
+    return (satisfied / this.samples.length) * 100;
   }
 
   private evict(nowMs: number): void {
@@ -42,329 +153,105 @@ class RollingUptime implements RollingUptimeTracker {
   }
 }
 
-interface MetricHandles {
-  snapshotAge: Gauge;
-  regimeBits: Gauge;
-  baseReserves: Gauge;
-  quoteReserves: Gauge;
-  lastMid: Gauge;
-  lastRebalance: Gauge;
-  quoteLatency: Histogram;
-  deltaBps: Histogram;
-  confBps: Histogram;
-  bboSpread: Histogram;
-  feeBps: Histogram;
-  totalBps: Histogram;
-  providerCalls: Counter;
-  precompileErrors: Counter;
-  previewStale: Counter;
-  aomqClamps: Counter;
-  recenterCommits: Counter;
-  quotes: Counter;
-  twoSidedUptime: Gauge;
+function createGauges(register: Registry) {
+  const mid = new Gauge({
+    name: 'shadow_mid',
+    help: 'Mid price used for last operation (scaled)',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const spread = new Gauge({
+    name: 'shadow_spread_bps',
+    help: 'Spread applied in basis points',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const conf = new Gauge({
+    name: 'shadow_conf_bps',
+    help: 'Confidence interval basis points',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const uptime = new Gauge({
+    name: 'shadow_uptime_two_sided_pct',
+    help: 'Two-sided uptime percentage',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const pnlTotal = new Gauge({
+    name: 'shadow_pnl_quote_cum',
+    help: 'Cumulative quote PnL',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const pnlRate = new Gauge({
+    name: 'shadow_pnl_quote_rate',
+    help: 'PnL rate per minute',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  return { mid, spread, conf, uptime, pnlTotal, pnlRate } as const;
 }
 
-function withCommonLabels<T extends Record<string, string>>(config: ShadowBotConfig, labels?: T): T & {
-  pair: string;
-  chain: string;
-  mode: string;
-} {
-  return {
-    pair: config.labels.pair,
-    chain: config.labels.chain,
-    mode: config.mode,
-    ...(labels ?? ({} as T))
-  };
+function createCounters(register: Registry) {
+  const quotes = new Counter({
+    name: 'shadow_quotes_total',
+    help: 'Total quotes sampled',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair', 'side'],
+    registers: [register]
+  });
+  const trades = new Counter({
+    name: 'shadow_trades_total',
+    help: 'Total executed trades',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const rejects = new Counter({
+    name: 'shadow_rejects_total',
+    help: 'Rejected trade intents',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const aomq = new Counter({
+    name: 'shadow_aomq_clamps_total',
+    help: 'Count of AOMQ clamps observed',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const recenter = new Counter({
+    name: 'shadow_recenter_commits_total',
+    help: 'Recenter commit events',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  return { quotes, trades, rejects, aomq, recenter } as const;
 }
 
-export class MetricsManager {
-  private readonly registry = new Registry();
-  private readonly handles: MetricHandles;
-  private readonly uptimeTracker: RollingUptime;
-  private server?: http.Server;
-
-  constructor(private readonly config: ShadowBotConfig) {
-    collectDefaultMetrics({ register: this.registry });
-
-    this.handles = this.createMetrics();
-    this.uptimeTracker = new RollingUptime(TWO_SIDED_WINDOW_MS);
-  }
-
-  getRegister(): Registry {
-    return this.registry;
-  }
-
-  async startServer(): Promise<void> {
-    if (this.server) return;
-    this.server = http.createServer(async (req, res) => {
-      if (!req.url) {
-        res.writeHead(400);
-        res.end('Missing url');
-        return;
-      }
-      if (req.url === '/metrics') {
-        try {
-          res.setHeader('Content-Type', this.registry.contentType);
-          res.end(await this.registry.metrics());
-        } catch (error) {
-          res.writeHead(500);
-          res.end((error as Error).message);
-        }
-        return;
-      }
-      res.writeHead(404);
-      res.end('Not found');
-    });
-
-    await new Promise<void>((resolve, reject) => {
-      if (!this.server) return resolve();
-      this.server.listen(this.config.promPort, resolve);
-      this.server.on('error', reject);
-    });
-  }
-
-  async stopServer(): Promise<void> {
-    if (!this.server) return;
-    await new Promise<void>((resolve) => this.server?.close(() => resolve()));
-    this.server = undefined;
-  }
-
-  recordPoolState(state: PoolState): void {
-    this.handles.baseReserves.set(withCommonLabels(this.config), Number(state.baseReserves));
-    this.handles.quoteReserves.set(withCommonLabels(this.config), Number(state.quoteReserves));
-    this.handles.lastMid.set(withCommonLabels(this.config), Number(state.lastMidWad));
-    if (state.snapshotAgeSec !== undefined) {
-      this.handles.snapshotAge.set(withCommonLabels(this.config), state.snapshotAgeSec);
-    }
-  }
-
-  recordRegime(flags: RegimeFlags): void {
-    this.handles.regimeBits.set(withCommonLabels(this.config), flags.bitmask);
-  }
-
-  recordOracle(snapshot: OracleSnapshot): void {
-    if (snapshot.hc.status === 'ok' && snapshot.hc.spreadBps !== undefined) {
-      this.handles.bboSpread.observe(withCommonLabels(this.config), snapshot.hc.spreadBps);
-    }
-    if (snapshot.pyth && snapshot.pyth.status === 'ok' && snapshot.pyth.confBps !== undefined) {
-      this.handles.confBps.observe(withCommonLabels(this.config), snapshot.pyth.confBps);
-    }
-    if (
-      snapshot.hc.status === 'ok' &&
-      snapshot.pyth &&
-      snapshot.pyth.status === 'ok' &&
-      snapshot.hc.midWad &&
-      snapshot.pyth.midWad &&
-      snapshot.pyth.midWad !== 0n
-    ) {
-      const diff = snapshot.hc.midWad > snapshot.pyth.midWad
-        ? snapshot.hc.midWad - snapshot.pyth.midWad
-        : snapshot.pyth.midWad - snapshot.hc.midWad;
-      const deltaBps = Number((diff * 10_000n) / snapshot.pyth.midWad);
-      this.handles.deltaBps.observe(withCommonLabels(this.config), deltaBps);
-    }
-  }
-
-  recordProbe(probe: ProbeQuote, rung: number, regimeLabel: string): void {
-    const labels = withCommonLabels(this.config, {
-      side: probe.side,
-      rung: String(rung),
-      regime: regimeLabel
-    });
-    this.handles.quoteLatency.observe(withCommonLabels(this.config), probe.latencyMs);
-    if (probe.success) {
-      this.handles.feeBps.observe(labels, probe.feeBps);
-      this.handles.totalBps.observe(labels, probe.totalBps);
-    }
-  }
-
-  recordTwoSided(timestampMs: number, twoSided: boolean): void {
-    this.uptimeTracker.addSample(timestampMs, twoSided);
-    const pct = this.uptimeTracker.getUptimePct(timestampMs);
-    this.handles.twoSidedUptime.set(withCommonLabels(this.config), pct);
-  }
-
-  incrementPrecompileError(): void {
-    this.handles.precompileErrors.inc(withCommonLabels(this.config));
-  }
-
-  incrementPreviewStale(): void {
-    this.handles.previewStale.inc(withCommonLabels(this.config));
-  }
-
-  incrementAomqClamp(): void {
-    this.handles.aomqClamps.inc(withCommonLabels(this.config));
-  }
-
-  incrementRecenterCommit(): void {
-    this.handles.recenterCommits.inc(withCommonLabels(this.config));
-  }
-
-  recordQuoteResult(result: 'ok' | 'error' | 'fallback'): void {
-    this.handles.quotes.inc(withCommonLabels(this.config, { result }));
-  }
-
-  recordProviderSample(sample: ProviderHealthSample): void {
-    const resultLabel = sample.success ? 'success' : 'error';
-    const labels = withCommonLabels(this.config, {
-      method: sample.method,
-      result: resultLabel
-    });
-    this.handles.providerCalls.inc(labels);
-  }
-
-  setLastRebalancePrice(midWad: bigint): void {
-    this.handles.lastRebalance.set(withCommonLabels(this.config), Number(midWad));
-  }
-
-  private createMetrics(): MetricHandles {
-    const snapshotAge = new Gauge({
-      name: 'dnmm_snapshot_age_sec',
-      help: 'Age of preview snapshot used in last loop',
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode']
-    });
-    const regimeBits = new Gauge({
-      name: 'dnmm_regime_bits',
-      help: 'Bitmask of current regime (AOMQ=1, Fallback=2, NearFloor=4, SizeFee=8, InvTilt=16)',
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode']
-    });
-    const baseReserves = new Gauge({
-      name: 'dnmm_pool_base_reserves',
-      help: 'Base token reserves (raw units)',
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode']
-    });
-    const quoteReserves = new Gauge({
-      name: 'dnmm_pool_quote_reserves',
-      help: 'Quote token reserves (raw units)',
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode']
-    });
-    const lastMid = new Gauge({
-      name: 'dnmm_last_mid_wad',
-      help: 'Last mid used in WAD',
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode']
-    });
-    const lastRebalance = new Gauge({
-      name: 'dnmm_last_rebalance_price_wad',
-      help: 'Last rebalance price (WAD) if available',
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode']
-    });
-    const quoteLatency = new Histogram({
-      name: 'dnmm_quote_latency_ms',
-      help: 'Latency of preview quotes',
-      buckets: this.config.histogramBuckets.quoteLatencyMs,
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode']
-    });
-    const deltaBps = new Histogram({
-      name: 'dnmm_delta_bps',
-      help: 'HC vs Pyth delta in bps',
-      buckets: this.config.histogramBuckets.deltaBps,
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode']
-    });
-    const confBps = new Histogram({
-      name: 'dnmm_conf_bps',
-      help: 'Pyth confidence in bps of price',
-      buckets: this.config.histogramBuckets.confBps,
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode']
-    });
-    const bboSpread = new Histogram({
-      name: 'dnmm_bbo_spread_bps',
-      help: 'HC BBO spread bps',
-      buckets: this.config.histogramBuckets.bboSpreadBps,
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode']
-    });
-    const feeBps = new Histogram({
-      name: 'dnmm_fee_bps',
-      help: 'Fee bps for probe quotes',
-      buckets: this.config.histogramBuckets.feeBps,
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode', 'side', 'rung', 'regime']
-    });
-    const totalBps = new Histogram({
-      name: 'dnmm_total_bps',
-      help: 'Total bps (fee + slippage vs chosen mid) for probe quotes',
-      buckets: this.config.histogramBuckets.totalBps,
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode', 'side', 'rung', 'regime']
-    });
-    const providerCalls = new Counter({
-      name: 'dnmm_provider_calls_total',
-      help: 'JSON-RPC provider calls grouped by method/result',
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode', 'method', 'result']
-    });
-    const precompileErrors = new Counter({
-      name: 'dnmm_precompile_errors_total',
-      help: 'Count of HyperCore precompile read failures',
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode']
-    });
-    const previewStale = new Counter({
-      name: 'dnmm_preview_stale_reverts_total',
-      help: 'Preview stale reverts due to config',
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode']
-    });
-    const aomqClamps = new Counter({
-      name: 'dnmm_aomq_clamps_total',
-      help: 'Count of AOMQ clamp signals over lifetime',
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode']
-    });
-    const recenterCommits = new Counter({
-      name: 'dnmm_recenter_commits_total',
-      help: 'Count of TargetBaseXstarUpdated events seen',
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode']
-    });
-    const quotes = new Counter({
-      name: 'dnmm_quotes_total',
-      help: 'Quotes issued by the bot',
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode', 'result']
-    });
-    const twoSidedUptime = new Gauge({
-      name: 'dnmm_two_sided_uptime_pct',
-      help: 'Rolling 15m fraction of time both sides had >0 size available',
-      registers: [this.registry],
-      labelNames: ['pair', 'chain', 'mode']
-    });
-
-    return {
-      snapshotAge,
-      regimeBits,
-      baseReserves,
-      quoteReserves,
-      lastMid,
-      lastRebalance,
-      quoteLatency,
-      deltaBps,
-      confBps,
-      bboSpread,
-      feeBps,
-      totalBps,
-      providerCalls,
-      precompileErrors,
-      previewStale,
-      aomqClamps,
-      recenterCommits,
-      quotes,
-      twoSidedUptime
-    };
-  }
+function createHistograms(register: Registry) {
+  const tradeSize = new Histogram({
+    name: 'shadow_trade_size_base_wad',
+    help: 'Trade size in base asset (wad)',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    buckets: TRADE_SIZE_BUCKETS,
+    registers: [register]
+  });
+  const tradeSlippage = new Histogram({
+    name: 'shadow_trade_slippage_bps',
+    help: 'Observed slippage in bps',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    buckets: SLIPPAGE_BUCKETS,
+    registers: [register]
+  });
+  const quoteLatency = new Histogram({
+    name: 'shadow_quote_latency_ms',
+    help: 'Quote latency in milliseconds',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair', 'side'],
+    buckets: QUOTE_LATENCY_BUCKETS,
+    registers: [register]
+  });
+  return { tradeSize, tradeSlippage, quoteLatency } as const;
 }
 
-export function createMetricsManager(config: ShadowBotConfig): MetricsManager {
+export function createMetricsManager(config: MultiRunRuntimeConfig): MetricsManager {
   return new MetricsManager(config);
 }
-
-export type { RollingUptime };

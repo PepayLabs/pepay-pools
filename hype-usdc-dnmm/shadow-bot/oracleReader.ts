@@ -1,7 +1,7 @@
 import { AbiCoder, Contract } from 'ethers';
 import { PYTH_ABI } from './abis.js';
 import {
-  ChainBackedConfig,
+  ChainRuntimeConfig,
   ChainClient,
   ErrorReason,
   HcOracleSample,
@@ -70,11 +70,7 @@ function toError(reason: ErrorReason, error: unknown): { status: 'error'; reason
 export class LiveOracleReader implements OracleReaderAdapter {
   private readonly pyth?: Contract;
 
-  constructor(
-    private readonly config: ChainBackedConfig,
-    private readonly chainClient: ChainClient,
-    pythOverride?: Contract
-  ) {
+  constructor(private readonly config: ChainRuntimeConfig, private readonly chainClient: ChainClient, pythOverride?: Contract) {
     if (pythOverride) {
       this.pyth = pythOverride;
     } else if (config.pythAddress && config.pythPriceId) {

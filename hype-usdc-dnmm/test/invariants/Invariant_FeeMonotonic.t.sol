@@ -42,7 +42,8 @@ contract FeeHandler {
             decayPctPerBlock: 15,
             gammaSizeLinBps: 0,
             gammaSizeQuadBps: 0,
-            sizeFeeCapBps: 0
+            sizeFeeCapBps: 0,
+            kappaLvrBps: 0
         });
         lastConf = 0;
         lastInv = 0;

@@ -1,7 +1,7 @@
 ---
 title: "Configuration Reference"
 version: "8e6f14e"
-last_updated: "2025-10-03"
+last_updated: "2025-10-04"
 ---
 
 # Configuration Reference
@@ -15,7 +15,7 @@ last_updated: "2025-10-03"
 - [Validation Steps](#validation-steps)
 
 ## Overview
-Runtime parameters live in `config/parameters_default.json`. Defaults bias towards conservative behavior: no optional features enabled, zero AOMQ min quote, and permissive preview behavior.
+Runtime parameters live in `config/parameters_default.json`. Defaults bias towards conservative behavior: optional feature flags remain off, AOMQ thresholds start at zero, and preview snapshots now expire after **1 second** to guarantee router parity.
 
 ## Schema
 ```json
@@ -53,7 +53,8 @@ Runtime parameters live in `config/parameters_default.json`. Defaults bias towar
     "decayPctPerBlock": "uint16",
     "gammaSizeLinBps": "uint16",
     "gammaSizeQuadBps": "uint16",
-    "sizeFeeCapBps": "uint16"
+    "sizeFeeCapBps": "uint16",
+    "kappaLvrBps": "uint16"
   },
   "inventory": {
     "floorBps": "uint16",
@@ -86,7 +87,8 @@ Runtime parameters live in `config/parameters_default.json`. Defaults bias towar
     "enableInvTilt": "bool",
     "enableAOMQ": "bool",
     "enableRebates": "bool",
-    "enableAutoRecenter": "bool"
+    "enableAutoRecenter": "bool",
+    "enableLvrFee": "bool"
   },
   "aomq": {
     "minQuoteNotional": "uint128",
@@ -115,8 +117,9 @@ Flag | Default | Result
 `featureFlags.blendOn` | `false` | Confidence term not blended.
 `featureFlags.parityCiOn` | `false` | Preview parity CI checks inactive offchain.
 `featureFlags.debugEmit` | `false` | Debug events withheld in production.
+`featureFlags.enableLvrFee` | `false` | LVR fee component inactive.
 `preview.enablePreviewFresh` | `false` | Preview `fresh` endpoint disabled.
-`preview.revertOnStalePreview` | `false` | Stale previews permitted.
+`preview.revertOnStalePreview` | `true` | Snapshots older than `preview.maxAgeSec` revert.
 `aomq.minQuoteNotional` | `0` | No enforced micro-quote minimum until configured.
 `aomq.emergencySpreadBps` | `0` | No emergency spread widening applied by default.
 `governance.timelockDelaySec` | `0` | No timelock; set before mainnet launch.
@@ -134,17 +137,18 @@ Oracle | `oracle.pyth.maxAgeSec` | `40000` | seconds | Relaxed fallback bound; t
 Fee | `fee.baseBps` | `15` | bps | Applied when no modifiers active.
 Fee | `fee.capBps` | `150` | bps | Global fee ceiling.
 Fee | `fee.gammaSizeLinBps` | `0` | bps | Linear size coefficient.
+Fee | `fee.kappaLvrBps` | `0` | bps | Multiplier for LVR fee term (`σ√Δt`).
 Inventory | `inventory.floorBps` | `300` | bps | 3% floor on both reserves.
 Inventory | `inventory.recenterThresholdPct` | `750` | percent (1/100 bps) | 7.5% deviation required to auto recenter.
 Inventory | `inventory.initialTargetBaseXstar` | `"auto"` | - | Pool infers target from reserves on deploy.
 Maker | `maker.S0Notional` | `5000` | quote units | Baseline size bucket.
 Maker | `maker.ttlMs` | `300` | milliseconds | Default TTL for RFQ quotes.
 Maker | `maker.alphaBboBps` | `0` | bps | BBO-linked floor multiplier.
-Preview | `preview.maxAgeSec` | `0` | seconds | Zero means preview never reverts on staleness.
+Preview | `preview.maxAgeSec` | `1` | seconds | Snapshots older than this revert in `preview*` calls.
 Preview | `preview.snapshotCooldownSec` | `0` | seconds | Zero allows immediate refresh loop.
 AOMQ | `aomq.minQuoteNotional` | `0` | quote units | Set >0 to clamp micro quotes.
 Governance | `governance.timelockDelaySec` | `0` | seconds | Configure >0 for mainnet safety.
-Rebates | `rebates.allowlist` | `[]` | addresses | Populate before enabling rebates.
+Rebates | `rebates.allowlist` | `[]` | addresses | Populate before enabling rebates; governance applies updates via `setAggregatorRouter`.
 
 ## Upgrade Safety
 - **Bounds enforcement:** `_validateConfigUpdate` reverts if divergence soft < accept or timelock missing when required (`contracts/DnmPool.sol:669`).

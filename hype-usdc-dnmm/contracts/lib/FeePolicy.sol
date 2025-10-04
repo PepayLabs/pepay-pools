@@ -24,6 +24,7 @@ library FeePolicy {
     uint256 private constant OFFSET_GAMMA_SIZE_LIN = 144;
     uint256 private constant OFFSET_GAMMA_SIZE_QUAD = 160;
     uint256 private constant OFFSET_SIZE_FEE_CAP = 176;
+    uint256 private constant OFFSET_KAPPA_LVR_BPS = 192;
 
     struct FeeConfig {
         uint16 baseBps;
@@ -36,6 +37,7 @@ library FeePolicy {
         uint16 gammaSizeLinBps;
         uint16 gammaSizeQuadBps;
         uint16 sizeFeeCapBps;
+        uint16 kappaLvrBps;
     }
 
     struct FeeState {
@@ -50,6 +52,7 @@ library FeePolicy {
         if (cfg.sizeFeeCapBps > cfg.capBps) {
             cfg.sizeFeeCapBps = cfg.capBps;
         }
+        if (cfg.kappaLvrBps >= 10_000) revert FeeCapTooHigh(cfg.kappaLvrBps);
 
         packed = uint256(cfg.baseBps);
         packed |= uint256(cfg.alphaConfNumerator) << OFFSET_ALPHA_CONF_NUM;
@@ -64,6 +67,7 @@ library FeePolicy {
         packed |= uint256(cfg.gammaSizeLinBps) << OFFSET_GAMMA_SIZE_LIN;
         packed |= uint256(cfg.gammaSizeQuadBps) << OFFSET_GAMMA_SIZE_QUAD;
         packed |= uint256(cfg.sizeFeeCapBps) << OFFSET_SIZE_FEE_CAP;
+        packed |= uint256(cfg.kappaLvrBps) << OFFSET_KAPPA_LVR_BPS;
     }
 
     function unpack(uint256 packed) internal pure returns (FeeConfig memory cfg) {
@@ -76,11 +80,7 @@ library FeePolicy {
             uint16 capBps,
             uint16 decayPctPerBlock
         ) = decode(packed);
-        (
-            uint16 gammaSizeLinBps,
-            uint16 gammaSizeQuadBps,
-            uint16 sizeFeeCapBps
-        ) = decodeSizeFee(packed);
+        (uint16 gammaSizeLinBps, uint16 gammaSizeQuadBps, uint16 sizeFeeCapBps) = decodeSizeFee(packed);
 
         cfg = FeeConfig({
             baseBps: baseBps,
@@ -92,7 +92,8 @@ library FeePolicy {
             decayPctPerBlock: decayPctPerBlock,
             gammaSizeLinBps: gammaSizeLinBps,
             gammaSizeQuadBps: gammaSizeQuadBps,
-            sizeFeeCapBps: sizeFeeCapBps
+            sizeFeeCapBps: sizeFeeCapBps,
+            kappaLvrBps: uint16((packed >> OFFSET_KAPPA_LVR_BPS) & MASK_16)
         });
     }
 

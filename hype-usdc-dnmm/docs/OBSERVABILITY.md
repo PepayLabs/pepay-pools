@@ -1,7 +1,7 @@
 ---
 title: "Observability"
 version: "8e6f14e"
-last_updated: "2025-10-03"
+last_updated: "2025-10-04"
 ---
 
 # Observability
@@ -27,7 +27,9 @@ Metric | Type | Labels | Unit | Description | Source
 `dnmm_conf_bps` | Histogram | `pair, chain, mode` | bps | Confidence value used during fee computation. | `shadow-bot/metrics.ts:284`
 `dnmm_bbo_spread_bps` | Histogram | `pair, chain, mode` | bps | Live HyperCore BBO spread. | `shadow-bot/metrics.ts:289`
 `dnmm_fee_bps` | Histogram | `pair, chain, mode, side, rung, regime` | bps | Final fee applied per ladder rung and regime flags. | `shadow-bot/metrics.ts:294`
+`dnmm_lvr_fee_bps` | Histogram | `pair, chain, mode, side, rung` | bps | LVR component emitted from `LvrFeeApplied`. | `shadow-bot/metrics.ts:306`
 `dnmm_total_bps` | Histogram | `pair, chain, mode, side, rung, regime` | bps | Total fees including rebates and floors. | `shadow-bot/metrics.ts:300`
+`dnmm_toxicity_score` | Gauge | `pair, chain, mode` | score (0-100) | Off-chain toxicity score driving AOMQ thresholds. | `shadow-bot/metrics.ts:314`
 `dnmm_provider_calls_total` | Counter | `pair, chain, mode, method, result` | count | Oracle provider RPC attempts vs results. | `shadow-bot/metrics.ts:308`
 `dnmm_precompile_errors_total` | Counter | `pair, chain, mode` | count | HyperCore precompile read failures. | `shadow-bot/metrics.ts:318`
 `dnmm_preview_stale_reverts_total` | Counter | `pair, chain, mode` | count | Preview requests that reverted due to staleness. | `shadow-bot/metrics.ts:322`
@@ -61,6 +63,7 @@ Metric | Type | Labels | Unit | Description | Source
 - `two_sided_uptime_pct` = rolling success rate of quotes returning non-zero liquidity; use `dnmm_two_sided_uptime_pct`.
 - `adverse_selection_bps` = `avg(dnmm_fee_bps)` − `avg(dnmm_total_bps)` when AOMQ inactive; negative swings warrant review of rebates.
 - `preview_staleness_ratio` = `dnmm_preview_stale_reverts_total / dnmm_quotes_total{result="ok"}`.
+- `lvr_capture_bps` = `avg(dnmm_lvr_fee_bps)`; track trend alongside toxicity score to validate surcharge effectiveness.
 
 ## Grafana Dashboards
 Dashboard | Path | Focus
@@ -69,6 +72,7 @@ Inventory & Recenter | `shadow-bot/dashboards/inventory-rebalancing.json` | Tilt
 Oracle Health | `shadow-bot/dashboards/oracle-health.json` | Divergence histograms, provider error rates.
 Quote Health | `shadow-bot/dashboards/quote-health.json` | TTL expiry, ladder parity, AOMQ triggers.
 Shadow Summary | `shadow-bot/dashboards/dnmm_shadow_metrics.json` | Executive overview combining uptime, divergence, and fees.
+LVR & Toxicity | `shadow-bot/dashboards/dnmm_shadow_metrics.json#lvr` | Track `dnmm_lvr_fee_bps` vs `dnmm_toxicity_score` and AOMQ clamps.
 
 ## Alerts & Thresholds
 Condition | Threshold | Action
@@ -78,6 +82,7 @@ Condition | Threshold | Action
 `dnmm_preview_stale_reverts_total` increasing with default zero thresholds | Critical | Enable `revertOnStalePreview` or widen refresh cadence.
 `dnmm_aomq_clamps_total` sustained > 0.1 per second | Critical | Review divergence soft gate and available inventory.
 `dnmm_two_sided_uptime_pct < 99%` over 15 min | Warning | Inspect floors, auto recenter health, and AOMQ clamps.
+`avg(dnmm_lvr_fee_bps) < 2` while `dnmm_toxicity_score` > 60 | Warning | Validate LVR config (`fee.kappaLvrBps`) and review maker TTL.
 
 ## Event → Metric Mapping
 Event | Metrics to Watch | Notes
@@ -86,5 +91,6 @@ Event | Metrics to Watch | Notes
 `TargetBaseXstarUpdated` (`contracts/DnmPool.sol:288`) | `dnmm_recenter_commits_total`, `dnmm_last_rebalance_price_wad` | Confirm recenter increments counter and price stored.
 `ManualRebalanceExecuted` (`contracts/DnmPool.sol:289`) | `dnmm_recenter_commits_total` | Manual runs should be rare; alert if >1 per hour.
 `QuoteFilled` (`contracts/quotes/QuoteRFQ.sol:55`) | `dnmm_quotes_total{result="ok"}` | Compare taker fill rate vs pool parity via shadow bot.
-`AggregatorDiscountUpdated` (`contracts/DnmPool.sol:283`) | `dnmm_fee_bps`, `dnmm_total_bps` | Validate discount effect on observed fees.
+`AggregatorDiscountUpdated` (`contracts/DnmPool.sol:311`) | `dnmm_fee_bps`, `dnmm_total_bps` | Validate discount effect on observed fees.
 `PreviewSnapshotStale` (revert) | `dnmm_preview_stale_reverts_total` | Align with preview config changes.
+`LvrFeeApplied` (`contracts/DnmPool.sol:315`) | `dnmm_lvr_fee_bps`, `dnmm_fee_bps` | Ensure surcharge fires during high-volatility frames.

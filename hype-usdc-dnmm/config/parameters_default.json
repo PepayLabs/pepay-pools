@@ -32,7 +32,8 @@
     "decayPctPerBlock": 20,
     "gammaSizeLinBps": 0,
     "gammaSizeQuadBps": 0,
-    "sizeFeeCapBps": 0
+    "sizeFeeCapBps": 0,
+    "kappaLvrBps": 0
   },
   "inventory": {
     "floorBps": 300,
@@ -50,9 +51,9 @@
     "betaFloorBps": 0
   },
   "preview": {
-    "maxAgeSec": 0,
+    "maxAgeSec": 1,
     "snapshotCooldownSec": 0,
-    "revertOnStalePreview": false,
+    "revertOnStalePreview": true,
     "enablePreviewFresh": false
   },
   "featureFlags": {
@@ -65,7 +66,8 @@
     "enableInvTilt": false,
     "enableAOMQ": false,
     "enableRebates": false,
-    "enableAutoRecenter": false
+    "enableAutoRecenter": false,
+    "enableLvrFee": false
   },
   "aomq": {
     "minQuoteNotional": 0,

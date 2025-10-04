@@ -73,21 +73,15 @@ contract DeployMocks is Script {
             decayPctPerBlock: 10,
             gammaSizeLinBps: 12,
             gammaSizeQuadBps: 3,
-            sizeFeeCapBps: 80
+            sizeFeeCapBps: 80,
+            kappaLvrBps: 0
         });
 
-        DnmPool.MakerConfig memory makerCfg = DnmPool.MakerConfig({
-            s0Notional: 50_000 * 1e6,
-            ttlMs: 1_000,
-            alphaBboBps: 25,
-            betaFloorBps: 20
-        });
+        DnmPool.MakerConfig memory makerCfg =
+            DnmPool.MakerConfig({s0Notional: 50_000 * 1e6, ttlMs: 1_000, alphaBboBps: 25, betaFloorBps: 20});
 
-        DnmPool.AomqConfig memory aomqCfg = DnmPool.AomqConfig({
-            minQuoteNotional: 25_000 * 1e6,
-            emergencySpreadBps: 60,
-            floorEpsilonBps: 10
-        });
+        DnmPool.AomqConfig memory aomqCfg =
+            DnmPool.AomqConfig({minQuoteNotional: 25_000 * 1e6, emergencySpreadBps: 60, floorEpsilonBps: 10});
 
         DnmPool.PreviewConfig memory previewCfg = DnmPool.PreviewConfig({
             maxAgeSec: 5,
@@ -106,7 +100,8 @@ contract DeployMocks is Script {
             enableInvTilt: true,
             enableAOMQ: true,
             enableRebates: false,
-            enableAutoRecenter: true
+            enableAutoRecenter: true,
+            enableLvrFee: false
         });
 
         DnmPool.Guardians memory guardians = DnmPool.Guardians({governance: deployer, pauser: deployer});

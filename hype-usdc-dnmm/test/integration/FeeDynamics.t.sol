@@ -424,7 +424,8 @@ contract FeeDynamicsTest is BaseTest {
             uint16 decayPctPerBlock,
             uint16 gammaSizeLinBps,
             uint16 gammaSizeQuadBps,
-            uint16 sizeFeeCapBps
+            uint16 sizeFeeCapBps,
+            uint16 kappaLvrBps
         ) = pool.feeConfig();
         cfg = FeePolicy.FeeConfig({
             baseBps: baseBps,
@@ -436,7 +437,8 @@ contract FeeDynamicsTest is BaseTest {
             decayPctPerBlock: decayPctPerBlock,
             gammaSizeLinBps: gammaSizeLinBps,
             gammaSizeQuadBps: gammaSizeQuadBps,
-            sizeFeeCapBps: sizeFeeCapBps
+            sizeFeeCapBps: sizeFeeCapBps,
+            kappaLvrBps: kappaLvrBps
         });
     }
 

@@ -1,7 +1,7 @@
 ---
 title: "Governance & Timelock"
 version: "8e6f14e"
-last_updated: "2025-10-03"
+last_updated: "2025-10-04"
 ---
 
 # Governance & Timelock
@@ -57,6 +57,16 @@ Governance | **High** | Only accessible via queue.
 - **Emergency disable size fee:**
   1. Because timelock zero, call `updateParams(ParamKind.Feature, encodedFlags)` to toggle off.
   2. Verify `featureFlags.enableSizeFee` false in `feature_status.md` and preview parity tests.
+- **Enable LVR fee surcharge:**
+  1. Queue `ParamKind.Feature` enabling `enableLvrFee` alongside `enableBboFloor` to preserve floor invariants.
+  2. Queue `ParamKind.Fee` with non-zero `kappaLvrBps` (e.g., 800) in the same governance batch.
+  3. Execute both after the delay; monitor `LvrFeeApplied` and `dnmm_lvr_fee_bps` for canary pool before broad rollout.
+- **Tighten AOMQ thresholds:**
+  1. Queue `ParamKind.Aomq` adjusting `minQuoteNotional`, `emergencySpreadBps`, or `floorEpsilonBps`.
+  2. Execute after timelock; verify `AomqActivated` telemetry and shadow-bot clamps before promoting to production.
+- **Manage aggregator allowlist:**
+  1. Use `setAggregatorRouter(executor, true/false)` (direct call from governance) to add or remove routers.
+  2. For coordinated changes, queue calls in a multisig batch; watch `AggregatorDiscountUpdated` and reconcile against Treasury rebate reporting.
 
 ## Events & Errors
 Signal | Purpose
@@ -71,3 +81,5 @@ Signal | Purpose
 - Governance queue: `test/unit/DnmPool_GovernanceTimelock.t.sol:15`.
 - Feature flip coverage: `test/unit/FeatureFlagsTest.t.sol` (ensure doc update if absent).
 - Negative cases: `test/integration/Scenario_TimestampGuards.t.sol:24` ensures ETA enforcement.
+- LVR rollout invariants: `test/integration/LvrFee_FloorInvariant.t.sol`.
+- Preview ladder parity & TTL: `test/integration/FirmLadder_TIFHonored.t.sol`.

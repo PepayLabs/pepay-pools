@@ -1,7 +1,7 @@
 ---
 title: "Testing Guide"
 version: "8e6f14e"
-last_updated: "2025-10-03"
+last_updated: "2025-10-04"
 ---
 
 # Testing Guide
@@ -20,8 +20,8 @@ DNMM uses Foundry-based unit/integration/invariant suites plus shadow-bot simula
 ## Test Matrix
 Layer | Focus | Entry Points | Notes
 --- | --- | --- | ---
-Unit | Libraries & config guards | `test/unit/*.t.sol` | Covers FeePolicy, Inventory, divergence logic, governance queue.
-Integration | Pipeline behavior end-to-end | `test/integration/*.t.sol` | Scenario-based sweeps for AOMQ, floor partial fills, oracle fallbacks.
+Unit | Libraries & config guards | `test/unit/*.t.sol` | Covers FeePolicy, Inventory, divergence logic, governance queue, LVR surcharge maths.
+Integration | Pipeline behavior end-to-end | `test/integration/*.t.sol` | Scenario-based sweeps for ladder parity, AOMQ clamps, floor partial fills, oracle fallbacks.
 Invariants | Safety properties | `script/run_invariants.sh` | Executes forked invariants; ensure gas report optional.
 Shadow Bot | Observability + replay | `shadow-bot/__tests__/*.ts` | Validate metrics emitter, probes, and replay harness.
 
@@ -31,6 +31,8 @@ Command | Purpose
 `forge test` | Full suite.
 `forge test --match-contract DnmPoolRebalanceTest` | Focus on auto/manual recenter.
 `forge test --match-contract Scenario_Preview_AOMQ` | Preview parity + AOMQ regression.
+`forge test --match-contract LvrFeeMonotonicTest` | Validate σ/TTL monotonicity of the LVR term.
+`forge test --match-contract FirmLadderTIFHonoredTest` | Audit ladder parity, TTL propagation, and stale preview reverts.
 `FOUNDRY_PROFILE=gas forge test --gas-report` | Regenerate gas report before updating docs.
 `yarn --cwd shadow-bot test` | Run shadow-bot Jest suite.
 
@@ -47,11 +49,13 @@ Command | Purpose
 - Steps:
   1. Persist snapshot via `refreshPreviewSnapshot`.
   2. Call `previewLadder` for `[S0, 2S0, 5S0, 10S0]`.
-  3. Execute swaps; compare fees/amounts; ensure AOMQ clamps reported identically.
+  3. Listen for `PreviewLadderServed` (when `debugEmit` on) to confirm rung schema + TTL telemetry.
+  4. Execute swaps; compare fees/amounts; ensure AOMQ clamps reported identically.
 - Failures usually indicate `preview.*` config mismatch or missing `FeePreviewInvariant` state update.
 
 ## CI Expectations
-- Docs linting & link checks (see `package.json` scripts after this update).
 - `forge fmt` enforced on Solidity changes.
-- Gas report diffs posted for PRs touching hot paths.
-- Preview parity tests must pass before enabling `parityCiOn` flag.
+- Preview parity suite (`--match-contract Scenario_Preview_AOMQ`) must pass; CI toggles `parityCiOn=true` on merge.
+- `dnmm_preview_stale_reverts_total` must not regress; CI fails if baseline increases when freshness guard active.
+- `FOUNDRY_PROFILE=gas forge test --gas-report` compared against `gas-snapshots.txt`; PRs exceeding thresholds fail.
+- Docs linting & link checks (`yarn docs:lint`) run on contracts/config changes.

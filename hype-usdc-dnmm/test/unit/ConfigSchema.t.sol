@@ -17,6 +17,7 @@ contract ConfigSchemaTest is BaseTest {
         assertEq(flags.enableAOMQ, false, "AOMQ default");
         assertEq(flags.enableRebates, false, "Rebates default");
         assertEq(flags.enableAutoRecenter, false, "Auto recenter default");
+        assertEq(flags.enableLvrFee, false, "LVR fee default");
     }
 
     function test_inventoryConfigExposesTiltFields() public view {
@@ -40,12 +41,7 @@ contract ConfigSchemaTest is BaseTest {
     }
 
     function test_makerConfigExposesBboFloorFields() public view {
-        (
-            uint128 s0Notional,
-            uint32 ttlMs,
-            uint16 alphaBboBps,
-            uint16 betaFloorBps
-        ) = pool.makerConfig();
+        (uint128 s0Notional, uint32 ttlMs, uint16 alphaBboBps, uint16 betaFloorBps) = pool.makerConfig();
 
         assertEq(s0Notional, 5_000 ether, "S0 default");
         assertEq(ttlMs, 300, "TTL default");
@@ -70,10 +66,15 @@ contract ConfigSchemaTest is BaseTest {
     function test_previewConfigDefaults() public view {
         (uint32 maxAgeSec, uint32 cooldownSec, bool revertOnStale, bool enableFresh) = pool.previewConfig();
 
-        assertEq(maxAgeSec, 0, "preview max age disabled by default");
+        assertEq(maxAgeSec, 1, "preview freshness horizon");
         assertEq(cooldownSec, 0, "preview cooldown default");
-        assertFalse(revertOnStale, "preview revert default");
+        assertTrue(revertOnStale, "preview stale guard default");
         assertFalse(enableFresh, "preview fresh disabled");
+    }
+
+    function test_feeConfigExposesLvrCoefficient() public view {
+        (,,,,,,,,,, uint16 kappaLvrBps) = pool.feeConfig();
+        assertEq(kappaLvrBps, 0, "kappa default");
     }
 
     function test_rebateDefaultsAreZero() public view {

@@ -10,6 +10,22 @@ import {
 const BPS = 10_000;
 const WAD = 10n ** 18n;
 
+interface StablePreviewResult {
+  readonly success: boolean;
+  readonly amountOut: number;
+  readonly mid: number;
+  readonly midWad: bigint;
+  readonly spreadBps: number;
+  readonly slippageBps: number;
+  readonly nextBaseReserves: number;
+  readonly nextQuoteReserves: number;
+  readonly reason?: string;
+  readonly executedInWad: bigint;
+  readonly executedBaseWad: bigint;
+  readonly feePaidWad: bigint;
+  readonly partial: boolean;
+}
+
 export interface StableSwapParams {
   readonly baseDecimals: number;
   readonly quoteDecimals: number;
@@ -32,6 +48,8 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
   private currentSpreadBps = 0;
   private currentConfBps: number | undefined;
   private lastOracle?: OracleSnapshot;
+  private readonly minBaseReserve: number;
+  private readonly minQuoteReserve: number;
 
   constructor(private readonly params: StableSwapParams) {
     this.baseScale = 10n ** BigInt(params.baseDecimals);
@@ -41,6 +59,8 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
     this.amplification = params.amplification ?? 100;
     this.feeBps = params.feeBps ?? 4;
     this.currentMidWad = toMidWad(this.currentMid());
+    this.minBaseReserve = Math.max(this.baseReserves * 0.05, 1);
+    this.minQuoteReserve = Math.max(this.quoteReserves * 0.05, 1);
   }
 
   async init(): Promise<void> {
@@ -66,12 +86,18 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
 
   async sampleQuote(side: 'base_in' | 'quote_in', sizeBaseWad: bigint): Promise<BenchmarkQuoteSample> {
     const size = Number(sizeBaseWad) / Number(this.baseScale);
-    const preview = this.preview(side, size, false);
+    const preview = this.preview(side, size);
     return {
       timestampMs: Date.now(),
       side,
       sizeBaseWad,
       feeBps: this.feeBps,
+      feeLvrBps: 0,
+      rebateBps: 0,
+      floorBps: 0,
+      ttlMs: undefined,
+      minOut: preview.success ? toBigInt(preview.amountOut, side === 'base_in' ? this.quoteScale : this.baseScale) : undefined,
+      aomqFlags: undefined,
       mid: this.currentMidWad,
       spreadBps: this.currentSpreadBps,
       confBps: this.currentConfBps,
@@ -88,7 +114,7 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
       return this.buildRejection(intent, 'zero_trade');
     }
 
-    const preview = this.preview(intent.side, size, true);
+    const preview = this.preview(intent.side, size);
     if (!preview.success || preview.amountOut <= 0) {
       return this.buildRejection(intent, preview.reason ?? 'insufficient_liquidity');
     }
@@ -113,26 +139,40 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
     this.baseReserves = preview.nextBaseReserves;
     this.quoteReserves = preview.nextQuoteReserves;
 
+    const executedInDecimal = intent.side === 'base_in'
+      ? Number(preview.executedInWad) / Number(this.baseScale)
+      : Number(preview.executedInWad) / Number(this.quoteScale);
     const pnlQuote = intent.side === 'base_in'
-      ? preview.amountOut - size * preview.mid
-      : intent.amountIn - preview.amountOut * preview.mid;
+      ? preview.amountOut - executedInDecimal * preview.mid
+      : executedInDecimal - preview.amountOut * preview.mid;
 
     return {
       intent,
       success: true,
-      amountIn: amountInWad,
+      amountIn: preview.executedInWad,
       amountOut: amountOutWad,
       midUsed: this.currentMidWad,
       feeBpsUsed: this.feeBps,
+      feeLvrBps: 0,
+      rebateBps: 0,
+      feePaid: preview.feePaidWad,
+      feeLvrPaid: 0n,
+      rebatePaid: 0n,
       floorBps: 0,
       tiltBps: 0,
       aomqClamped: false,
-      minOut: undefined,
+      minOut: amountOutWad,
       slippageBpsVsMid: preview.slippageBps,
       pnlQuote,
       inventoryBase: toBigInt(this.baseReserves, this.baseScale),
       inventoryQuote: toBigInt(this.quoteReserves, this.quoteScale),
-      latencyMs: 12
+      latencyMs: 12,
+      isPartial: preview.partial,
+      appliedAmountIn: preview.executedInWad,
+      intentBaseSizeWad: intent.side === 'base_in' ? amountInWad : toBigInt(preview.amountOut, this.baseScale),
+      executedBaseSizeWad: intent.side === 'base_in'
+        ? preview.executedBaseWad
+        : amountOutWad
     };
   }
 
@@ -144,6 +184,8 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
       amountOut: 0n,
       midUsed: this.currentMidWad,
       feeBpsUsed: this.feeBps,
+      feeLvrBps: 0,
+      rebateBps: 0,
       floorBps: 0,
       tiltBps: 0,
       aomqClamped: false,
@@ -153,17 +195,21 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
       inventoryBase: toBigInt(this.baseReserves, this.baseScale),
       inventoryQuote: toBigInt(this.quoteReserves, this.quoteScale),
       latencyMs: 5,
-      rejectReason: reason
+      rejectReason: reason,
+      feePaid: 0n,
+      feeLvrPaid: 0n,
+      rebatePaid: 0n
     };
   }
 
-  private preview(side: 'base_in' | 'quote_in', size: number, apply: boolean) {
+  private preview(side: 'base_in' | 'quote_in', size: number): StablePreviewResult {
     const amp = this.amplification;
     const x = this.baseReserves;
     const y = this.quoteReserves;
     const dx = side === 'base_in' ? size : size / this.currentMid();
     const feeMultiplier = 1 - this.feeBps / BPS;
     const dxAfterFee = dx * feeMultiplier;
+    const feePaid = dx - dxAfterFee;
 
     if (dxAfterFee <= 0) {
       return {
@@ -175,19 +221,35 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
         slippageBps: 0,
         nextBaseReserves: x,
         nextQuoteReserves: y,
-        reason: 'fee_zero'
+        reason: 'fee_zero',
+        executedInWad: 0n,
+        executedBaseWad: 0n,
+        feePaidWad: 0n,
+        partial: false
       } as const;
     }
 
     if (side === 'base_in') {
       const D = computeD(amp, x, y);
-      const newX = x + dxAfterFee;
-      const newY = getY(amp, newX, D);
+      let newX = x + dxAfterFee;
+      let newY = getY(amp, newX, D);
+      let partial = false;
+      if (newY < this.minQuoteReserve) {
+        newY = this.minQuoteReserve;
+        newX = getY(amp, newY, D);
+        partial = true;
+      }
       const amountOut = Math.max(0, y - newY);
-      const nextBase = apply ? newX : x;
-      const nextQuote = apply ? newY : y;
+      const nextBase = newX;
+      const nextQuote = newY;
       const midBefore = this.currentMid();
       const midAfter = nextQuote === 0 ? midBefore : nextQuote / nextBase;
+      const executedAfterFee = nextBase - x;
+      const executedRaw = executedAfterFee / feeMultiplier;
+      const feePaidEffective = executedRaw - executedAfterFee;
+      const executedRawWad = toBigInt(executedRaw, this.baseScale);
+      const executedBaseWad = toBigInt(executedAfterFee, this.baseScale);
+      const feePaidWad = toBigInt(feePaidEffective, this.baseScale);
       return {
         success: amountOut > 0,
         amountOut,
@@ -197,18 +259,34 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
         slippageBps: computeSlippageBps(midBefore, midAfter),
         nextBaseReserves: nextBase,
         nextQuoteReserves: nextQuote,
-        reason: amountOut > 0 ? undefined : 'zero_output'
+        reason: amountOut > 0 ? undefined : 'zero_output',
+        executedInWad: executedRawWad,
+        executedBaseWad,
+        feePaidWad,
+        partial
       } as const;
     }
 
     const D = computeD(amp, x, y);
-    const newY = y + dxAfterFee;
-    const newX = getY(amp, newY, D);
+    let newY = y + dxAfterFee;
+    let newX = getY(amp, newY, D);
+    let partial = false;
+    if (newX < this.minBaseReserve) {
+      newX = this.minBaseReserve;
+      newY = getY(amp, newX, D);
+      partial = true;
+    }
     const amountOut = Math.max(0, x - newX);
-    const nextBase = apply ? newX : x;
-    const nextQuote = apply ? newY : y;
+    const nextBase = newX;
+    const nextQuote = newY;
     const midBefore = this.currentMid();
     const midAfter = nextQuote === 0 ? midBefore : nextQuote / nextBase;
+    const executedAfterFee = nextQuote - y;
+    const executedRaw = executedAfterFee / feeMultiplier;
+    const feePaidEffective = executedRaw - executedAfterFee;
+    const executedRawWad = toBigInt(executedRaw, this.quoteScale);
+    const executedBaseWad = toBigInt(amountOut, this.baseScale);
+    const feePaidWad = toBigInt(feePaidEffective, this.quoteScale);
     return {
       success: amountOut > 0,
       amountOut,
@@ -218,7 +296,11 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
       slippageBps: computeSlippageBps(midBefore, midAfter),
       nextBaseReserves: nextBase,
       nextQuoteReserves: nextQuote,
-      reason: amountOut > 0 ? undefined : 'zero_output'
+      reason: amountOut > 0 ? undefined : 'zero_output',
+      executedInWad: executedRawWad,
+      executedBaseWad,
+      feePaidWad,
+      partial
     } as const;
   }
 

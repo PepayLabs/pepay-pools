@@ -92,7 +92,8 @@ export class SimPoolClient implements PoolClientAdapter {
       decayPctPerBlock: 0,
       gammaSizeLinBps: 0,
       gammaSizeQuadBps: 0,
-      sizeFeeCapBps: 0
+      sizeFeeCapBps: 0,
+      kappaLvrBps: 0
     };
     const maker: MakerConfigState = {
       s0Notional: this.quoteReserves,

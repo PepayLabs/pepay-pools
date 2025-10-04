@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parseUnits } from 'ethers';
+import { createRequire } from 'module';
 import { z } from 'zod';
 import {
   AddressBookEntry,
@@ -14,10 +15,12 @@ import {
   ShadowBotMode,
   ShadowBotParameters
 } from './types.js';
-import parametersDefaultsJson from '../config/parameters_default.json' assert { type: 'json' };
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const require = createRequire(import.meta.url);
+
+const parametersDefaultsJson = require('../config/parameters_default.json');
 
 const DEFAULT_PAIR = 'HYPE/USDC';
 const DEFAULT_BASE_SYMBOL = 'HYPE';

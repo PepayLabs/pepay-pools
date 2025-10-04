@@ -183,10 +183,10 @@ async function prepareAdapters(
   benchmarks: readonly BenchmarkId[]
 ): Promise<PreparedTickResources> {
   if (isChainBackedConfig(config.baseConfig) && config.chainConfig) {
-    return prepareChainAdapters(config.chainConfig, config, benchmarks);
+    return prepareChainAdapters(config.chainConfig, config, setting, benchmarks);
   }
   if (!isChainBackedConfig(config.baseConfig)) {
-    return prepareMockAdapters(config.baseConfig, config, benchmarks);
+    return prepareMockAdapters(config.baseConfig, config, setting, benchmarks);
   }
   throw new Error('Unsupported configuration for multi-run execution');
 }
@@ -194,6 +194,7 @@ async function prepareAdapters(
 async function prepareChainAdapters(
   chainConfig: ChainBackedConfig,
   runtime: MultiRunRuntimeConfig,
+  setting: RunSettingDefinition,
   benchmarks: readonly BenchmarkId[]
 ): Promise<PreparedTickResources> {
   const chainClient = createLiveChainClient(chainConfig);
@@ -209,7 +210,13 @@ async function prepareChainAdapters(
   for (const benchmark of benchmarks) {
     switch (benchmark) {
       case 'dnmm': {
-        const adapter = new DnmmBenchmarkAdapter({ chain: chainRuntime, poolClient, oracleReader });
+        const adapter = new DnmmBenchmarkAdapter({
+          chain: chainRuntime,
+          poolClient,
+          oracleReader,
+          setting,
+          baseConfig: runtime.baseConfig
+        });
         await adapter.init();
         adapters.push(adapter);
         break;
@@ -219,7 +226,8 @@ async function prepareChainAdapters(
           baseDecimals: chainConfig.baseDecimals,
           quoteDecimals: chainConfig.quoteDecimals,
           baseReserves: initialState.baseReserves,
-          quoteReserves: initialState.quoteReserves
+          quoteReserves: initialState.quoteReserves,
+          feeBps: setting.comparator?.cpmm?.feeBps
         });
         await adapter.init();
         adapters.push(adapter);
@@ -230,7 +238,9 @@ async function prepareChainAdapters(
           baseDecimals: chainConfig.baseDecimals,
           quoteDecimals: chainConfig.quoteDecimals,
           baseReserves: initialState.baseReserves,
-          quoteReserves: initialState.quoteReserves
+          quoteReserves: initialState.quoteReserves,
+          feeBps: setting.comparator?.stableswap?.feeBps,
+          amplification: setting.comparator?.stableswap?.amplification
         });
         await adapter.init();
         adapters.push(adapter);
@@ -252,6 +262,7 @@ async function prepareChainAdapters(
 async function prepareMockAdapters(
   mockConfig: MockShadowBotConfig,
   runtime: MultiRunRuntimeConfig,
+  setting: RunSettingDefinition,
   benchmarks: readonly BenchmarkId[]
 ): Promise<PreparedTickResources> {
   const poolClient = new SimPoolClient({
@@ -284,7 +295,9 @@ async function prepareMockAdapters(
         const adapter = new DnmmBenchmarkAdapter({
           chain: placeholderChain,
           poolClient,
-          oracleReader
+          oracleReader,
+          setting,
+          baseConfig: runtime.baseConfig
         });
         await adapter.init();
         adapters.push(adapter);
@@ -296,7 +309,8 @@ async function prepareMockAdapters(
           baseDecimals: mockConfig.baseDecimals,
           quoteDecimals: mockConfig.quoteDecimals,
           baseReserves: state.baseReserves,
-          quoteReserves: state.quoteReserves
+          quoteReserves: state.quoteReserves,
+          feeBps: setting.comparator?.cpmm?.feeBps
         });
         await adapter.init();
         adapters.push(adapter);
@@ -308,7 +322,9 @@ async function prepareMockAdapters(
           baseDecimals: mockConfig.baseDecimals,
           quoteDecimals: mockConfig.quoteDecimals,
           baseReserves: state.baseReserves,
-          quoteReserves: state.quoteReserves
+          quoteReserves: state.quoteReserves,
+          feeBps: setting.comparator?.stableswap?.feeBps,
+          amplification: setting.comparator?.stableswap?.amplification
         });
         await adapter.init();
         adapters.push(adapter);
@@ -370,18 +386,31 @@ async function recordQuotes(
 
 function tradeResultToCsv(settingId: string, benchmark: BenchmarkId, result: BenchmarkTradeResult): TradeCsvRecord {
   const tsIso = new Date(result.intent.timestampMs).toISOString();
+  const intentSizeFallback = result.intent.amountIn !== undefined ? String(result.intent.amountIn) : '';
+  const appliedSizeFallback = result.appliedAmountIn !== undefined ? result.appliedAmountIn.toString() : '';
   return {
     tsIso,
     settingId,
     benchmark,
     side: result.intent.side,
+    intentSize: result.intentBaseSizeWad ? result.intentBaseSizeWad.toString() : intentSizeFallback,
+    appliedSize: result.executedBaseSizeWad ? result.executedBaseSizeWad.toString() : appliedSizeFallback,
+    isPartial: result.isPartial,
     amountIn: result.amountIn.toString(),
     amountOut: result.amountOut.toString(),
     midUsed: result.midUsed.toString(),
     feeBpsUsed: result.feeBpsUsed,
+    feeLvrBps: result.feeLvrBps,
+    rebateBps: result.rebateBps,
+    feePaid: result.feePaid ? result.feePaid.toString() : undefined,
+    feeLvrPaid: result.feeLvrPaid ? result.feeLvrPaid.toString() : undefined,
+    rebatePaid: result.rebatePaid ? result.rebatePaid.toString() : undefined,
     floorBps: result.floorBps ?? 0,
     tiltBps: result.tiltBps ?? 0,
     aomqClamped: result.aomqClamped,
+    floorEnforced: result.floorEnforced,
+    aomqUsed: result.aomqUsed,
+    success: result.success,
     minOut: result.minOut?.toString(),
     slippageBpsVsMid: result.slippageBpsVsMid,
     pnlQuote: result.pnlQuote,
@@ -397,7 +426,14 @@ function quoteSampleToCsv(settingId: string, benchmark: BenchmarkId, sample: Ben
     benchmark,
     side: sample.side,
     sizeBaseWad: sample.sizeBaseWad.toString(),
+    intentSizeBaseWad: sample.sizeBaseWad.toString(),
     feeBps: sample.feeBps,
+    feeLvrBps: sample.feeLvrBps,
+    rebateBps: sample.rebateBps,
+    floorBps: sample.floorBps,
+    ttlMs: sample.ttlMs,
+    minOut: sample.minOut?.toString(),
+    aomqFlags: sample.aomqFlags,
     mid: sample.mid.toString(),
     spreadBps: sample.spreadBps,
     confBps: sample.confBps,

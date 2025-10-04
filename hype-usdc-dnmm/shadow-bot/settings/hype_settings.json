@@ -1,22 +1,105 @@
 {
-  "version": "1",
+  "version": "2",
   "pair": "HYPE/USDC",
+  "settings": [
+    {
+      "id": "dnmm_base",
+      "label": "DNMM Base",
+      "enableLvrFee": false,
+      "kappaLvrBps": 0,
+      "enableAOMQ": true,
+      "enableRebates": true,
+      "maker": { "ttlMs": 1000 },
+      "rebates": { "bps": 3, "allowlist": [] }
+    },
+    {
+      "id": "dnmm_lvr_600",
+      "label": "DNMM LVR 600bps",
+      "enableLvrFee": true,
+      "kappaLvrBps": 600,
+      "enableAOMQ": true,
+      "enableRebates": true,
+      "maker": { "ttlMs": 1000 },
+      "rebates": { "bps": 3, "allowlist": [] }
+    },
+    {
+      "id": "dnmm_lvr_800",
+      "label": "DNMM LVR 800bps",
+      "enableLvrFee": true,
+      "kappaLvrBps": 800,
+      "enableAOMQ": true,
+      "enableRebates": true,
+      "maker": { "ttlMs": 1000 },
+      "rebates": { "bps": 3, "allowlist": [] }
+    },
+    {
+      "id": "dnmm_lvr_1000",
+      "label": "DNMM LVR 1000bps",
+      "enableLvrFee": true,
+      "kappaLvrBps": 1000,
+      "enableAOMQ": true,
+      "enableRebates": true,
+      "maker": { "ttlMs": 1000 },
+      "rebates": { "bps": 3, "allowlist": [] }
+    },
+    {
+      "id": "dnmm_no_aomq",
+      "label": "DNMM No AOMQ",
+      "enableLvrFee": true,
+      "kappaLvrBps": 800,
+      "enableAOMQ": false,
+      "enableRebates": true,
+      "maker": { "ttlMs": 1000 },
+      "rebates": { "bps": 3, "allowlist": [] }
+    },
+    {
+      "id": "dnmm_no_rebate",
+      "label": "DNMM No Rebate",
+      "enableLvrFee": true,
+      "kappaLvrBps": 800,
+      "enableAOMQ": true,
+      "enableRebates": false,
+      "maker": { "ttlMs": 1000 },
+      "rebates": { "bps": 0, "allowlist": [] }
+    },
+    {
+      "id": "dnmm_ttl_1200ms",
+      "label": "DNMM TTL 1200ms",
+      "enableLvrFee": true,
+      "kappaLvrBps": 800,
+      "enableAOMQ": true,
+      "enableRebates": true,
+      "maker": { "ttlMs": 1200 },
+      "rebates": { "bps": 3, "allowlist": [] }
+    }
+  ],
   "runs": [
     {
-      "id": "A",
-      "label": "baseline_calm",
+      "id": "calm_retail",
+      "label": "Calm Retail Flow",
+      "settings": [
+        "dnmm_base",
+        "dnmm_lvr_600",
+        "dnmm_lvr_800",
+        "dnmm_lvr_1000",
+        "dnmm_no_aomq",
+        "dnmm_no_rebate",
+        "dnmm_ttl_1200ms"
+      ],
       "featureFlags": {
         "enableSoftDivergence": true,
         "enableSizeFee": false,
         "enableBboFloor": true,
         "enableInvTilt": true,
         "enableAOMQ": false,
-        "enableRebates": false
+        "enableRebates": false,
+        "enableLvrFee": false
       },
       "makerParams": {
         "betaFloorBps": 15,
         "alphaBboBps": 2500,
-        "S0Notional": 10000
+        "S0Notional": 10000,
+        "ttlMs": 1000
       },
       "inventoryParams": {
         "invTiltBpsPer1pct": 100,
@@ -53,20 +136,31 @@
       }
     },
     {
-      "id": "B",
-      "label": "size_fee_active",
+      "id": "trend_router",
+      "label": "Trend Router Flow",
+      "settings": [
+        "dnmm_base",
+        "dnmm_lvr_600",
+        "dnmm_lvr_800",
+        "dnmm_lvr_1000",
+        "dnmm_no_aomq",
+        "dnmm_no_rebate",
+        "dnmm_ttl_1200ms"
+      ],
       "featureFlags": {
         "enableSoftDivergence": true,
         "enableSizeFee": true,
         "enableBboFloor": true,
         "enableInvTilt": true,
         "enableAOMQ": false,
-        "enableRebates": false
+        "enableRebates": false,
+        "enableLvrFee": false
       },
       "makerParams": {
         "betaFloorBps": 15,
         "alphaBboBps": 3000,
-        "S0Notional": 15000
+        "S0Notional": 15000,
+        "ttlMs": 1000
       },
       "inventoryParams": {
         "invTiltBpsPer1pct": 120,
@@ -101,6 +195,43 @@
         "ttl_sec": 20,
         "minOut_policy": "preview_ladder"
       }
+    }
+  ],
+  "riskScenarios": [
+    { "id": "calm", "bbo_spread_bps": [5, 15], "sigma_bps": [5, 20] },
+    { "id": "elevated", "bbo_spread_bps": [20, 60], "sigma_bps": [20, 80] },
+    {
+      "id": "crisis",
+      "bbo_spread_bps": [60, 200],
+      "sigma_bps": [80, 300],
+      "pyth_outages": { "bursts": 3, "secs_each": 20 }
+    },
+    {
+      "id": "oracle_dropout",
+      "pyth_drop_rate": 0.02,
+      "duration_min": 60,
+      "autopause_expected": true
+    },
+    {
+      "id": "latency_spike",
+      "quote_latency_ms": 400,
+      "ttl_expiry_rate_target": 0.05
+    },
+    { "id": "spread_widen", "bbo_spread_bps_shift": "+30" }
+  ],
+  "tradeFlows": [
+    { "id": "retail_mixed", "size_dist": "lognorm", "median_base": "S0", "heavytail": true },
+    {
+      "id": "router_heavy",
+      "size_dist": "bimodal",
+      "modes": ["2S0", "5S0"],
+      "share": { "dnmm": 0.7, "cpmm": 0.2, "stableswap": 0.1 }
+    },
+    {
+      "id": "inst_block",
+      "size_dist": "spikes",
+      "spike_sizes": ["5S0", "10S0"],
+      "interval_min": 20
     }
   ],
   "benchmarks": ["dnmm", "cpmm", "stableswap"]

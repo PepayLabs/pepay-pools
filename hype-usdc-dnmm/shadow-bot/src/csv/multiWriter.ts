@@ -7,14 +7,21 @@ const TRADE_HEADER = [
   'setting_id',
   'benchmark',
   'side',
+  'intent_size',
+  'applied_size',
+  'is_partial',
   'amount_in',
   'amount_out',
-  'mid_used',
+  'fee_paid',
+  'fee_lvr_paid',
+  'rebate_paid',
   'fee_bps_used',
-  'floor_bps',
-  'tilt_bps',
-  'aomq_clamped',
-  'minOut',
+  'fee_lvr_bps',
+  'rebate_bps',
+  'floor_enforced',
+  'aomq_used',
+  'success',
+  'min_out',
   'slippage_bps_vs_mid',
   'pnl_quote',
   'inventory_base',
@@ -27,11 +34,16 @@ const QUOTE_HEADER = [
   'benchmark',
   'side',
   'size_base_wad',
-  'fee_bps',
   'mid',
   'spread_bps',
   'conf_bps',
-  'aomq_active'
+  'fee_bps',
+  'fee_lvr_bps',
+  'floor_bps',
+  'aomq_flags',
+  'rebate_bps',
+  'ttl_ms',
+  'min_out'
 ];
 
 const SCOREBOARD_HEADER = [
@@ -115,18 +127,27 @@ async function appendRow(
 }
 
 function tradeRow(record: TradeCsvRecord): string {
+  const formatBool = (value: boolean | undefined): string =>
+    value === undefined ? '' : value ? 'true' : 'false';
   return [
     record.tsIso,
     record.settingId,
     record.benchmark,
     record.side,
+    record.intentSize ?? '',
+    record.appliedSize ?? '',
+    formatBool(record.isPartial),
     record.amountIn,
     record.amountOut,
-    record.midUsed,
+    record.feePaid ?? '',
+    record.feeLvrPaid ?? '',
+    record.rebatePaid ?? '',
     String(record.feeBpsUsed),
-    record.floorBps !== undefined ? String(record.floorBps) : '',
-    record.tiltBps !== undefined ? String(record.tiltBps) : '',
-    record.aomqClamped ? 'true' : 'false',
+    record.feeLvrBps !== undefined ? String(record.feeLvrBps) : '',
+    record.rebateBps !== undefined ? String(record.rebateBps) : '',
+    formatBool(record.floorEnforced ?? (record.floorBps !== undefined && record.floorBps > 0)),
+    formatBool(record.aomqUsed ?? record.aomqClamped),
+    formatBool(record.success),
     record.minOut ?? '',
     record.slippageBpsVsMid.toFixed(6),
     record.pnlQuote.toFixed(6),
@@ -136,17 +157,23 @@ function tradeRow(record: TradeCsvRecord): string {
 }
 
 function quoteRow(record: QuoteCsvRecord): string {
+  const aomqFlags = record.aomqFlags ?? (record.aomqActive ? 'active' : '');
   return [
     record.tsIso,
     record.settingId,
     record.benchmark,
     record.side,
     record.sizeBaseWad,
-    String(record.feeBps),
     record.mid,
     String(record.spreadBps),
     record.confBps !== undefined ? String(record.confBps) : '',
-    record.aomqActive ? 'true' : 'false'
+    String(record.feeBps),
+    record.feeLvrBps !== undefined ? String(record.feeLvrBps) : '',
+    record.floorBps !== undefined ? String(record.floorBps) : '',
+    aomqFlags,
+    record.rebateBps !== undefined ? String(record.rebateBps) : '',
+    record.ttlMs !== undefined ? String(record.ttlMs) : '',
+    record.minOut ?? ''
   ].join(',');
 }
 

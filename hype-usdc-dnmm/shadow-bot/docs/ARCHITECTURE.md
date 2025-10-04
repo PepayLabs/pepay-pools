@@ -93,6 +93,7 @@ Each adapter implements `init()`, `prepareTick()`, `sampleQuote()`, `simulateTra
 - `metrics/hype-metrics/run_<RUN_ID>/trades/<SETTING>_<BENCHMARK>.csv`
 - `metrics/hype-metrics/run_<RUN_ID>/scoreboard.csv`
 - Prometheus endpoint on `http://0.0.0.0:${PROM_PORT}/metrics` exposing `shadow_*` gauges/counters/histograms.
+- `metrics/hype-metrics/run_<RUN_ID>/scoreboard.json` captures the aggregated KPI table **plus** the risk scenario metadata used for each setting, enabling downstream automation or dashboards to reconcile scenario targets vs. observed outcomes.
 
 A full metric glossary is maintained in `docs/METRICS_GLOSSARY.md` and now includes the `shadow.*` series.
 

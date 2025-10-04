@@ -44,6 +44,10 @@ When the scenario (or live data) delivers stale Pyth quotes beyond `maxAgeSecStr
 
 Use these signals to confirm the strict SLA is doing its job during outage simulations.
 
+For TTL stress tests, compare the scenario target with the observed scoreboard value (analyst summary lists both). The difference highlights whether additional pressure or latency tweaks are required.
+
+`scoreboard.json` captures the same run-level `scenarioMeta` map so downstream tooling can reconcile scenario configuration without reopening the original settings file.
+
 ## Operational Checklist
 
 1. Ensure the scenario IDs in `runs[]` match an entry in `riskScenarios[]`.

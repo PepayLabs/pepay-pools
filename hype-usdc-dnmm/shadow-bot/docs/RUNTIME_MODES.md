@@ -7,12 +7,12 @@ This document explains how the shadow bot operates in each supported mode, what 
 | Mode | Description | Primary Use | Dependencies |
 | --- | --- | --- | --- |
 | `mock` *(default)* | All data is generated locally via the scenario engine and simulators. | CI, local development, regression tests. | None – no chain required. |
-| `fork` | Connects to a Hardhat/Foundry fork and reads on-chain state without mutating it. | Pre-production validation with real history. | Fork node (`RPC_URL`), optional fork deploy JSON, address book. |
+| `fork` | Connects to a Hardhat/Foundry fork and reads on-chain state without mutating it. | Pre-production validation with real history. | Fork node (`RPC_URL`), optional fork deploy JSON, address book, HyperCore/Pyth precompile IDs. |
 | `live` | Observes production HyperEVM deployment using read-only RPC calls. | Production monitoring, oncall dashboards. | HyperEVM RPC endpoint, real pool/oracle addresses, API rate limits. |
 
 ### Switching Modes
 
-Set `MODE` in `.dnmmenv` (or via environment variable) and provide the required addresses.
+Set `MODE` in `.dnmmenv` (or via environment variable) and provide the required addresses. The loader resolves missing values from the address book or fork deploy snapshot.
 
 ```
 MODE=live
@@ -30,9 +30,11 @@ Mock runs rely on `src/mock/scenarios.ts`, which defines deterministic parameter
 
 ## Fork Mode Details
 
-- Provide `FORK_DEPLOY_JSON` that points to the output of the deployment script (pool, token, oracle addresses).
-- `config.ts` merges fork overrides with `.dnmmenv` values; CLI flags can override both.
+- Provide `FORK_DEPLOY_JSON` pointing to the output of the deployment script (pool/token/oracle/Hype/USDC, hypercore precompiles, keys).
+- Optional overrides via env: `POOL_ADDR`, `HYPE_ADDR`, `USDC_ADDR`, `PYTH_ADDR`, `HC_PX_PRECOMPILE`, `HC_BBO_PRECOMPILE`, `HC_PX_KEY`, `HC_BBO_KEY`, `WS_URL`.
+- `config.ts` merges (CLI flags) → env vars → fork deploy JSON → address book entries. Missing values throw explicit errors.
 - Fork mode never mutates state; all interactions are read-only.
+- When `PYTH_MAX_AGE_SEC_STRICT` (via parameters) is exceeded, trades are rejected with `PythStaleStrict` so fork smoke tests surface freshness issues.
 
 ## Live Mode Details
 

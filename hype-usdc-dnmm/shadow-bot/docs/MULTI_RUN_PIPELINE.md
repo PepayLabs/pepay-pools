@@ -16,6 +16,7 @@ This document dives into the end-to-end flow when you invoke the multi-setting r
    - Enters a tick loop (default 250 ms) that fetches oracle/pool state, samples quotes, executes trades, and updates metrics/CSV/scoreboard.
    - Every 30 minutes (configurable via `CHECKPOINT_MINUTES`) the aggregator snapshot is persisted to `metrics/hype-metrics/run_<RUN_ID>/checkpoint.json`; the file also records which setting IDs completed so a multi-day run can resume after interruption.
    - When a `riskScenarioId` is attached to a run, the loader now hydrates deterministic oracle simulations (spread/sigma ranges, Pyth outages/dropouts, latency spikes) so the mock adapters mirror stress conditions without mutating the base run definition.
+   - Scenario TTL pressure (`ttl_expiry_rate_target`) rescales maker/router TTL before the run so timeout rates trend toward the target; the analyst summary compares the observed percentage against the scenario goal.
    - DNMM trades now enforce the strict Pyth freshness SLA (`maxAgeSecStrict`); stale oracle frames convert intents into rejects tagged `PythStaleStrict`, feeding preview staleness KPIs and Prometheus counters.
 4. **Output Finalization** – Once all settings finish, the runner writes `scoreboard.csv`, shuts down the Prometheus server, and prints a summary JSON log (`shadowbot.multi.completed`).
    - In addition to the CSV, the runner now emits `scoreboard.json`, `scoreboard.md`, and `summary.md` (analyst narrative) alongside checkpoint cleanup.

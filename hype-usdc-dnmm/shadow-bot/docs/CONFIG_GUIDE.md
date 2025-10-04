@@ -52,6 +52,20 @@ Optional files:
 - `address-book.json` — preset deployment metadata keyed by chain ID.
 - `FORK_DEPLOY_JSON` — output from deployment scripts to auto-populate fork addresses.
 
+### Fork & Oracle Override Cheat Sheet
+
+| Env Var | Notes |
+| --- | --- |
+| `FORK_DEPLOY_JSON` | Path to JSON produced by deployment scripts (`chainId`, `poolAddress`, `hypeAddress`, `usdcAddress`, `pythAddress`, `hcPxPrecompile`, `hcBboPrecompile`, `hcPxKey`, `hcBboKey`, `wsUrl`). |
+| `POOL_ADDR`, `HYPE_ADDR`, `USDC_ADDR` | Override the pool/token addresses discovered from the fork deploy or address book. |
+| `PYTH_ADDR` | Manually set the Pyth contract when experimenting with alternative deployments. |
+| `HC_PX_PRECOMPILE`, `HC_BBO_PRECOMPILE` | Override HyperCore precompile addresses (e.g., when testing a patched precompile locally). |
+| `HC_PX_KEY`, `HC_BBO_KEY` | Override HyperCore oracle keys (defaults to `107`). |
+| `WS_URL` | Optional websocket RPC for subscriptions; falls back to fork deploy metadata. |
+| `PYTH_MAX_AGE_SEC_STRICT` | (via parameters JSON) Strict freshness guardrail for DNMM RFQ verification. |
+
+All overrides obey the precedence: **CLI flag → env var → fork deploy JSON → address book**. Missing required values produce explicit loader errors so fork smoke tests fail fast.
+
 ## 3. Multi-Run CLI Flags
 
 | Flag / Env | Description |

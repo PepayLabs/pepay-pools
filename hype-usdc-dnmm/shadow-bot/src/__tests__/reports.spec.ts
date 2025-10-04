@@ -79,6 +79,10 @@ describe('generateScoreboardArtifacts', () => {
       pair: { pair: 'HYPE/USDC', chain: 'HypeEVM', baseSymbol: 'HYPE', quoteSymbol: 'USDC' },
       benchmarks: ['dnmm', 'cpmm'],
       rows: MOCK_ROWS,
+      scenarioMeta: {
+        dnmm_base: { id: 'calm', ttlExpiryRateTarget: 0.02 },
+        dnmm_lvr_800: { id: 'stress', ttlExpiryRateTarget: 0.05, autopauseExpected: true }
+      },
       reports: {
         analystSummaryMd: {
           sections: ['Executive Summary', 'Recommendation & Next Canary'],
@@ -92,10 +96,13 @@ describe('generateScoreboardArtifacts', () => {
 
     expect(artifacts.scoreboardJson.runId).toBe('test-run');
     expect(artifacts.scoreboardJson.rows).toHaveLength(MOCK_ROWS.length);
+    expect(artifacts.scoreboardJson.scenarioMeta?.dnmm_lvr_800?.ttlExpiryRateTarget).toBe(0.05);
 
     expect(artifacts.scoreboardMarkdown).toMatch(/\| Setting \| Benchmark \|/);
     expect(artifacts.summaryMarkdown).toMatch(/## Executive Summary/);
     expect(artifacts.summaryMarkdown).toMatch(/dnmm_lvr_800/);
     expect(artifacts.summaryMarkdown).toMatch(/preview_staleness_ratio/);
+    expect(artifacts.summaryMarkdown).toMatch(/TTL pressure scenarios applied/);
+    expect(artifacts.summaryMarkdown).toMatch(/Risk scenarios flagged autopause expectations/);
   });
 });

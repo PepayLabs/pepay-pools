@@ -7,7 +7,7 @@ export interface LoadEnvOptions {
   readonly override?: boolean;
 }
 
-const DEFAULT_FILES = ['.env.local', '.env'];
+const DEFAULT_FILES = ['.dnmmenv.local', '.dnmmenv'];
 
 export function loadEnv(options: LoadEnvOptions = {}): Record<string, string> {
   const cwd = options.cwd ?? process.cwd();

@@ -26,7 +26,8 @@ The HYPE/USDC DNMM stack combines HyperCore order-book data with fallback oracle
 - **Strict vs relaxed:** RFQ and swap paths toggle `OracleMode` (`contracts/interfaces/IDnmPool.sol:94`) to demand stricter `maxAgeSec` and confidence caps; unset mids revert with `Errors.MidUnset()`.
 
 ## Fee & Inventory Pipeline
-- **Pipeline entry:** `_applyFeePipeline` composes base, confidence, size, inventory, BBO floors, LVR surcharge, and aggregator rebates (`contracts/DnmPool.sol:1689-1787`).
+- **Pipeline entry:** `_applyFeePipeline` composes base, confidence (when `blendOn`), size, inventory tilt, LVR surcharge, cap, BBO floor, and aggregator rebates in that order (`contracts/DnmPool.sol:1689-1787`).
+  - Cap clamps before the BBO floor, the floor is the final guard, and rebates apply last without ever breaching the floor.
 - **Confidence term:** `_computeConfidenceFeeBps` blends spread/sigma/pyth weights (HyperCore caps) aligning with `fee.alphaConfNumerator` / `fee.betaInvDevNumerator` defaults (`config/parameters_default.json`).
 - **Size-aware fee:** Linear/quadratic adjustments plus caps (`contracts/lib/FeePolicy.sol:120`, `contracts/DnmPool.sol:1360`).
 - **LVR surcharge:** Volatility × √TTL term activated via `enableLvrFee` flag and `fee.kappaLvrBps`; clamped to cap and emits `LvrFeeApplied` for observability (`contracts/DnmPool.sol:1753-1799`).

@@ -44,12 +44,17 @@ Core-4 introduces a **loss-vs-reprice (LVR)** surcharge that scales with blended
 - Normalized size `u = sizeWad / S0Wad` with `S0` from `maker.S0Notional` (`5000` quote units). Linear (`gammaSizeLinBps`) and quadratic (`gammaSizeQuadBps`) multipliers accumulate (`contracts/lib/FeePolicy.sol:117`).
 - Capped at `fee.sizeFeeCapBps` (default `0`).
 
-- **Pipeline order:** base → confidence → size → inventory tilt → LVR surcharge → cap → BBO floor → rebates. LVR always runs before cap/floor so that pricing remains monotonic.
+- **Pipeline order:** base → confidence → size → inventory tilt → LVR surcharge → cap → BBO floor → rebate. LVR always runs before the clamps, cap executes before the floor, and the floor is the final guard; rebates run last and never bypass the floor.
 - Enabled by `featureFlags.enableLvrFee` (default `false`).
-- Adds `fee_lvr = min(fee.capBps, kappaLvrBps * (σ√Δt + toxicity_bias) * LVR_SCALE)` where σ is the blended confidence sigma (`contracts/DnmPool.sol:1903-1957`), `Δt = maker.ttlMs / 1000`, `LVR_SCALE = 1 / (5 × 10^17)`, and `toxicity_bias` activates when AOMQ clamps are live (`contracts/DnmPool.sol:1721-1814`).
+- WAD math steps:
+  1. `sigmaWad = sigmaBps * 1e14`.
+  2. `dtWad = maker.ttlMs * 1e18 / 1000`.
+  3. `sqrtDtWad = sqrtWad(dtWad)`.
+  4. `termWad = (sigmaWad * sqrtDtWad) / 1e18 + toxicityBiasWad`, clamped between 0 and 1e18.
+  5. `feeLvrBps = mulDivUp(kappaLvrBps, termWad, 1e18)`.
+- The resulting fee is added to the pipeline before applying the cap/floor; `_applyFeePipeline` then clamps to `capBps`, clamps to the BBO floor, and only afterwards applies the rebate (`contracts/DnmPool.sol:1689-1814`).
 - `fee.kappaLvrBps` controls the slope; defaults to `0` (disabled).
 - Emits `LvrFeeApplied` on-settlement when the term is non-zero, enabling the `dnmm_lvr_fee_bps` histogram.
-- Does not bypass the BBO floor or global cap; `_applyFeePipeline` clamps after adding the surcharge (`contracts/DnmPool.sol:1721-1814`).
 
 ### Caps & Floors
 - Global cap `fee.capBps` bounds the pipeline (default `150` bps).

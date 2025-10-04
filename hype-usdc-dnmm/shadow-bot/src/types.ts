@@ -847,12 +847,20 @@ export interface ScoreboardRow {
   readonly trades: number;
   readonly pnlQuoteTotal: number;
   readonly pnlPerMmNotionalBps: number;
+  readonly pnlPerRisk: number;
   readonly winRatePct: number;
+  readonly routerWinRatePct: number;
   readonly avgFeeBps: number;
+  readonly avgFeeAfterRebateBps: number;
   readonly avgSlippageBps: number;
   readonly twoSidedUptimePct: number;
   readonly rejectRatePct: number;
   readonly aomqClampsTotal: number;
+  readonly aomqClampsRatePct: number;
+  readonly lvrCaptureBps: number;
+  readonly priceImprovementVsCpmmBps?: number;
+  readonly previewStalenessRatioPct: number;
+  readonly timeoutExpiryRatePct: number;
   readonly recenterCommitsTotal: number;
 }
 
@@ -910,6 +918,7 @@ export interface BenchmarkTradeResult {
   readonly timestampMs?: number;
   readonly intentBaseSizeWad?: bigint;
   readonly executedBaseSizeWad?: bigint;
+  readonly sigmaBps?: number;
 }
 
 export interface BenchmarkQuoteSample {

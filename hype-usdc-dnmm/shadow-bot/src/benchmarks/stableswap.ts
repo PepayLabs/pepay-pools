@@ -172,7 +172,8 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
       intentBaseSizeWad: intent.side === 'base_in' ? amountInWad : toBigInt(preview.amountOut, this.baseScale),
       executedBaseSizeWad: intent.side === 'base_in'
         ? preview.executedBaseWad
-        : amountOutWad
+        : amountOutWad,
+      sigmaBps: 0
     };
   }
 
@@ -198,7 +199,8 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
       rejectReason: reason,
       feePaid: 0n,
       feeLvrPaid: 0n,
-      rebatePaid: 0n
+      rebatePaid: 0n,
+      sigmaBps: 0
     };
   }
 

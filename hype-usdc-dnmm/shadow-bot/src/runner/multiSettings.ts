@@ -56,7 +56,11 @@ export async function runMultiSettings(config: MultiRunRuntimeConfig): Promise<R
   const csv = createMultiCsvWriter(config);
   const scoreboard = new ScoreboardAggregator(
     config.runs,
-    config.benchmarks.length > 0 ? config.benchmarks : BENCHMARK_IDS
+    config.benchmarks.length > 0 ? config.benchmarks : BENCHMARK_IDS,
+    {
+      baseDecimals: config.baseConfig.baseDecimals,
+      quoteDecimals: config.baseConfig.quoteDecimals
+    }
   );
 
   await metrics.start();

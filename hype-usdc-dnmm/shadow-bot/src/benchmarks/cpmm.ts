@@ -145,7 +145,8 @@ export class CpmmBenchmarkAdapter implements BenchmarkAdapter {
       isPartial: preview.partial,
       appliedAmountIn: preview.executedIn,
       intentBaseSizeWad: intent.side === 'base_in' ? sizeWad : preview.amountOutWad,
-      executedBaseSizeWad: preview.executedBaseWad
+      executedBaseSizeWad: preview.executedBaseWad,
+      sigmaBps: 0
     };
   }
 
@@ -171,7 +172,8 @@ export class CpmmBenchmarkAdapter implements BenchmarkAdapter {
       rejectReason: reason,
       feePaid: 0n,
       feeLvrPaid: 0n,
-      rebatePaid: 0n
+      rebatePaid: 0n,
+      sigmaBps: 0
     };
   }
 

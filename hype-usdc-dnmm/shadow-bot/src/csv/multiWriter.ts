@@ -52,12 +52,20 @@ const SCOREBOARD_HEADER = [
   'trades',
   'pnl_quote_total',
   'pnl_per_mm_notional_bps',
+  'pnl_per_risk',
   'win_rate_pct',
+  'router_win_rate_pct',
   'avg_fee_bps',
+  'avg_fee_after_rebate_bps',
   'avg_slippage_bps',
   'two_sided_uptime_pct',
   'reject_rate_pct',
   'aomq_clamps_total',
+  'aomq_clamps_rate_pct',
+  'lvr_capture_bps',
+  'price_improvement_vs_cpmm_bps',
+  'preview_staleness_ratio_pct',
+  'timeout_expiry_rate_pct',
   'recenter_commits_total'
 ];
 
@@ -184,12 +192,20 @@ function scoreboardRow(row: ScoreboardRow): string {
     String(row.trades),
     row.pnlQuoteTotal.toFixed(6),
     row.pnlPerMmNotionalBps.toFixed(6),
+    row.pnlPerRisk.toFixed(6),
     row.winRatePct.toFixed(4),
+    row.routerWinRatePct.toFixed(4),
     row.avgFeeBps.toFixed(4),
+    row.avgFeeAfterRebateBps.toFixed(4),
     row.avgSlippageBps.toFixed(4),
     row.twoSidedUptimePct.toFixed(4),
     row.rejectRatePct.toFixed(4),
     String(row.aomqClampsTotal),
+    row.aomqClampsRatePct.toFixed(4),
+    row.lvrCaptureBps.toFixed(4),
+    row.priceImprovementVsCpmmBps !== undefined ? row.priceImprovementVsCpmmBps.toFixed(4) : '',
+    row.previewStalenessRatioPct.toFixed(4),
+    row.timeoutExpiryRatePct.toFixed(4),
     String(row.recenterCommitsTotal)
   ].join(',');
 }

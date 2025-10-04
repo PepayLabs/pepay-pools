@@ -33,6 +33,7 @@ interface QuoteComputation {
   readonly reason: string;
   readonly usedFallback: boolean;
   readonly aomqUsed: boolean;
+  readonly sigmaBps: number;
 }
 
 export interface DnmmAdapterParams {
@@ -197,7 +198,8 @@ export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
       appliedAmountIn: executedIn,
       timestampMs: intent.timestampMs,
       intentBaseSizeWad: baseSizeWad,
-      executedBaseSizeWad: executedBaseWad
+      executedBaseSizeWad: executedBaseWad,
+      sigmaBps: preview.sigmaBps
     };
   }
 
@@ -275,7 +277,8 @@ export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
       minOutBps,
       reason: String(response.reason ?? 'OK'),
       usedFallback: Boolean(response.usedFallback),
-      aomqUsed: this.enableAomq && regimeFlags.asArray.includes('AOMQ')
+      aomqUsed: this.enableAomq && regimeFlags.asArray.includes('AOMQ'),
+      sigmaBps: poolState.sigmaBps ?? 0
     };
   }
 }

@@ -67,6 +67,7 @@ Governance | **High** | Only accessible via queue.
 - **Manage aggregator allowlist:**
   1. Use `setAggregatorRouter(executor, true/false)` (direct call from governance) to add or remove routers.
   2. For coordinated changes, queue calls in a multisig batch; watch `AggregatorDiscountUpdated` and reconcile against Treasury rebate reporting.
+  3. Document every allowlist change in treasury ops runbook; unlisted routers should be pruned within 7 days.
 
 ## Events & Errors
 Signal | Purpose

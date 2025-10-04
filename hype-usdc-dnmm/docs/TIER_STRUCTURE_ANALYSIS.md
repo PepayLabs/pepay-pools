@@ -55,8 +55,8 @@ const venues = [
 ### Tier A: Aggregator Recognition (70-80% of volume)
 **Who**: Known aggregator router contracts (1inch, CoW, Matcha, Paraswap)
 **How**: Simple address whitelist
-**Discount**: 3-5 bps (just enough to be consistently cheaper than Uniswap)
-**Gas**: +2k (one address check)
+**Discount**: Fixed 3 bps (protocol constant; keeps routing parity while respecting floors)
+**Gas**: +~2k (single allowlist SLOAD)
 
 ### Tier B: Direct Institutional (15-25% of volume)
 **Who**: Professional traders with direct integration
@@ -82,7 +82,7 @@ const venues = [
 
 ### Why We Should Still Give Aggregator Discount
 
-Even though others don't, a small discount (3-5 bps) helps us:
+Even though others don't, a small fixed discount (3 bps) helps us:
 1. Consistently beat Uniswap (30 bps) in routing
 2. Signal that we WANT aggregator integration
 3. Cost is minimal (3-5 bps on 70% of volume)
@@ -94,16 +94,17 @@ Even though others don't, a small discount (3-5 bps) helps us:
 ### Aggregator Tier (Simple Address-Based)
 
 ```solidity
-// Known aggregator router contracts
-mapping(address => bool) public isAggregatorRouter;
+mapping(address => bool) private _aggregatorRouters;
+uint16 public constant AGGREGATOR_DISCOUNT_BPS = 3;
 
-// Aggregator discount (applies to ALL recognized aggregators)
-uint16 public constant AGGREGATOR_DISCOUNT_BPS = 3;  // 3 bps discount
+function setAggregatorRouter(address executor, bool allowed) external onlyGovernance {
+    if (executor == address(0)) revert Errors.InvalidConfig();
+    _aggregatorRouters[executor] = allowed;
+    emit AggregatorDiscountUpdated(executor, allowed ? AGGREGATOR_DISCOUNT_BPS : 0);
+}
 
-// Governance can add/remove aggregators
-function setAggregatorRouter(address router, bool status) external onlyGovernance {
-    isAggregatorRouter[router] = status;
-    emit AggregatorRouterUpdated(router, status);
+function _aggregatorDiscount(address executor) internal view returns (uint16) {
+    return _aggregatorRouters[executor] ? AGGREGATOR_DISCOUNT_BPS : 0;
 }
 ```
 
@@ -198,6 +199,18 @@ Final fee: 5 bps ✅ (competitive with Curve!)
 Dynamic fee: 30 bps
 Aggregator discount: -3 bps
 Final fee: 27 bps ✅ (still cheaper than Uniswap 30 bps)
+```
+
+### Example 3: Volatile Frame (LVR enabled)
+
+**Aggregator Route:**
+```
+Base fee: 15 bps
+Confidence term: +9 bps (σ-driven)
+LVR surcharge: +6 bps (enableLvrFee, kappa=800)
+Subtotal: 30 bps
+Aggregator discount: -3 bps
+Final fee: 27 bps ✅ (volatility priced without violating floor)
 ```
 
 **Tier 3 Institution:**

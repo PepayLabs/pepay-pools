@@ -1,7 +1,7 @@
 ---
 title: "Operations"
 version: "8e6f14e"
-last_updated: "2025-10-03"
+last_updated: "2025-10-04"
 ---
 
 # Operations
@@ -24,6 +24,7 @@ last_updated: "2025-10-03"
 3. **Guardians:**
    - Assign `governance`, `pauser`, `treasury` addresses (`contracts/interfaces/IDnmPool.sol:63`).
    - Stage timelock delay via governance queue if non-zero.
+   - Pre-register known routers via `setAggregatorRouter(executor,true)` in staging before enabling rebates.
 4. **Shadow Bot:**
    - Populate `.env` with RPCs, Prometheus port, and address book entries (`shadow-bot/README.md`).
    - Launch in `MOCK` mode for smoke tests, then `LIVE` with production RPCs.
@@ -36,7 +37,8 @@ Flag | Default | Effect | Activation Steps
 `enableBboFloor` | `false` | Enables `_computeBboFloor` enforcement. | Update maker config; monitor AOMQ clamps.
 `enableInvTilt` | `false` | Turns on inventory tilt adjustments. | Ensure `inventory.*` weights configured before enabling.
 `enableAOMQ` | `false` | Activates AOMQ clamps for degraded states. | Tune `aomq.*` parameters; watch `dnmm_aomq_clamps_total`.
-`enableRebates` | `false` | Allows aggregator discount schedule. | Populate allowlist; ensure `QuoteRFQ` integrates minOut.
+`enableRebates` | `false` | Allows aggregator discount schedule. | Populate allowlist via `setAggregatorRouter`; ensure `QuoteRFQ` integrates minOut.
+`enableLvrFee` | `false` | Adds volatility × √TTL surcharge after the base pipeline. | Set `fee.kappaLvrBps` > 0, enable flag in canary, monitor `dnmm_lvr_fee_bps`.
 `blendOn` | `false` | Enables confidence blend pipeline. | Validate `dnmm_conf_bps` histograms tighten.
 `parityCiOn` | `false` | Turns on preview parity CI gating (`test/integration/PreviewParity.t.sol`). | Run CI before mainnet migration.
 
@@ -44,8 +46,10 @@ Flag | Default | Effect | Activation Steps
 - **Pause:** Call `pause()` via guardian or governance when divergence > hard cap or pool mispricing suspected (`contracts/DnmPool.sol:615`). Confirm event `Paused(address)` emitted.
 - **Unpause:** After mitigation, call `unpause()`; rerun `Scenario_CalmFlow` to confirm pipeline.
 - **Refresh Preview:** `refreshPreviewSnapshot(OracleMode.Relaxed, oracleData)` if `dnmm_snapshot_age_sec` drifts.
+- **Allowlist Router:** `setAggregatorRouter(executor,true/false)` through governance to onboard/offboard routers; verify event and update rebate accounting.
 - **Manual Recenter:** Invoke `manualRebalance` when reserves drift beyond target and auto flag disabled. Validate `ManualRebalanceExecuted` event.
 - **Parameter Updates:** Use governance queue (`queueParamUpdate`) → wait timelock → `executeParamUpdate`; cross-check with `CONFIG.md` schema.
+- **LVR Tuning:** Adjust `fee.kappaLvrBps` via fee parameters; monitor `dnmm_lvr_fee_bps` and confirm cap adherence before widening scope.
 
 ## Autopause Integration
 - `OracleWatcher` monitors divergence/age thresholds and emits pause intents (`contracts/observer/OracleWatcher.sol:200`).
@@ -55,13 +59,14 @@ Flag | Default | Effect | Activation Steps
 ## Canary & A/B Rollouts
 1. Deploy new configuration to **Canary Pool** with limited maker notional.
 2. Enable feature flags incrementally:
-   - Phase 1: `blendOn`, `enableBboFloor`.
+   - Phase 1: `blendOn`, `enableBboFloor` (keep `enableLvrFee`/rebates off).
    - Phase 2: `enableSizeFee`, `enableInvTilt`.
    - Phase 3: `enableAOMQ`, `enableAutoRecenter`.
+   - Phase 4: `enableRebates`, `enableLvrFee` with `fee.kappaLvrBps` ≥ 800 after monitoring canary metrics.
 3. Compare canary metrics vs production using Grafana dashboards; require `dnmm_two_sided_uptime_pct` within ±0.2%.
 4. Promote configuration to production via governance queue once canary stable for ≥24h (absolute date tracking in rollout doc).
 
 ## References
 - Contracts: `contracts/DnmPool.sol`, `contracts/observer/*`, `contracts/quotes/QuoteRFQ.sol`
 - Docs: `RUNBOOK.md`, `docs/CONFIG.md`, `docs/DIVERGENCE_POLICY.md`
-- Tests: `test/integration/Scenario_DivergenceTripwire.t.sol`, `test/integration/Scenario_CanaryShadow.t.sol`
+- Tests: `test/integration/Scenario_DivergenceTripwire.t.sol`, `test/integration/Scenario_CanaryShadow.t.sol`, `test/integration/FirmLadder_TIFHonored.t.sol`, `test/integration/LvrFee_FloorInvariant.t.sol`

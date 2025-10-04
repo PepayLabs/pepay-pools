@@ -161,3 +161,4 @@ Rebates | `rebates.allowlist` | `[]` | addresses | Populate before enabling reba
 2. Run `yarn shadow-bot lint` ensure configuration exports align with bot expectations (`shadow-bot/config.ts`).
 3. Execute `forge test --match-contract Scenario_CalmFlow` after parameter changes to confirm behavior.
 4. Update this document and `RUNBOOK.md` whenever defaults change; note diff in `CHANGELOG.md` under “Docs”.
+5. When enabling rebates, diff `rebates.allowlist` against treasury records and emit a dry-run `setAggregatorRouter` on staging before production.

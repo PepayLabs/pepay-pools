@@ -36,3 +36,6 @@ Update Procedure:
 ## Gap Review
 - **EMA exact weighting**: Lifinity caches EMA in state; HyperCore exposes via precompile – weighting remains aligned with current docs.
 - **Rebalance automation**: Parity achieved via swap-hook auto recentering and permissionless `rebalanceTarget()`; governance override remains via `setTargetBaseXstar`.
+- **LVR surcharge parity**: Core-4 adds a sigma×√TTL fee term guarded by `enableLvrFee`; the slope (`kappaLvrBps`) mirrors the deterministic quote adjustments in the Solana implementation and remains capped by the fee ceiling.
+- **Aggregator allowlist**: Solana router recognition is mirrored by Solidity `setAggregatorRouter` (governance-only) ensuring discounts stay bounded at 3 bps without bypassing floors.
+- **Preview ladder telemetry**: Debug ladder emission (`PreviewLadderServed`) replicates the Solana router SDK parity checks by hashing snapshot metadata and providing rung-aligned fee vectors.

@@ -7,6 +7,13 @@
 - **Optimized**: 3,847 lines (~19% reduction)
 - **Strategic Refocus**: Academic theory → Practical implementation
 
+## Core-4 Addendum (2025-10-04)
+- **Volatility-aware fees shipped**: `enableLvrFee` + `fee.kappaLvrBps` introduces sigma×√TTL surcharge taxing toxic flow while preserving floor guarantees.
+- **Router parity tightened**: Preview snapshots expire after 1 second; `PreviewLadderServed` event and ladder telemetry align off-chain quotes with on-chain ladders.
+- **Aggregator governance**: `setAggregatorRouter` allowlist is now the single path to rebates; schedule changes emit `AggregatorDiscountUpdated` for treasury reconciliation.
+- **Observability uplift**: New metrics (`dnmm_lvr_fee_bps`, ladder parity panels) and runbooks updated to track surcharge effectiveness.
+- **Gas posture**: Aggregator SLOAD + LVR math add ~+2.3k gas vs previous baselines; budgets remain within Core-4 objectives (≤305k swap).
+
 ---
 
 ## Critical Philosophy Shift
@@ -159,14 +166,14 @@ Week 11-12: ✅ Analytics + gas optimization
 - **Problem**: UNREALISTIC (theoretical minimum ~160k)
 - Risk: Wasting dev time chasing impossible target
 
-### AFTER:
-- Current: 210k gas/swap
-- Target: 180-195k gas/swap (realistic -15-30k reduction)
-- Breakdown:
-  - Storage packing: -20k
-  - Calculation caching: -10k
-  - Assembly math: -15k (DEFERRED)
-- **Total realistic savings**: ~30k gas
+### AFTER (Core-4 budgets):
+- Current: 303k gas/swap (`swap_base_hc` with LVR + rebates enabled).
+- Target: Maintain ≤305k while exploring selective optimizations (coalesced oracle reads, ladder caching).
+- Breakdown of incremental cost vs 2025-09 snapshot:
+  - Aggregator allowlist SLOAD: +1.9k gas (conditional on `enableRebates`).
+  - LVR surcharge math + telemetry: +0.4k gas.
+  - Preview TTL enforcement (no additional swap cost; protects routers).
+- **Actionable savings:** focus on reducing conditional branches when AOMQ inactive (~3-4k gas headroom) without regressing feature coverage.
 
 ---
 

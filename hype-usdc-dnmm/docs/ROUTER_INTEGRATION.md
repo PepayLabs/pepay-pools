@@ -47,6 +47,7 @@ Rung | Size Multiple | TTL Guidance | Slippage Buffer | Notes
 - Governance manages the allowlist with `setAggregatorRouter(executor, allowed)`; updates emit `AggregatorDiscountUpdated` with either `3` or `0` bps.
 - Routers must submit transactions from the allow-listed executor to receive the rebate.
 - Discounts never bypass floors; final fee is `max(feePipeline - rebate, minFloor)`.
+- Treasury should audit allow-listed executors weekly; stale entries should be removed via `setAggregatorRouter(executor,false)` to avoid leakage.
 
 ## Floor Preservation Contract
 - Flooring logic returns leftover input on partial fills (`contracts/lib/Inventory.sol:42-105`).

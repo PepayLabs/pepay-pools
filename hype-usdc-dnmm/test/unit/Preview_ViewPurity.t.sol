@@ -19,8 +19,8 @@ contract PreviewViewPurityTest is BaseTest {
 
     function test_previewFunctionsDoNotWrite() public {
         uint256[] memory sizes = new uint256[](2);
-        sizes[0] = 1e17;
-        sizes[1] = 5e17;
+        sizes[0] = 100_000_000_000_000_000;
+        sizes[1] = 500_000_000_000_000_000;
 
         vm.record();
         pool.previewFees(sizes);

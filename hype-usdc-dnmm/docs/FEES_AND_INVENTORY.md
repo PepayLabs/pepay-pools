@@ -46,7 +46,7 @@ Core-4 introduces a **loss-vs-reprice (LVR)** surcharge that scales with blended
 
 - **Pipeline order:** base → confidence → size → inventory tilt → LVR surcharge → cap → BBO floor → rebates. LVR always runs before cap/floor so that pricing remains monotonic.
 - Enabled by `featureFlags.enableLvrFee` (default `false`).
-- Adds `fee_lvr = min(fee.capBps, kappaLvrBps * (σ√Δt + toxicity_bias) * LVR_SCALE)` where σ is the blended confidence sigma (`contracts/DnmPool.sol:1903-1957`), `Δt = maker.ttlMs / 1000`, `LVR_SCALE = 1 / 5e17`, and `toxicity_bias` activates when AOMQ clamps are live (`contracts/DnmPool.sol:1721-1814`).
+- Adds `fee_lvr = min(fee.capBps, kappaLvrBps * (σ√Δt + toxicity_bias) * LVR_SCALE)` where σ is the blended confidence sigma (`contracts/DnmPool.sol:1903-1957`), `Δt = maker.ttlMs / 1000`, `LVR_SCALE = 1 / (5 × 10^17)`, and `toxicity_bias` activates when AOMQ clamps are live (`contracts/DnmPool.sol:1721-1814`).
 - `fee.kappaLvrBps` controls the slope; defaults to `0` (disabled).
 - Emits `LvrFeeApplied` on-settlement when the term is non-zero, enabling the `dnmm_lvr_fee_bps` histogram.
 - Does not bypass the BBO floor or global cap; `_applyFeePipeline` clamps after adding the surcharge (`contracts/DnmPool.sol:1721-1814`).

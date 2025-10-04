@@ -76,7 +76,7 @@
                "area": "Preview snapshot + events",
                "actions": [
                  "Ensure snapshot fields (mid, spread, conf, flags, ts) already persisted per call path remain unchanged for determinism.",
-                 "Add optional event `PreviewLadderServed(bytes32 snapId, uint8[] rungs, uint16[] feeBps, uint32 tifMs)` gated by debug flag for auditability without gas bloat in prod."
+                "Add optional event `PreviewLadderServed(bytes32 snapId, uint8[4] rungs, uint16[8] feeBps, uint32 tifMs)` gated by debug flag for auditability without gas bloat in prod."
                ]
              }
            ]

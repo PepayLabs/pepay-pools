@@ -297,7 +297,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
     event PreviewSnapshotRefreshed(
         address indexed caller, uint64 timestamp, uint64 blockNumber, uint96 midWad, uint32 divergenceBps, uint8 flags
     );
-    event PreviewLadderServed(bytes32 indexed snapshotId, uint8[] rungs, uint16[] feeBps, uint32 ttlMs);
+    event PreviewLadderServed(bytes32 indexed snapshotId, uint8[4] rungs, uint16[8] feeBps, uint32 ttlMs);
     event ConfidenceDebug(
         uint256 confSpreadBps,
         uint256 confSigmaBps,
@@ -1782,17 +1782,6 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             feeBps = adjusted > feeParams.capBps ? feeParams.capBps : uint16(adjusted);
         }
 
-        if (gates.rebates) {
-            uint16 discountBps = _aggregatorRouters[msg.sender] ? MAX_REBATE_BPS : 0;
-            if (discountBps > 0) {
-                if (discountBps >= feeBps) {
-                    feeBps = 0;
-                } else {
-                    feeBps = uint16(uint256(feeBps) - discountBps);
-                }
-            }
-        }
-
         if (gates.lvrFee && feeParams.kappaLvrBps > 0) {
             uint16 lvrFeeBps =
                 _computeLvrFeeBps(outcome, makerCfg, aomqCfg, gates, isBaseIn, feeParams.capBps, feeParams.kappaLvrBps);
@@ -1803,6 +1792,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             }
         }
 
+        uint16 floorBpsApplied;
         if (gates.bboFloor) {
             uint16 floorBps = _computeBboFloor(outcome.spreadBps, makerCfg);
             if (floorBps > feeParams.capBps) {
@@ -1810,6 +1800,18 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             }
             if (feeBps < floorBps) {
                 feeBps = floorBps;
+            }
+            floorBpsApplied = floorBps;
+        }
+
+        if (gates.rebates) {
+            uint16 discountBps = _aggregatorRouters[msg.sender] ? MAX_REBATE_BPS : 0;
+            if (discountBps > 0) {
+                uint256 discounted = uint256(feeBps) > discountBps ? uint256(feeBps) - discountBps : 0;
+                feeBps = uint16(discounted);
+                if (gates.bboFloor && feeBps < floorBpsApplied) {
+                    feeBps = floorBpsApplied;
+                }
             }
         }
 
@@ -2022,7 +2024,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
 
         (uint256[] memory askFeeBps, uint256[] memory bidFeeBps,,) = _computePreviewFees(outcome, sizes);
 
-        uint16[] memory feeBps = new uint16[](sizes.length * 2);
+        uint16[8] memory feeBps;
         for (uint256 i = 0; i < sizes.length; ++i) {
             uint256 ask = askFeeBps[i];
             uint256 bid = bidFeeBps[i];
@@ -2030,7 +2032,7 @@ contract DnmPool is IDnmPool, ReentrancyGuard {
             feeBps[2 * i + 1] = bid > type(uint16).max ? type(uint16).max : uint16(bid);
         }
 
-        uint8[] memory rungs = new uint8[](4);
+        uint8[4] memory rungs;
         rungs[0] = 1;
         rungs[1] = 2;
         rungs[2] = 5;

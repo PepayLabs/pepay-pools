@@ -20,7 +20,7 @@ DNMM uses Foundry-based unit/integration/invariant suites plus shadow-bot simula
 ## Test Matrix
 Layer | Focus | Entry Points | Notes
 --- | --- | --- | ---
-Unit | Libraries & config guards | `test/unit/*.t.sol` | Covers FeePolicy, Inventory, divergence logic, governance queue, LVR surcharge maths.
+Unit | Libraries & config guards | `test/unit/*.t.sol` | Covers FeePolicy, Inventory, divergence logic, governance queue, LVR surcharge maths, fee ordering/rebate clamps.
 Integration | Pipeline behavior end-to-end | `test/integration/*.t.sol` | Scenario-based sweeps for ladder parity, AOMQ clamps, floor partial fills, oracle fallbacks.
 Invariants | Safety properties | `script/run_invariants.sh` | Executes forked invariants; ensure gas report optional.
 Shadow Bot | Observability + replay | `shadow-bot/__tests__/*.ts` | Validate metrics emitter, probes, and replay harness.
@@ -32,6 +32,7 @@ Command | Purpose
 `forge test --match-contract DnmPoolRebalanceTest` | Focus on auto/manual recenter.
 `forge test --match-contract Scenario_Preview_AOMQ` | Preview parity + AOMQ regression.
 `forge test --match-contract LvrFeeMonotonicTest` | Validate σ/TTL monotonicity of the LVR term.
+`forge test --match-contract FeeOrderClampOrderTest` | Verify pipeline ordering (LVR precedes cap/floor and rebates execute last while preserving floors).
 `forge test --match-contract FirmLadderTIFHonoredTest` | Audit ladder parity, TTL propagation, and stale preview reverts.
 `FOUNDRY_PROFILE=gas forge test --gas-report` | Regenerate gas report before updating docs.
 `forge test --match-contract LvrFee_RespectsCapsTest` | Asserts surcharge never exceeds configured cap and floor invariants hold.

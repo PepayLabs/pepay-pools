@@ -37,7 +37,7 @@ The HYPE/USDC DNMM stack combines HyperCore order-book data with fallback oracle
 ## Swap Execution Workflow
 - **Quote:** `quoteSwapExactIn` triggers oracle reads, confidence aggregation, and pipeline evaluation without mutating reserves (`contracts/DnmPool.sol:421`).
 - **Swap:** `swapExactIn` reuses the quote outcome, applies allow-listed rebates (F09), LVR surcharge, and floor preservation clamps (`contracts/DnmPool.sol:884`, `contracts/DnmPool.sol:1713-1778`).
-- **Telemetry:** When debug mode is enabled, `PreviewLadderServed` surfaces ladder parity + TTL for routers, and `LvrFeeApplied` reports volatility surcharge hits to Prometheus ingesters (`contracts/DnmPool.sol:300-313`, `contracts/DnmPool.sol:2037-2051`).
+- **Telemetry:** When debug mode is enabled, `PreviewLadderServed` surfaces ladder parity + TTL for routers, and `LvrFeeApplied` reports volatility surcharge hits to Prometheus ingesters (`contracts/DnmPool.sol:300-313`, `contracts/DnmPool.sol:1997-2051`).
 - **RFQ integration:** `QuoteRFQ.verifyAndSwap` verifies EIP-712 signed quotes, checks TTL, and dispatches to pool swap functions (`contracts/quotes/QuoteRFQ.sol:162`).
 
 - **Snapshot capture:** `_persistPreviewSnapshot` now records AOMQ state, volatility inputs, and caller metadata so preview ladders stay router-aligned (`contracts/DnmPool.sol:1877-1916`).

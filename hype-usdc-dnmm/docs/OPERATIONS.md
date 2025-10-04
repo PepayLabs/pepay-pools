@@ -20,7 +20,7 @@ last_updated: "2025-10-04"
    - Deploy `QuoteRFQ` pointing at the pool if RFQ trading required.
 2. **Adapters:**
    - Configure HyperCore IDs in `config/oracle.ids.json` before constructor call (`contracts/oracle/OracleAdapterHC.sol`).
-   - Set Pyth price IDs / price feeds; confirm `maxAgeSec` matches network.
+   - Set Pyth price IDs / price feeds; confirm `pyth.maxAgeSec` remains `10` seconds for RFQ strict policy.
 3. **Guardians:**
    - Assign `governance`, `pauser`, `treasury` addresses (`contracts/interfaces/IDnmPool.sol:63`).
    - Stage timelock delay via governance queue if non-zero.

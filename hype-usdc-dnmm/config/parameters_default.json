@@ -18,7 +18,7 @@
       "sigmaEwmaLambdaBps": 9000
     },
     "pyth": {
-      "maxAgeSec": 40000,
+      "maxAgeSec": 10,
       "confCapBps": 100
     }
   },

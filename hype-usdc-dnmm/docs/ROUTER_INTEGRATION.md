@@ -21,13 +21,13 @@ This guide targets routers/aggregators integrating DNMM quotes off-chain. Use po
 
 ## MinOut Calculation
 1. Call `previewLadder([S0, 2S0, 5S0, 10S0])` to retrieve fee bps per rung plus clamp flags (`contracts/DnmPool.sol:1103-1235`).
-2. On refresh, `PreviewLadderServed` emits (when `featureFlags.debugEmit` is enabled) with zipped `[ask0, bid0, ask1, bid1...]` fees and the active `maker.ttlMs`. Use this telemetry to audit router parity.
+2. On refresh, `PreviewLadderServed` emits (when `featureFlags.debugEmit` is enabled) with fixed `[ask0, bid0, ask1, bid1...]` fee bps (packed into `uint16[8]`) and the active `maker.ttlMs`. Use this telemetry to audit router parity.
 3. Derive `amountOutPreview` using the returned fee for the requested rung.
 4. Compute `minOut = amountOutPreview - slippageBuffer[rung]` (see buffers below) and embed in RFQ or direct router transaction.
 5. Snapshots older than one second (`preview.maxAgeSec = 1`) revert; refresh proactively on every price poll or when `dnmm_snapshot_age_sec` > 0.8s to avoid last-second failures.
 
 ## Preview Ladder Telemetry
-- **Event:** `PreviewLadderServed(bytes32 snapId, uint8[] rungs, uint16[] feeBps, uint32 tifMs)` (debug mode only).
+- **Event:** `PreviewLadderServed(bytes32 snapId, uint8[4] rungs, uint16[8] feeBps, uint32 tifMs)` (debug mode only).
 - **Rungs:** Always `[1, 2, 5, 10]` representing `{S0, 2S0, 5S0, 10S0}` multiples.
 - **Fees:** Zipped array `[ask0, bid0, ask1, bid1, ...]` in bps; align with `previewLadder` output.
 - **TTL:** `tifMs` mirrors `maker.ttlMs`; routers should cap on-chain TTL ≤ this value.

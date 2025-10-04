@@ -26,7 +26,7 @@ DNMM quotes anchor to HyperCore order-book data. Pyth feeds provide divergence c
 
 ## Pyth Adapter
 - Contract: `contracts/oracle/OracleAdapterPyth.sol` processes price/confidence pairs and rewrites to uniform scale (`:1-180`).
-- Max age defaults to 40,000 sec; set tighter bounds in production. Confidence cap `oracle.pyth.confCapBps = 100` clamps variance.
+- Max age defaults to 10 seconds (`oracle.pyth.maxAgeSec = 10`) for strict RFQ verification and preview freshness. Confidence cap `oracle.pyth.confCapBps = 100` clamps variance.
 - Used for both fallback pricing and blended confidence term.
 
 ## Fallback & EMA Logic

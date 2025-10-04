@@ -57,6 +57,7 @@ Command | Purpose
 
 ## CI Expectations
 - `forge fmt` enforced on Solidity changes.
+- Full `forge test` (no `--match` filters) must succeed in CI; targeted runs are for local triage only.
 - Preview parity suite (`--match-contract Scenario_Preview_AOMQ`) must pass; CI toggles `parityCiOn=true` on merge.
 - `dnmm_preview_stale_reverts_total` must not regress; CI fails if baseline increases when freshness guard active.
 - `FOUNDRY_PROFILE=gas forge test --gas-report` compared against `gas-snapshots.txt`; PRs exceeding thresholds fail.

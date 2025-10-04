@@ -1,5 +1,7 @@
 // test-precompiles.ts - Test ALL HyperCore precompiles to find correct spot price
-import 'dotenv/config';
+import { loadEnv } from './env.js';
+
+loadEnv();
 import { AbiCoder, JsonRpcProvider } from 'ethers';
 
 const RPC_URL = process.env.RPC_URL || '';

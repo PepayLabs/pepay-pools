@@ -1,7 +1,9 @@
 // monitor.ts
 // Real-time monitoring and alerting system for shadow bot
 
-import 'dotenv/config';
+import { loadEnv } from './env.js';
+
+loadEnv();
 import fetch from 'node-fetch';
 import { Contract, JsonRpcProvider, formatUnits } from 'ethers';
 

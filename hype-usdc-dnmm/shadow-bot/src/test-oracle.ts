@@ -1,5 +1,7 @@
 // test-oracle.ts - Diagnostic test for HYPE oracle pricing
-import 'dotenv/config';
+import { loadEnv } from './env.js';
+
+loadEnv();
 import { AbiCoder, Contract, JsonRpcProvider, getBigInt, toBeHex } from 'ethers';
 
 const RPC_URL = process.env.RPC_URL || '';

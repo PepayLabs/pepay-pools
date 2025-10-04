@@ -1,8 +1,9 @@
-import 'dotenv/config';
+import { loadEnv } from './env.js';
 import { loadMultiRunConfig } from './config-multi.js';
 import { runMultiSettings } from './runner/multiSettings.js';
 
 async function main(): Promise<void> {
+  loadEnv();
   const config = await loadMultiRunConfig();
   const result = await runMultiSettings(config);
   console.log(

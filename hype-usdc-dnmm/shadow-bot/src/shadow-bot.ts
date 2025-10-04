@@ -1,4 +1,6 @@
-import 'dotenv/config';
+import { loadEnv } from './env.js';
+
+loadEnv();
 import { Contract } from 'ethers';
 import { loadConfig } from './config.js';
 import { IDNM_POOL_ABI } from './abis.js';

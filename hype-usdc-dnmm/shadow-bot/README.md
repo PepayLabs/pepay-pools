@@ -119,6 +119,8 @@ Benchmarks share the DNMM `PoolClientAdapter` interface and consume HyperCore/Py
 
 ## Configuration
 
+Environment variables are loaded by a lightweight helper (`src/env.ts`), which reads `.env.local` followed by `.env` from the project root. Values are applied to `process.env` unless already defined, so command line overrides still win. This replaces the previous `dotenv` dependency to avoid missing-module issues in sandboxed environments.
+
 ### Common variables
 
 | Variable | Default | Description |

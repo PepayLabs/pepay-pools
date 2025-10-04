@@ -41,6 +41,10 @@ export class CpmmBenchmarkAdapter implements BenchmarkAdapter {
   }
 
   async init(): Promise<void> {
+    // deterministic emulator – no external resources
+  }
+
+  async init(): Promise<void> {
     // no-op for deterministic emulator
   }
 
@@ -217,6 +221,10 @@ export class CpmmBenchmarkAdapter implements BenchmarkAdapter {
       nextQuoteReserves: nextQuote,
       reason: amountOut > 0n ? undefined : 'zero_output'
     } as const;
+  }
+
+  async close(): Promise<void> {
+    // no external connections to release
   }
 
   private computeMidWad(base?: bigint, quote?: bigint): bigint {

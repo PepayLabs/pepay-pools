@@ -14,7 +14,9 @@ This document dives into the end-to-end flow when you invoke the multi-setting r
    - Instantiates benchmark adapters (DNMM, CPMM, StableSwap) with per-mode clients (live or sim).
    - Creates a seeded flow engine for deterministic trade intent generation.
    - Enters a tick loop (default 250 ms) that fetches oracle/pool state, samples quotes, executes trades, and updates metrics/CSV/scoreboard.
+   - Every 30 minutes (configurable via `CHECKPOINT_MINUTES`) the aggregator snapshot is persisted to `metrics/hype-metrics/run_<RUN_ID>/checkpoint.json`; the file also records which setting IDs completed so a multi-day run can resume after interruption.
 4. **Output Finalization** – Once all settings finish, the runner writes `scoreboard.csv`, shuts down the Prometheus server, and prints a summary JSON log (`shadowbot.multi.completed`).
+   - In addition to the CSV, the runner now emits `scoreboard.json`, `scoreboard.md`, and `summary.md` (analyst narrative) alongside checkpoint cleanup.
 
 ## Adapter Responsibilities
 
@@ -36,7 +38,7 @@ Refer to README for the CSV column definitions. Each setting writes separate fil
 
 ## Prometheus Labels
 
-All multi-run metrics share `{run_id, setting_id, benchmark, pair}`. Gauges/counters/histograms are prefixed `shadow.` (see `docs/METRICS_GLOSSARY.md`). The exporter listens on the port specified by `PROM_PORT` or `--prom-port`.
+All multi-run metrics share `{run_id, setting_id, benchmark, pair}`. Gauges/counters/histograms are prefixed `shadow_*`. Derived KPIs from the scoreboard (`shadow_router_win_rate_pct`, `shadow_pnl_per_risk`, `shadow_lvr_capture_bps`, etc.) are materialised as gauges during the finalize step. When the runner is pointed at a live/fork network, a parallel `dnmm_*` stream mirrors on-chain telemetry (mid, spread, reserves, sigma) into the same registry so Grafana dashboards can overlay simulated vs. production values. The exporter listens on the port specified by `PROM_PORT` or `--prom-port`.
 
 ---
 

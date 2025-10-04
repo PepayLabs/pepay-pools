@@ -81,7 +81,7 @@ export function createMultiCsvWriter(config: MultiRunRuntimeConfig): MultiCsvWri
   const headerCache = new Set<string>();
   const tradesDir = config.paths.tradesDir;
   const quotesDir = config.paths.quotesDir;
-  const scoreboardPath = config.paths.scoreboardPath;
+  const scoreboardCsvPath = config.paths.scoreboardCsvPath;
   const persist = config.persistCsv;
 
   return {
@@ -108,8 +108,8 @@ export function createMultiCsvWriter(config: MultiRunRuntimeConfig): MultiCsvWri
     },
     async writeScoreboard(rows: readonly ScoreboardRow[]): Promise<void> {
       const content = [SCOREBOARD_HEADER.join(','), ...rows.map(scoreboardRow)].join('\n');
-      await fs.mkdir(path.dirname(scoreboardPath), { recursive: true });
-      await fs.writeFile(scoreboardPath, `${content}\n`, 'utf8');
+      await fs.mkdir(path.dirname(scoreboardCsvPath), { recursive: true });
+      await fs.writeFile(scoreboardCsvPath, `${content}\n`, 'utf8');
     },
     async close(): Promise<void> {
       // no resources to release

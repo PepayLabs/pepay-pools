@@ -1,3 +1,5 @@
+import fs from 'fs/promises';
+import path from 'path';
 import {
   BENCHMARK_IDS,
   BenchmarkAdapter,
@@ -10,6 +12,7 @@ import {
   PoolState,
   QuoteCsvRecord,
   RunSettingDefinition,
+  ScoreboardAggregatorState,
   ScoreboardRow,
   TradeCsvRecord,
   TradeIntent,
@@ -30,14 +33,33 @@ import { LivePoolClient } from '../poolClient.js';
 import { LiveOracleReader } from '../oracleReader.js';
 import { SimPoolClient } from '../sim/simPool.js';
 import { SimOracleReader } from '../sim/simOracle.js';
+import { generateScoreboardArtifacts } from '../reports/scoreboard.js';
 
 const DEFAULT_TICK_MS = defaultTickMs();
+const CHECKPOINT_VERSION = 1;
+
+interface MultiRunCheckpoint {
+  readonly version: number;
+  readonly runId: string;
+  readonly completedSettings: readonly string[];
+  readonly aggregator: ScoreboardAggregatorState;
+  readonly updatedAtMs: number;
+  readonly complete?: boolean;
+}
+
+interface CheckpointManager {
+  readonly completed: Set<string>;
+  markCompleted(settingId: string): Promise<void>;
+  flush(): Promise<void>;
+  finalize(): Promise<void>;
+}
 
 interface RunnerContext {
   readonly runtime: MultiRunRuntimeConfig;
   readonly metrics: MultiMetricsManager;
   readonly csv: MultiCsvWriter;
   readonly scoreboard: ScoreboardAggregator;
+  readonly checkpoint: CheckpointManager;
 }
 
 interface PreparedTickResources {
@@ -54,27 +76,59 @@ export interface RunnerResult {
 export async function runMultiSettings(config: MultiRunRuntimeConfig): Promise<RunnerResult> {
   const metrics = new MultiMetricsManager(config);
   const csv = createMultiCsvWriter(config);
+  const benchmarks = config.benchmarks.length > 0 ? config.benchmarks : BENCHMARK_IDS;
+  const checkpointData = await loadCheckpoint(config.paths.checkpointPath, config.runId);
+  const completedSettings = new Set<string>(checkpointData?.completedSettings ?? []);
   const scoreboard = new ScoreboardAggregator(
     config.runs,
-    config.benchmarks.length > 0 ? config.benchmarks : BENCHMARK_IDS,
+    benchmarks,
     {
       baseDecimals: config.baseConfig.baseDecimals,
-      quoteDecimals: config.baseConfig.quoteDecimals
+      quoteDecimals: config.baseConfig.quoteDecimals,
+      initialState: checkpointData?.aggregator
     }
+  );
+  const checkpoint = createCheckpointManager(
+    config.paths.checkpointPath,
+    config.runId,
+    completedSettings,
+    scoreboard
   );
 
   await metrics.start();
   await csv.init();
 
-  const ctx: RunnerContext = { runtime: config, metrics, csv, scoreboard };
-  const tasks = config.runs.map((run) => () => runSingleSetting(ctx, run));
-  await executeWithConcurrency(tasks, config.maxParallel);
+  const ctx: RunnerContext = { runtime: config, metrics, csv, scoreboard, checkpoint };
+  const pendingRuns = config.runs.filter((run) => !checkpoint.completed.has(run.id));
+  if (pendingRuns.length > 0) {
+    const tasks = pendingRuns.map((run) => () => runSingleSetting(ctx, run));
+    await executeWithConcurrency(tasks, config.maxParallel);
+  }
+
+  await checkpoint.flush();
 
   const rows = scoreboard.buildRows();
+  metrics.recordScoreboard(rows);
   await csv.writeScoreboard(rows);
+
+  const artifacts = generateScoreboardArtifacts({
+    runId: config.runId,
+    pair: config.pairLabels,
+    mode: config.runtime.mode,
+    rows,
+    benchmarks,
+    reports: config.reports
+  });
+
+  await Promise.all([
+    writeArtifact(config.paths.scoreboardJsonPath, `${JSON.stringify(artifacts.scoreboardJson, null, 2)}\n`),
+    writeArtifact(config.paths.scoreboardMarkdownPath, artifacts.scoreboardMarkdown),
+    writeArtifact(config.paths.analystSummaryPath, artifacts.summaryMarkdown)
+  ]);
 
   await csv.close();
   await metrics.stop();
+  await checkpoint.finalize();
 
   return { scoreboard: rows };
 }
@@ -104,6 +158,8 @@ async function runSingleSetting(ctx: RunnerContext, setting: RunSettingDefinitio
       .catch(() => undefined);
     await tickResources.cleanup();
   }
+
+  await ctx.checkpoint.markCompleted(setting.id);
 }
 
 async function processTick(
@@ -116,6 +172,10 @@ async function processTick(
   const { metrics, csv, scoreboard, runtime } = ctx;
   const oracle = await resources.fetchOracle();
   const poolState = await resources.fetchPoolState();
+
+  if (runtime.runtime.mode !== 'mock') {
+    metrics.recordDnmmSnapshot(setting.id, { oracle, poolState });
+  }
 
   await Promise.all(
     resources.adapters.map(async (adapter) => {
@@ -143,7 +203,7 @@ async function processTick(
           result
         );
       }
-    })
+      })
   );
 }
 
@@ -460,4 +520,71 @@ async function executeWithConcurrency<T>(tasks: readonly (() => Promise<T>)[], l
   });
   await Promise.all(workers);
   return results;
+}
+
+async function loadCheckpoint(checkpointPath: string, runId: string): Promise<MultiRunCheckpoint | undefined> {
+  try {
+    const contents = await fs.readFile(checkpointPath, 'utf8');
+    const parsed = JSON.parse(contents) as MultiRunCheckpoint;
+    if (parsed.runId !== runId) {
+      return undefined;
+    }
+    return parsed;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+function createCheckpointManager(
+  checkpointPath: string,
+  runId: string,
+  completed: Set<string>,
+  scoreboard: ScoreboardAggregator
+): CheckpointManager {
+  let writeQueue = Promise.resolve();
+
+  async function persist(): Promise<void> {
+    const payload: MultiRunCheckpoint = {
+      version: CHECKPOINT_VERSION,
+      runId,
+      completedSettings: Array.from(completed.values()),
+      aggregator: scoreboard.exportState(),
+      updatedAtMs: Date.now()
+    };
+    await fs.mkdir(path.dirname(checkpointPath), { recursive: true });
+    await fs.writeFile(checkpointPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  }
+
+  function enqueuePersist(): Promise<void> {
+    writeQueue = writeQueue.then(persist);
+    return writeQueue;
+  }
+
+  return {
+    completed,
+    markCompleted(settingId: string): Promise<void> {
+      if (!completed.has(settingId)) {
+        completed.add(settingId);
+        return enqueuePersist();
+      }
+      return writeQueue;
+    },
+    flush(): Promise<void> {
+      return enqueuePersist();
+    },
+    async finalize(): Promise<void> {
+      await writeQueue;
+      await fs.rm(checkpointPath, { force: true });
+    }
+  };
+}
+
+async function writeArtifact(targetPath: string, content: string): Promise<void> {
+  const normalized = content.endsWith('\n') ? content : `${content}\n`;
+  await fs.mkdir(path.dirname(targetPath), { recursive: true });
+  await fs.writeFile(targetPath, normalized, 'utf8');
 }

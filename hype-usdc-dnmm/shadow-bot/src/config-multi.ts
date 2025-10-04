@@ -21,6 +21,7 @@ import {
   SettingsFileSchema,
   ShadowBotConfig,
   RouterConfig,
+  ReportsConfig,
   isChainBackedConfig,
   RuntimeChainConfig,
   ChainRuntimeConfig,
@@ -29,7 +30,9 @@ import {
   MockShadowBotConfig,
   SettingSweepDefinition,
   RiskScenarioDefinition,
-  TradeFlowDefinition
+  TradeFlowDefinition,
+  AnalystSummaryConfig,
+  HighlightRule
 } from './types.js';
 import { loadConfig } from './config.js';
 
@@ -108,6 +111,7 @@ export async function loadMultiRunConfig(
   );
 
   const runtime = extractRuntime(baseConfig);
+  const reports = normalizeReports(settings.reports);
 
   return {
     runId,
@@ -130,7 +134,8 @@ export async function loadMultiRunConfig(
     tradeFlows,
     paths,
     runtime,
-    addressBookPath: isChainBackedConfig(baseConfig) ? baseConfig.addressBookSource : undefined
+    addressBookPath: isChainBackedConfig(baseConfig) ? baseConfig.addressBookSource : undefined,
+    reports
   };
 }
 
@@ -229,11 +234,20 @@ function resolveBenchmarks(
 
 function buildRunnerPaths(root: string, runId: string): RunnerPaths {
   const runRoot = path.join(root, `run_${runId}`);
+  const scoreboardCsvPath = path.join(runRoot, 'scoreboard.csv');
+  const scoreboardJsonPath = path.join(runRoot, 'scoreboard.json');
+  const scoreboardMarkdownPath = path.join(runRoot, 'scoreboard.md');
+  const analystSummaryPath = path.join(runRoot, 'summary.md');
+  const checkpointPath = path.join(runRoot, 'checkpoint.json');
   return {
     runRoot,
     tradesDir: path.join(runRoot, 'trades'),
     quotesDir: path.join(runRoot, 'quotes'),
-    scoreboardPath: path.join(runRoot, 'scoreboard.csv')
+    scoreboardCsvPath,
+    scoreboardJsonPath,
+    scoreboardMarkdownPath,
+    analystSummaryPath,
+    checkpointPath
   };
 }
 
@@ -282,6 +296,13 @@ function normalizeOptionalStringArray(raw: unknown, pointer: string): string[] |
   }
   if (!Array.isArray(raw)) {
     throw new Error(`${pointer} must be an array of strings when provided`);
+  }
+  return raw.map((entry, idx) => requireString(entry, `${pointer}[${idx}]`));
+}
+
+function requireStringArray(raw: unknown, pointer: string): string[] {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw new Error(`${pointer} must be a non-empty array of strings`);
   }
   return raw.map((entry, idx) => requireString(entry, `${pointer}[${idx}]`));
 }
@@ -560,6 +581,117 @@ function normalizeTradeFlowDefinition(raw: unknown, index: number): TradeFlowDef
     ...(sizeParams ? { sizeParams } : {}),
     ...(pattern ? { pattern } : {})
   };
+}
+
+function normalizeReports(raw: unknown): ReportsConfig | undefined {
+  if (raw === undefined || raw === null) {
+    return undefined;
+  }
+  const record = expectRecord(raw, 'reports');
+  const summaryRaw = record.analyst_summary_md ?? record.analystSummaryMd;
+  if (summaryRaw === undefined) {
+    return {};
+  }
+  const analystSummary = normalizeAnalystSummary(summaryRaw);
+  return {
+    analystSummaryMd: analystSummary
+  };
+}
+
+function normalizeAnalystSummary(raw: unknown): AnalystSummaryConfig {
+  const record = expectRecord(raw, 'reports.analyst_summary_md');
+  const sections = requireStringArray(record.sections, 'reports.analyst_summary_md.sections');
+  const highlightRulesRaw = record.highlight_rules ?? record.highlightRules;
+  const highlightRules = Array.isArray(highlightRulesRaw)
+    ? highlightRulesRaw.map((entry, index) => normalizeHighlightRule(entry, index))
+    : undefined;
+  return {
+    sections,
+    highlightRules
+  };
+}
+
+function normalizeHighlightRule(raw: unknown, index: number): HighlightRule {
+  if (typeof raw === 'string') {
+    const description = raw.trim();
+    const lowered = description.toLowerCase();
+    if (lowered.includes('pnl_per_risk')) {
+      const topMatch = description.match(/top\s+(\d+)/i);
+      const top = topMatch ? Number(topMatch[1]) : 2;
+      return {
+        id: 'pnl_per_risk_top',
+        description,
+        params: { top }
+      };
+    }
+    if (lowered.includes('preview_staleness_ratio')) {
+      const threshold = extractPercentage(description) ?? 1;
+      return {
+        id: 'preview_staleness_threshold',
+        description,
+        params: { thresholdPct: threshold }
+      };
+    }
+    if (lowered.includes('two_sided_uptime_pct')) {
+      const threshold = extractPercentage(description) ?? 99.5;
+      return {
+        id: 'uptime_floor',
+        description,
+        params: { thresholdPct: threshold }
+      };
+    }
+    return {
+      id: 'pnl_per_risk_top',
+      description,
+      params: { top: 2 }
+    };
+  }
+  if (!raw || typeof raw !== 'object') {
+    throw new Error(`reports.highlight_rules[${index}] must be a string or object`);
+  }
+  const record = raw as Record<string, unknown>;
+  const id = requireString(record.id, `reports.highlight_rules[${index}].id`);
+  const description = requireString(record.description, `reports.highlight_rules[${index}].description`);
+  const params = record.params && typeof record.params === 'object'
+    ? normalizeParams(record.params as Record<string, unknown>, `reports.highlight_rules[${index}].params`)
+    : undefined;
+  const normalizedId = normalizeHighlightRuleId(id, index);
+  return {
+    id: normalizedId,
+    description,
+    params
+  };
+}
+
+function normalizeHighlightRuleId(candidate: string, index: number): HighlightRule['id'] {
+  switch (candidate) {
+    case 'pnl_per_risk_top':
+    case 'preview_staleness_threshold':
+    case 'uptime_floor':
+      return candidate;
+    default:
+      throw new Error(`reports.highlight_rules[${index}].id has unsupported value '${candidate}'`);
+  }
+}
+
+function normalizeParams(record: Record<string, unknown>, pointer: string): Record<string, number | string> {
+  const result: Record<string, number | string> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      result[key] = value;
+    } else if (typeof value === 'string' && value.trim().length > 0) {
+      const numeric = Number(value);
+      result[key] = Number.isFinite(numeric) ? numeric : value.trim();
+    }
+  }
+  return result;
+}
+
+function extractPercentage(text: string): number | undefined {
+  const match = text.match(/([-+]?[0-9]*\.?[0-9]+)\s*%/);
+  if (!match) return undefined;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : undefined;
 }
 
 function normalizeFeatureFlags(raw: unknown, index: number): RunFeatureFlags {

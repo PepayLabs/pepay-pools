@@ -1,8 +1,8 @@
-# Shadow Bot Runner Implementation Guide
+# Shadow Bot Reports Implementation Guide
 
-**Path**: `hype-usdc-dnmm/shadow-bot/src/runner`
+**Path**: `hype-usdc-dnmm/shadow-bot/src/reports`
 
-**Description**: Orchestration layer for multi-setting benchmarking, concurrency control, scoreboard aggregation, and CLI entrypoints.
+**Description**: Markdown/JSON report generation utilities for multi-run benchmarks, including scoreboard tabulation and analyst summaries.
 
 ## Purpose
 - Capture the intent of this module/folder and its relationship to the broader HYPE/HyperEVM initiative.
@@ -34,4 +34,4 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- 2025-10-04: Added 30-minute checkpointing/resume support, scoreboard artifact generation (CSV/JSON/MD), and derived KPI metric emission for the multi-runner.
+- 2025-10-04: Initial extraction of scoreboard + analyst summary generation helpers.

@@ -1,15 +1,20 @@
 import http from 'http';
 import { Counter, Gauge, Histogram, Registry, collectDefaultMetrics } from 'prom-client';
 import {
+  BenchmarkId,
   BenchmarkQuoteSample,
   BenchmarkTradeResult,
   MultiRunRuntimeConfig,
-  PrometheusLabelSet
+  PrometheusLabelSet,
+  ScoreboardRow,
+  OracleSnapshot,
+  PoolState
 } from '../types.js';
 
 const QUOTE_LATENCY_BUCKETS = [1, 5, 10, 20, 50, 100, 200, 500, 1_000];
 const TRADE_SIZE_BUCKETS = [0.001, 0.01, 0.1, 1, 5, 10, 25, 50, 100, 250, 500];
 const SLIPPAGE_BUCKETS = [0.1, 0.5, 1, 2, 5, 10, 25, 50, 75, 100];
+const WAD = 10n ** 18n;
 
 interface MetricsContext {
   recordOracle(sample: { mid: bigint; spreadBps?: number; confBps?: number }): void;
@@ -49,6 +54,7 @@ export class MultiMetricsManager {
   private readonly gauges = createGauges(this.registry);
   private readonly counters = createCounters(this.registry);
   private readonly histograms = createHistograms(this.registry);
+  private readonly dnmmGauges: ReturnType<typeof createDnmmGauges> | undefined;
   private readonly server?: http.Server;
 
   constructor(private readonly config: MultiRunRuntimeConfig) {
@@ -57,6 +63,7 @@ export class MultiMetricsManager {
       res.setHeader('Content-Type', this.registry.contentType);
       res.end(await this.registry.metrics());
     });
+    this.dnmmGauges = this.config.runtime.mode === 'mock' ? undefined : createDnmmGauges(this.registry);
   }
 
   async start(): Promise<void> {
@@ -75,12 +82,7 @@ export class MultiMetricsManager {
     const key = `${settingId}::${benchmark}`;
     let ctx = this.contexts.get(key);
     if (!ctx) {
-      const labels: PrometheusLabelSet = {
-        run_id: this.config.runId,
-        setting_id: settingId,
-        benchmark: benchmark as any,
-        pair: this.config.pairLabels.pair
-      };
+      const labels = this.buildLabels(settingId, benchmark);
       ctx = new MetricsContextImpl(labels, this.gauges, this.counters, this.histograms);
       this.contexts.set(key, ctx);
     }
@@ -88,13 +90,63 @@ export class MultiMetricsManager {
   }
 
   recordRecenter(settingId: string, benchmark: string): void {
-    const labels: PrometheusLabelSet = {
+    const labels = this.buildLabels(settingId, benchmark);
+    this.counters.recenter.inc(labels);
+  }
+
+  recordScoreboard(rows: readonly ScoreboardRow[]): void {
+    for (const row of rows) {
+      const labels = this.buildLabels(row.settingId, row.benchmark);
+      this.gauges.routerWin.set(labels, row.routerWinRatePct);
+      this.gauges.pnlPerRisk.set(labels, row.pnlPerRisk);
+      this.gauges.avgSlippage.set(labels, row.avgSlippageBps);
+      this.gauges.effectiveFee.set(labels, row.avgFeeAfterRebateBps);
+      this.gauges.lvrCapture.set(labels, row.lvrCaptureBps);
+      if (row.priceImprovementVsCpmmBps !== undefined) {
+        this.gauges.priceImprovement.set(labels, row.priceImprovementVsCpmmBps);
+      }
+      this.gauges.previewStaleness.set(labels, row.previewStalenessRatioPct);
+      this.gauges.timeoutRate.set(labels, row.timeoutExpiryRatePct);
+    }
+  }
+
+  recordDnmmSnapshot(settingId: string, snapshot: {
+    oracle: OracleSnapshot;
+    poolState: PoolState;
+  }): void {
+    if (!this.dnmmGauges) return;
+    const labels = this.buildLabels(settingId, 'dnmm');
+    const mid = snapshot.oracle.hc.midWad ? wadToFloat(snapshot.oracle.hc.midWad) : undefined;
+    if (mid !== undefined) {
+      this.dnmmGauges.mid.set(labels, mid);
+    }
+    if (snapshot.oracle.hc.spreadBps !== undefined) {
+      this.dnmmGauges.spread.set(labels, snapshot.oracle.hc.spreadBps);
+    }
+    if (snapshot.oracle.pyth?.confBps !== undefined) {
+      this.dnmmGauges.conf.set(labels, snapshot.oracle.pyth.confBps);
+    }
+    if (snapshot.poolState.snapshotAgeSec !== undefined) {
+      this.dnmmGauges.snapshotAge.set(labels, snapshot.poolState.snapshotAgeSec);
+    }
+    if (snapshot.poolState.baseReserves !== undefined) {
+      this.dnmmGauges.baseReserves.set(labels, bigintToFloat(snapshot.poolState.baseReserves, this.config.baseConfig.baseDecimals));
+    }
+    if (snapshot.poolState.quoteReserves !== undefined) {
+      this.dnmmGauges.quoteReserves.set(labels, bigintToFloat(snapshot.poolState.quoteReserves, this.config.baseConfig.quoteDecimals));
+    }
+    if (snapshot.poolState.sigmaBps !== undefined) {
+      this.dnmmGauges.sigma.set(labels, snapshot.poolState.sigmaBps);
+    }
+  }
+
+  private buildLabels(settingId: string, benchmark: string): PrometheusLabelSet {
+    return {
       run_id: this.config.runId,
       setting_id: settingId,
-      benchmark: benchmark as any,
+      benchmark: benchmark as BenchmarkId,
       pair: this.config.pairLabels.pair
     };
-    this.counters.recenter.inc(labels);
   }
 }
 
@@ -195,7 +247,70 @@ function createGauges(register: Registry) {
     labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
     registers: [register]
   });
-  return { mid, spread, conf, uptime, pnlTotal, pnlRate } as const;
+  const routerWin = new Gauge({
+    name: 'shadow_router_win_rate_pct',
+    help: 'Router win rate percentage from scoreboard aggregation',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const pnlPerRisk = new Gauge({
+    name: 'shadow_pnl_per_risk',
+    help: 'PnL per unit of risk (scoreboard aggregate)',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const priceImprovement = new Gauge({
+    name: 'shadow_price_improvement_vs_cpmm_bps',
+    help: 'Average price improvement versus CPMM comparator (bps)',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const previewStaleness = new Gauge({
+    name: 'shadow_preview_staleness_ratio_pct',
+    help: 'Preview staleness ratio percentage',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const timeoutRate = new Gauge({
+    name: 'shadow_timeout_expiry_rate_pct',
+    help: 'Timeout expiry rate percentage',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const effectiveFee = new Gauge({
+    name: 'shadow_effective_fee_after_rebate_bps',
+    help: 'Effective fee after rebates (bps)',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const avgSlippage = new Gauge({
+    name: 'shadow_avg_slippage_bps',
+    help: 'Average slippage in bps',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const lvrCapture = new Gauge({
+    name: 'shadow_lvr_capture_bps',
+    help: 'Average LVR capture in basis points',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  return {
+    mid,
+    spread,
+    conf,
+    uptime,
+    pnlTotal,
+    pnlRate,
+    routerWin,
+    pnlPerRisk,
+    priceImprovement,
+    previewStaleness,
+    timeoutRate,
+    effectiveFee,
+    avgSlippage,
+    lvrCapture
+  } as const;
 }
 
 function createCounters(register: Registry) {
@@ -255,4 +370,63 @@ function createHistograms(register: Registry) {
     registers: [register]
   });
   return { tradeSize, tradeSlippage, quoteLatency } as const;
+}
+
+function createDnmmGauges(register: Registry) {
+  const mid = new Gauge({
+    name: 'dnmm_last_mid_wad',
+    help: 'Live DNMM mid price (wad -> decimal)',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const spread = new Gauge({
+    name: 'dnmm_hc_spread_bps',
+    help: 'HyperCore spread in bps',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const conf = new Gauge({
+    name: 'dnmm_pyth_conf_bps',
+    help: 'Pyth confidence interval (bps)',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const snapshotAge = new Gauge({
+    name: 'dnmm_snapshot_age_sec',
+    help: 'Preview snapshot age in seconds',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const baseReserves = new Gauge({
+    name: 'dnmm_pool_base_reserves',
+    help: 'Pool base reserves (scaled)',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const quoteReserves = new Gauge({
+    name: 'dnmm_pool_quote_reserves',
+    help: 'Pool quote reserves (scaled)',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  const sigma = new Gauge({
+    name: 'dnmm_sigma_bps',
+    help: 'Observed sigma (bps)',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
+  return { mid, spread, conf, snapshotAge, baseReserves, quoteReserves, sigma } as const;
+}
+
+function wadToFloat(value: bigint): number {
+  if (value === 0n) return 0;
+  return Number(value) / Number(WAD);
+}
+
+function bigintToFloat(value: bigint, decimals: number): number {
+  if (decimals === 0) {
+    return Number(value);
+  }
+  const scale = 10n ** BigInt(decimals);
+  return Number(value) / Number(scale);
 }

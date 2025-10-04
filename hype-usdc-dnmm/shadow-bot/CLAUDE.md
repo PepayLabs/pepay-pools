@@ -34,4 +34,4 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- Update this section whenever significant architectural or dependency changes land.
+- 2025-10-04: Multi-run pipeline now persists checkpoints, emits scoreboard JSON/Markdown reports, and surfaces derived KPIs + DNMM import metrics for side-by-side dashboards.

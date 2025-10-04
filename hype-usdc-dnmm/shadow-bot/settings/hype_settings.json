@@ -234,5 +234,24 @@
       "interval_min": 20
     }
   ],
-  "benchmarks": ["dnmm", "cpmm", "stableswap"]
+  "benchmarks": ["dnmm", "cpmm", "stableswap"],
+  "reports": {
+    "analyst_summary_md": {
+      "sections": [
+        "Executive Summary",
+        "Methodology & Scenarios",
+        "Headline KPIs (by Setting & Benchmark)",
+        "Volatility Regimes (Calm/Elevated/Crisis)",
+        "Size Buckets (≤S0, 2S0–5S0, ≥5S0)",
+        "Edge Attribution: Size/InvTilt/LVR/Floor/Rebate",
+        "Risk & Uptime",
+        "Recommendation & Next Canary"
+      ],
+      "highlight_rules": [
+        "Flag settings with pnl_per_risk top 2 and router_win_rate > baseline",
+        "Flag settings with preview_staleness_ratio > 1%",
+        "Flag settings with two_sided_uptime_pct < 99.5%"
+      ]
+    }
+  }
 }

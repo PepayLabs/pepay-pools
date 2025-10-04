@@ -6,6 +6,7 @@ Enterprise telemetry harness for the HYPE/USDC Dynamic Nonlinear Market Maker (D
 - [Runtime Modes](docs/RUNTIME_MODES.md)
 - [Multi-Setting Pipeline](docs/MULTI_RUN_PIPELINE.md)
 - [Configuration Guide](docs/CONFIG_GUIDE.md)
+- [Known Issues](docs/KNOWN_ISSUES.md)
 
 ## Table of Contents
 1. [Installation](#installation)

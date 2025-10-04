@@ -699,10 +699,17 @@ export interface BenchmarkQuoteSample {
   readonly aomqActive: boolean;
 }
 
+export interface BenchmarkTickContext {
+  readonly timestampMs: number;
+  readonly oracle: OracleSnapshot;
+  readonly poolState: PoolState;
+}
+
 export interface BenchmarkAdapter {
   readonly id: BenchmarkId;
   init(): Promise<void>;
   close(): Promise<void>;
+  prepareTick(context: BenchmarkTickContext): Promise<void>;
   sampleQuote(side: ProbeSide, sizeBaseWad: bigint): Promise<BenchmarkQuoteSample>;
   simulateTrade(intent: TradeIntent): Promise<BenchmarkTradeResult>;
 }
@@ -733,4 +740,3 @@ export interface CsvWriterAdapter {
   appendQuotes(records: readonly QuoteCsvRecord[]): Promise<void>;
   writeScoreboard(rows: readonly ScoreboardRow[]): Promise<void>;
 }
-

@@ -4,6 +4,7 @@ import {
   BenchmarkQuoteSample,
   BenchmarkTradeResult,
   MultiRunRuntimeConfig,
+  OracleSnapshot,
   PrometheusLabelSet
 } from './types.js';
 
@@ -12,6 +13,7 @@ const TRADE_SIZE_BUCKETS = [0.001, 0.01, 0.1, 1, 5, 10, 25, 50, 100, 250, 500];
 const SLIPPAGE_BUCKETS = [0.1, 0.5, 1, 2, 5, 10, 25, 50, 75, 100];
 
 interface MetricsContext {
+  recordOracle(snapshot: OracleSnapshot): void;
   recordQuote(sample: BenchmarkQuoteSample): void;
   recordTrade(result: BenchmarkTradeResult): void;
   recordReject(): void;
@@ -90,6 +92,21 @@ class MetricsContextImpl implements MetricsContext {
     private readonly counters: ReturnType<typeof createCounters>,
     private readonly histograms: ReturnType<typeof createHistograms>
   ) {}
+
+  recordOracle(snapshot: OracleSnapshot): void {
+    if (snapshot.hc.midWad !== undefined) {
+      this.gauges.mid.set(this.labels, Number(snapshot.hc.midWad));
+    }
+    if (snapshot.hc.spreadBps !== undefined) {
+      this.gauges.spread.set(this.labels, snapshot.hc.spreadBps);
+    }
+    if (snapshot.hc.ageSec !== undefined) {
+      this.gauges.snapshotAge.set(this.labels, snapshot.hc.ageSec);
+    }
+    if (snapshot.pyth?.confBps !== undefined) {
+      this.gauges.conf.set(this.labels, snapshot.pyth.confBps);
+    }
+  }
 
   recordQuote(sample: BenchmarkQuoteSample): void {
     const quoteLabels = { ...this.labels, side: sample.side } as const;
@@ -172,6 +189,12 @@ function createGauges(register: Registry) {
     labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
     registers: [register]
   });
+  const snapshotAge = new Gauge({
+    name: 'shadow_snapshot_age_sec',
+    help: 'Age of HyperCore snapshot in seconds',
+    labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
+    registers: [register]
+  });
   const uptime = new Gauge({
     name: 'shadow_uptime_two_sided_pct',
     help: 'Two-sided uptime percentage',
@@ -190,7 +213,7 @@ function createGauges(register: Registry) {
     labelNames: ['run_id', 'setting_id', 'benchmark', 'pair'],
     registers: [register]
   });
-  return { mid, spread, conf, uptime, pnlTotal, pnlRate } as const;
+  return { mid, spread, conf, snapshotAge, uptime, pnlTotal, pnlRate } as const;
 }
 
 function createCounters(register: Registry) {

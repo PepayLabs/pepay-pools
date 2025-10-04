@@ -1,9 +1,11 @@
 import {
   BenchmarkAdapter,
   BenchmarkQuoteSample,
+  BenchmarkTickContext,
   BenchmarkTradeResult,
   ChainRuntimeConfig,
   OracleReaderAdapter,
+  OracleSnapshot,
   PoolClientAdapter,
   TradeIntent
 } from '../types.js';
@@ -25,6 +27,8 @@ export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
   private inventoryQuote: bigint = 0n;
   private baseScale!: bigint;
   private quoteScale!: bigint;
+  private lastOracle?: OracleSnapshot;
+  private lastSpreadBps = 0;
 
   constructor(private readonly params: DnmmAdapterParams) {}
 
@@ -40,20 +44,27 @@ export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
     // no-op
   }
 
+  async prepareTick(context: BenchmarkTickContext): Promise<void> {
+    this.lastOracle = context.oracle;
+    this.lastSpreadBps = context.oracle.hc.spreadBps ?? this.lastSpreadBps;
+    this.inventoryBase = context.poolState.baseReserves;
+    this.inventoryQuote = context.poolState.quoteReserves;
+  }
+
   async sampleQuote(side: 'base_in' | 'quote_in', sizeBaseWad: bigint): Promise<BenchmarkQuoteSample> {
     const amount = side === 'base_in'
       ? sizeBaseWad
       : toQuoteWadFromBase(sizeBaseWad, this.currentMid(), this.baseScale, this.quoteScale);
     const raw = await this.params.poolClient.quoteExactIn(amount, side === 'base_in', ORACLE_MODE_SPOT, '0x');
-    const mid = raw.midUsed ?? 0n;
+    const mid = this.lastOracle?.hc.midWad ?? raw.midUsed ?? 0n;
     return {
       timestampMs: Date.now(),
       side,
       sizeBaseWad,
       feeBps: raw.feeBpsUsed ?? 0,
       mid,
-      spreadBps: 0,
-      confBps: 0,
+      spreadBps: this.lastOracle?.hc.spreadBps ?? this.lastSpreadBps,
+      confBps: this.lastOracle?.pyth?.confBps,
       aomqActive: raw.reason === 'AOMQClamp'
     };
   }
@@ -66,9 +77,9 @@ export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
     const response = await this.params.poolClient.quoteExactIn(amountIn, intent.side === 'base_in', ORACLE_MODE_SPOT, '0x');
     const amountOut = response.amountOut ?? 0n;
     const success = amountOut > 0n;
-    const mid = response.midUsed ?? 0n;
+    const oracleMid = this.lastOracle?.hc.midWad ?? response.midUsed ?? 0n;
     const execPrice = computeExecPrice(intent.side, amountIn, amountOut, this.baseScale, this.quoteScale);
-    const midDecimal = mid === 0n ? Number(execPrice) : Number(mid) / Number(WAD);
+    const midDecimal = oracleMid === 0n ? Number(execPrice) : Number(oracleMid) / Number(WAD);
     const slippage = computeSlippageBps(midDecimal, execPrice);
 
     if (intent.minOut) {
@@ -76,7 +87,7 @@ export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
         ? toScaled(intent.minOut, this.quoteScale)
         : toScaled(intent.minOut, this.baseScale);
       if (amountOut < minOutWad) {
-        return this.buildRejection(intent, mid);
+        return this.buildRejection(intent, oracleMid);
       }
     }
 
@@ -97,7 +108,7 @@ export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
       success,
       amountIn,
       amountOut,
-      midUsed: mid,
+      midUsed: oracleMid,
       feeBpsUsed: response.feeBpsUsed ?? 0,
       floorBps: 0,
       tiltBps: 0,
@@ -138,6 +149,9 @@ export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
   }
 
   private currentMid(): number {
+    if (this.lastOracle?.hc.midWad !== undefined && this.lastOracle.hc.midWad > 0n) {
+      return Number(this.lastOracle.hc.midWad) / Number(WAD);
+    }
     const base = Number(this.inventoryBase) / Number(this.baseScale);
     const quote = Number(this.inventoryQuote) / Number(this.quoteScale);
     if (base === 0) return 1;

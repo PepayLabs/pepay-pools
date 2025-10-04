@@ -122,6 +122,7 @@ export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
       rebateBps: this.rebateBps,
       floorBps: this.poolConfig?.inventory.floorBps,
       ttlMs: this.makerTtlMs,
+      latencyMs: this.setting.latency.quoteToTxMs,
       minOut: BigInt(preview.minOutBps),
       aomqFlags: preview.aomqUsed ? 'AOMQ' : undefined,
       mid: preview.midWad,
@@ -192,7 +193,7 @@ export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
       pnlQuote,
       inventoryBase: this.inventoryBase,
       inventoryQuote: this.inventoryQuote,
-      latencyMs: 25,
+      latencyMs: this.setting.latency.quoteToTxMs,
       rejectReason: success ? undefined : preview.reason,
       isPartial,
       appliedAmountIn: executedIn,
@@ -219,7 +220,7 @@ export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
       pnlQuote: 0,
       inventoryBase: this.inventoryBase,
       inventoryQuote: this.inventoryQuote,
-      latencyMs: 20,
+      latencyMs: this.setting.latency.quoteToTxMs,
       rejectReason: 'min_out_unmet'
     };
   }

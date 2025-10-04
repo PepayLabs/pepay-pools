@@ -1,3 +1,5 @@
+import fs from 'fs/promises';
+import path from 'path';
 import {
   BENCHMARK_IDS,
   BenchmarkAdapter,
@@ -10,9 +12,11 @@ import {
   PoolState,
   QuoteCsvRecord,
   RunSettingDefinition,
+  ScoreboardAggregatorState,
   ScoreboardRow,
   TradeCsvRecord,
   TradeIntent,
+  RiskScenarioDefinition,
   isChainBackedConfig,
   ChainBackedConfig,
   MockShadowBotConfig,
@@ -30,14 +34,34 @@ import { LivePoolClient } from '../poolClient.js';
 import { LiveOracleReader } from '../oracleReader.js';
 import { SimPoolClient } from '../sim/simPool.js';
 import { SimOracleReader } from '../sim/simOracle.js';
+import { generateScoreboardArtifacts } from '../reports/scoreboard.js';
+import { hashStringToSeed } from '../utils/random.js';
 
 const DEFAULT_TICK_MS = defaultTickMs();
+const CHECKPOINT_VERSION = 1;
+
+interface MultiRunCheckpoint {
+  readonly version: number;
+  readonly runId: string;
+  readonly completedSettings: readonly string[];
+  readonly aggregator: ScoreboardAggregatorState;
+  readonly updatedAtMs: number;
+  readonly complete?: boolean;
+}
+
+interface CheckpointManager {
+  readonly completed: Set<string>;
+  markCompleted(settingId: string): Promise<void>;
+  flush(): Promise<void>;
+  finalize(): Promise<void>;
+}
 
 interface RunnerContext {
   readonly runtime: MultiRunRuntimeConfig;
   readonly metrics: MultiMetricsManager;
   readonly csv: MultiCsvWriter;
   readonly scoreboard: ScoreboardAggregator;
+  readonly checkpoint: CheckpointManager;
 }
 
 interface PreparedTickResources {
@@ -54,49 +78,83 @@ export interface RunnerResult {
 export async function runMultiSettings(config: MultiRunRuntimeConfig): Promise<RunnerResult> {
   const metrics = new MultiMetricsManager(config);
   const csv = createMultiCsvWriter(config);
+  const benchmarks = config.benchmarks.length > 0 ? config.benchmarks : BENCHMARK_IDS;
+  const checkpointData = await loadCheckpoint(config.paths.checkpointPath, config.runId);
+  const completedSettings = new Set<string>(checkpointData?.completedSettings ?? []);
   const scoreboard = new ScoreboardAggregator(
     config.runs,
-    config.benchmarks.length > 0 ? config.benchmarks : BENCHMARK_IDS,
+    benchmarks,
     {
       baseDecimals: config.baseConfig.baseDecimals,
-      quoteDecimals: config.baseConfig.quoteDecimals
+      quoteDecimals: config.baseConfig.quoteDecimals,
+      initialState: checkpointData?.aggregator
     }
+  );
+  const checkpoint = createCheckpointManager(
+    config.paths.checkpointPath,
+    config.runId,
+    completedSettings,
+    scoreboard
   );
 
   await metrics.start();
   await csv.init();
 
-  const ctx: RunnerContext = { runtime: config, metrics, csv, scoreboard };
-  const tasks = config.runs.map((run) => () => runSingleSetting(ctx, run));
-  await executeWithConcurrency(tasks, config.maxParallel);
+  const ctx: RunnerContext = { runtime: config, metrics, csv, scoreboard, checkpoint };
+  const pendingRuns = config.runs.filter((run) => !checkpoint.completed.has(run.id));
+  if (pendingRuns.length > 0) {
+  const tasks = pendingRuns.map((run) => () => runSingleSetting(ctx, run));
+    await executeWithConcurrency(tasks, config.maxParallel);
+  }
+
+  await checkpoint.flush();
 
   const rows = scoreboard.buildRows();
+  metrics.recordScoreboard(rows);
   await csv.writeScoreboard(rows);
+
+  const artifacts = generateScoreboardArtifacts({
+    runId: config.runId,
+    pair: config.pairLabels,
+    mode: config.runtime.mode,
+    rows,
+    benchmarks,
+    reports: config.reports
+  });
+
+  await Promise.all([
+    writeArtifact(config.paths.scoreboardJsonPath, `${JSON.stringify(artifacts.scoreboardJson, null, 2)}\n`),
+    writeArtifact(config.paths.scoreboardMarkdownPath, artifacts.scoreboardMarkdown),
+    writeArtifact(config.paths.analystSummaryPath, artifacts.summaryMarkdown)
+  ]);
 
   await csv.close();
   await metrics.stop();
+  await checkpoint.finalize();
 
   return { scoreboard: rows };
 }
 
 async function runSingleSetting(ctx: RunnerContext, setting: RunSettingDefinition): Promise<void> {
   const { runtime } = ctx;
+  const scenario = resolveRiskScenario(runtime, setting.riskScenarioId);
+  const effectiveSetting = applyRiskScenario(setting, scenario);
   const durationSec = runtime.durationOverrideSec
-    ? Math.min(setting.flow.seconds, runtime.durationOverrideSec)
-    : setting.flow.seconds;
+    ? Math.min(effectiveSetting.flow.seconds, runtime.durationOverrideSec)
+    : effectiveSetting.flow.seconds;
   const durationMs = durationSec * 1_000;
   const tickMs = DEFAULT_TICK_MS;
   const startMs = Date.now();
-  const engine = buildFlowEngine(setting, startMs, durationMs);
+  const engine = buildFlowEngine(effectiveSetting, startMs, durationMs);
 
   const benchmarks = runtime.benchmarks.length > 0 ? runtime.benchmarks : BENCHMARK_IDS;
-  const tickResources = await prepareAdapters(runtime, setting, benchmarks);
+  const tickResources = await prepareAdapters(runtime, effectiveSetting, benchmarks, scenario, tickMs);
 
   try {
     let timestampMs = startMs;
     while (!engine.isComplete(timestampMs)) {
       const intents = engine.next(timestampMs);
-      await processTick(ctx, setting, tickResources, intents, timestampMs);
+      await processTick(ctx, effectiveSetting, tickResources, intents, timestampMs);
       timestampMs += tickMs;
     }
   } finally {
@@ -104,6 +162,8 @@ async function runSingleSetting(ctx: RunnerContext, setting: RunSettingDefinitio
       .catch(() => undefined);
     await tickResources.cleanup();
   }
+
+  await ctx.checkpoint.markCompleted(setting.id);
 }
 
 async function processTick(
@@ -117,6 +177,15 @@ async function processTick(
   const oracle = await resources.fetchOracle();
   const poolState = await resources.fetchPoolState();
 
+  const strictMaxAgeSec = runtime.baseConfig.parameters.oracle.pyth.maxAgeSecStrict ?? 0;
+  const pythAgeSec = computePythAgeSec(oracle, timestampMs);
+  const isStrictStale =
+    strictMaxAgeSec > 0 && (oracle.pyth?.status !== 'ok' || pythAgeSec === undefined || pythAgeSec > strictMaxAgeSec);
+
+  if (runtime.runtime.mode !== 'mock') {
+    metrics.recordDnmmSnapshot(setting.id, { oracle, poolState });
+  }
+
   await Promise.all(
     resources.adapters.map(async (adapter) => {
       await adapter.prepareTick({ timestampMs, oracle, poolState });
@@ -124,7 +193,8 @@ async function processTick(
       metricsContext.recordOracle({
         mid: oracle.hc.midWad ?? 0n,
         spreadBps: oracle.hc.spreadBps,
-        confBps: oracle.pyth?.confBps
+        confBps: oracle.pyth?.confBps,
+        sigmaBps: oracle.hc.sigmaBps ?? poolState.sigmaBps
       });
 
       const quotes = await sampleQuotes(adapter, setting, timestampMs);
@@ -132,7 +202,11 @@ async function processTick(
       scoreboard.recordTwoSided(setting.id, adapter.id, twoSided);
 
       for (const intent of intents) {
-        const result = await adapter.simulateTrade(intent);
+        const baseResult = await adapter.simulateTrade(intent);
+        const result =
+          adapter.id === 'dnmm'
+            ? applyPythStrictPolicy(baseResult, isStrictStale, setting.latency.quoteToTxMs)
+            : baseResult;
         await recordTradeResult(
           runtime,
           metricsContext,
@@ -143,7 +217,7 @@ async function processTick(
           result
         );
       }
-    })
+      })
   );
 }
 
@@ -181,16 +255,58 @@ function buildFlowEngine(
   return createFlowEngine(setting.flow, options);
 }
 
+function resolveRiskScenario(
+  runtime: MultiRunRuntimeConfig,
+  scenarioId: string | undefined
+): RiskScenarioDefinition | undefined {
+  if (!scenarioId || !runtime.riskScenarios) {
+    return undefined;
+  }
+  return runtime.riskScenarios.find((scenario) => scenario.id === scenarioId);
+}
+
+function applyRiskScenario(
+  setting: RunSettingDefinition,
+  scenario: RiskScenarioDefinition | undefined
+): RunSettingDefinition {
+  if (!scenario) {
+    return setting;
+  }
+  const latency =
+    scenario.quoteLatencyMs !== undefined
+      ? { ...setting.latency, quoteToTxMs: scenario.quoteLatencyMs }
+      : setting.latency;
+  const durationSeconds = scenario.durationMin
+    ? Math.max(setting.flow.seconds, scenario.durationMin * 60)
+    : setting.flow.seconds;
+  const flow =
+    durationSeconds !== setting.flow.seconds
+      ? { ...setting.flow, seconds: durationSeconds }
+      : setting.flow;
+
+  if (latency === setting.latency && flow === setting.flow) {
+    return setting;
+  }
+
+  return {
+    ...setting,
+    latency,
+    flow
+  };
+}
+
 async function prepareAdapters(
   config: MultiRunRuntimeConfig,
   setting: RunSettingDefinition,
-  benchmarks: readonly BenchmarkId[]
+  benchmarks: readonly BenchmarkId[],
+  scenario: RiskScenarioDefinition | undefined,
+  tickMs: number
 ): Promise<PreparedTickResources> {
   if (isChainBackedConfig(config.baseConfig) && config.chainConfig) {
     return prepareChainAdapters(config.chainConfig, config, setting, benchmarks);
   }
   if (!isChainBackedConfig(config.baseConfig)) {
-    return prepareMockAdapters(config.baseConfig, config, setting, benchmarks);
+    return prepareMockAdapters(config.baseConfig, config, setting, benchmarks, scenario, tickMs);
   }
   throw new Error('Unsupported configuration for multi-run execution');
 }
@@ -267,13 +383,20 @@ async function prepareMockAdapters(
   mockConfig: MockShadowBotConfig,
   runtime: MultiRunRuntimeConfig,
   setting: RunSettingDefinition,
-  benchmarks: readonly BenchmarkId[]
+  benchmarks: readonly BenchmarkId[],
+  scenario: RiskScenarioDefinition | undefined,
+  tickMs: number
 ): Promise<PreparedTickResources> {
   const poolClient = new SimPoolClient({
     baseDecimals: mockConfig.baseDecimals,
     quoteDecimals: mockConfig.quoteDecimals
   });
-  const oracleReader = new SimOracleReader();
+  const oracleReader = new SimOracleReader({
+    baseMidWad: 1_000_000_000_000_000_000n,
+    seed: hashStringToSeed(`${runtime.seedBase}_${setting.id}`),
+    scenario,
+    tickMs
+  });
 
   const adapters: BenchmarkAdapter[] = [];
   const placeholderChain: ChainRuntimeConfig = {
@@ -445,6 +568,46 @@ function quoteSampleToCsv(settingId: string, benchmark: BenchmarkId, sample: Ben
   };
 }
 
+function computePythAgeSec(oracle: OracleSnapshot, timestampMs: number): number | undefined {
+  if (!oracle.pyth || oracle.pyth.publishTimeSec === undefined) {
+    return undefined;
+  }
+  const publishMs = oracle.pyth.publishTimeSec * 1_000;
+  return publishMs > 0 ? Math.max(0, (timestampMs - publishMs) / 1_000) : undefined;
+}
+
+function applyPythStrictPolicy(
+  result: BenchmarkTradeResult,
+  enforceStale: boolean,
+  latencyMs: number
+): BenchmarkTradeResult {
+  if (!enforceStale) {
+    return result;
+  }
+  if (!result.success && result.rejectReason && result.rejectReason.toLowerCase().includes('stale')) {
+    return result;
+  }
+  return {
+    ...result,
+    success: false,
+    amountIn: 0n,
+    amountOut: 0n,
+    feePaid: result.feePaid ?? 0n,
+    feeLvrPaid: result.feeLvrPaid ?? 0n,
+    rebatePaid: result.rebatePaid ?? 0n,
+    aomqClamped: false,
+    aomqUsed: false,
+    floorEnforced: false,
+    minOut: undefined,
+    slippageBpsVsMid: 0,
+    pnlQuote: 0,
+    latencyMs,
+    rejectReason: result.rejectReason
+      ? `${result.rejectReason}|PythStaleStrict`
+      : 'PythStaleStrict'
+  };
+}
+
 async function executeWithConcurrency<T>(tasks: readonly (() => Promise<T>)[], limit: number): Promise<T[]> {
   if (tasks.length === 0) return [];
   const results: T[] = new Array(tasks.length);
@@ -460,4 +623,71 @@ async function executeWithConcurrency<T>(tasks: readonly (() => Promise<T>)[], l
   });
   await Promise.all(workers);
   return results;
+}
+
+async function loadCheckpoint(checkpointPath: string, runId: string): Promise<MultiRunCheckpoint | undefined> {
+  try {
+    const contents = await fs.readFile(checkpointPath, 'utf8');
+    const parsed = JSON.parse(contents) as MultiRunCheckpoint;
+    if (parsed.runId !== runId) {
+      return undefined;
+    }
+    return parsed;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+function createCheckpointManager(
+  checkpointPath: string,
+  runId: string,
+  completed: Set<string>,
+  scoreboard: ScoreboardAggregator
+): CheckpointManager {
+  let writeQueue = Promise.resolve();
+
+  async function persist(): Promise<void> {
+    const payload: MultiRunCheckpoint = {
+      version: CHECKPOINT_VERSION,
+      runId,
+      completedSettings: Array.from(completed.values()),
+      aggregator: scoreboard.exportState(),
+      updatedAtMs: Date.now()
+    };
+    await fs.mkdir(path.dirname(checkpointPath), { recursive: true });
+    await fs.writeFile(checkpointPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  }
+
+  function enqueuePersist(): Promise<void> {
+    writeQueue = writeQueue.then(persist);
+    return writeQueue;
+  }
+
+  return {
+    completed,
+    markCompleted(settingId: string): Promise<void> {
+      if (!completed.has(settingId)) {
+        completed.add(settingId);
+        return enqueuePersist();
+      }
+      return writeQueue;
+    },
+    flush(): Promise<void> {
+      return enqueuePersist();
+    },
+    async finalize(): Promise<void> {
+      await writeQueue;
+      await fs.rm(checkpointPath, { force: true });
+    }
+  };
+}
+
+async function writeArtifact(targetPath: string, content: string): Promise<void> {
+  const normalized = content.endsWith('\n') ? content : `${content}\n`;
+  await fs.mkdir(path.dirname(targetPath), { recursive: true });
+  await fs.writeFile(targetPath, normalized, 'utf8');
 }

@@ -34,4 +34,4 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- Update this section whenever significant architectural or dependency changes land.
+- 2025-10-04: Added 30-minute checkpointing/resume support, scoreboard artifact generation (CSV/JSON/MD), derived KPI metric emission, and risk-scenario aware oracle/latency adjustments for the multi-runner.

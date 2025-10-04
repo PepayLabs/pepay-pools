@@ -216,6 +216,7 @@ export interface HcOracleSample {
   readonly askWad?: bigint;
   readonly spreadBps?: number;
   readonly ageSec?: number;
+  readonly sigmaBps?: number;
   readonly statusDetail?: string;
 }
 
@@ -710,13 +711,18 @@ export interface SettingsFileSchema {
   readonly tradeFlows?: readonly TradeFlowDefinition[];
   readonly oracles?: SettingsOracles;
   readonly benchmarks?: readonly BenchmarkId[];
+  readonly reports?: ReportsConfig;
 }
 
 export interface RunnerPaths {
   readonly runRoot: string;
   readonly tradesDir: string;
   readonly quotesDir: string;
-  readonly scoreboardPath: string;
+  readonly scoreboardCsvPath: string;
+  readonly scoreboardJsonPath: string;
+  readonly scoreboardMarkdownPath: string;
+  readonly analystSummaryPath: string;
+  readonly checkpointPath: string;
 }
 
 export interface ChainRuntimeConfig {
@@ -771,6 +777,7 @@ export interface MultiRunRuntimeConfig {
   readonly paths: RunnerPaths;
   readonly runtime: RuntimeChainConfig;
   readonly addressBookPath?: string;
+  readonly reports?: ReportsConfig;
 }
 
 export interface TradeIntent {
@@ -864,6 +871,60 @@ export interface ScoreboardRow {
   readonly recenterCommitsTotal: number;
 }
 
+export interface ScoreboardAccumulatorSnapshot {
+  readonly trades: number;
+  readonly wins: number;
+  readonly pnlTotal: number;
+  readonly feeSum: number;
+  readonly slippageSum: number;
+  readonly rejects: number;
+  readonly intents: number;
+  readonly aomq: number;
+  readonly recenter: number;
+  readonly twoSidedSamples: number;
+  readonly twoSidedSatisfied: number;
+  readonly lvrBpsSum: number;
+  readonly lvrCount: number;
+  readonly effectiveFeeAfterRebateSum: number;
+  readonly effectiveFeeCount: number;
+  readonly previewStaleRejects: number;
+  readonly timeoutRejects: number;
+  readonly riskExposure: number;
+  readonly sigmaSamples: number;
+}
+
+export interface IntentMatchSnapshot {
+  readonly success: boolean;
+  readonly price: number;
+  readonly side: ProbeSide;
+}
+
+export interface ScoreboardAggregatorState {
+  readonly buckets: Record<string, ScoreboardAccumulatorSnapshot>;
+  readonly makerNotional: Record<string, number>;
+  readonly intentComparisons: Record<string, Record<string, Record<BenchmarkId, IntentMatchSnapshot>>>;
+}
+
+export interface ReportsConfig {
+  readonly analystSummaryMd?: AnalystSummaryConfig;
+}
+
+export interface AnalystSummaryConfig {
+  readonly sections: readonly string[];
+  readonly highlightRules?: readonly HighlightRule[];
+}
+
+export type HighlightRuleId =
+  | 'pnl_per_risk_top'
+  | 'preview_staleness_threshold'
+  | 'uptime_floor';
+
+export interface HighlightRule {
+  readonly id: HighlightRuleId;
+  readonly description: string;
+  readonly params?: Record<string, number | string>;
+}
+
 export interface ScoreboardContext {
   readonly runId: string;
   readonly pair: string;
@@ -930,6 +991,7 @@ export interface BenchmarkQuoteSample {
   readonly rebateBps?: number;
   readonly floorBps?: number;
   readonly ttlMs?: number;
+  readonly latencyMs?: number;
   readonly minOut?: bigint;
   readonly aomqFlags?: string;
   readonly mid: bigint;

@@ -3,6 +3,9 @@ import {
   BenchmarkId,
   BenchmarkTradeResult,
   RunSettingDefinition,
+  ScoreboardAccumulatorSnapshot,
+  ScoreboardAggregatorState,
+  IntentMatchSnapshot,
   ScoreboardRow
 } from '../types.js';
 
@@ -44,6 +47,10 @@ interface ScoreboardOptions {
   readonly quoteDecimals: number;
 }
 
+interface ScoreboardAggregatorOptions extends ScoreboardOptions {
+  readonly initialState?: ScoreboardAggregatorState;
+}
+
 export class ScoreboardAggregator {
   private readonly map = new Map<string, Accumulator>();
   private readonly makerNotional = new Map<string, number>();
@@ -53,15 +60,10 @@ export class ScoreboardAggregator {
   constructor(
     settings: readonly RunSettingDefinition[],
     benchmarks: readonly BenchmarkId[],
-    options: ScoreboardOptions
+    options: ScoreboardAggregatorOptions
   ) {
     this.options = options;
-    for (const setting of settings) {
-      this.makerNotional.set(setting.id, setting.makerParams.S0Notional);
-      for (const benchmark of benchmarks) {
-        this.map.set(key(setting.id, benchmark), createAccumulator());
-      }
-    }
+    this.bootstrap(settings, benchmarks, options.initialState);
   }
 
   recordTrade(settingId: string, benchmark: BenchmarkId, result: BenchmarkTradeResult): void {
@@ -131,6 +133,30 @@ export class ScoreboardAggregator {
     bucket.recenter += 1;
   }
 
+  exportState(): ScoreboardAggregatorState {
+    const buckets: Record<string, ScoreboardAccumulatorSnapshot> = {};
+    for (const [bucketKey, acc] of this.map.entries()) {
+      buckets[bucketKey] = { ...acc };
+    }
+    const makerNotional: Record<string, number> = {};
+    for (const [settingId, notional] of this.makerNotional.entries()) {
+      makerNotional[settingId] = notional;
+    }
+    const intentComparisons: Record<string, Record<string, Record<BenchmarkId, IntentMatchSnapshot>>> = {};
+    for (const [settingId, intents] of this.intentComparisons.entries()) {
+      const intentsRecord: Record<string, Record<BenchmarkId, IntentMatchSnapshot>> = {};
+      for (const [intentId, matches] of intents.entries()) {
+        const matchRecord: Record<BenchmarkId, IntentMatchSnapshot> = {} as Record<BenchmarkId, IntentMatchSnapshot>;
+        for (const [benchmark, match] of matches.entries()) {
+          matchRecord[benchmark] = { ...match };
+        }
+        intentsRecord[intentId] = matchRecord;
+      }
+      intentComparisons[settingId] = intentsRecord;
+    }
+    return { buckets, makerNotional, intentComparisons };
+  }
+
   buildRows(): ScoreboardRow[] {
     const priceImprovement = this.computePriceImprovement();
     const rows: ScoreboardRow[] = [];
@@ -188,6 +214,48 @@ export class ScoreboardAggregator {
       this.map.set(bucketKey, bucket);
     }
     return bucket;
+  }
+
+  private bootstrap(
+    settings: readonly RunSettingDefinition[],
+    benchmarks: readonly BenchmarkId[],
+    state: ScoreboardAggregatorState | undefined
+  ): void {
+    if (state) {
+      for (const [bucketKey, snapshot] of Object.entries(state.buckets)) {
+        this.map.set(bucketKey, { ...snapshot });
+      }
+      for (const [settingId, notional] of Object.entries(state.makerNotional)) {
+        this.makerNotional.set(settingId, notional);
+      }
+      for (const [settingId, intents] of Object.entries(state.intentComparisons)) {
+        const intentMap = new Map<string, Map<BenchmarkId, IntentMatch>>();
+        for (const [intentId, matches] of Object.entries(intents)) {
+          const matchMap = new Map<BenchmarkId, IntentMatch>();
+          for (const [benchmarkId, snapshot] of Object.entries(matches) as [BenchmarkId, IntentMatchSnapshot][]) {
+            matchMap.set(benchmarkId, { ...snapshot });
+          }
+          intentMap.set(intentId, matchMap);
+        }
+        this.intentComparisons.set(settingId, intentMap);
+      }
+    }
+
+    for (const setting of settings) {
+      if (!this.makerNotional.has(setting.id)) {
+        this.makerNotional.set(setting.id, setting.makerParams.S0Notional);
+      }
+      const settingMapKey = state?.intentComparisons?.[setting.id];
+      if (settingMapKey === undefined && !this.intentComparisons.has(setting.id)) {
+        this.intentComparisons.set(setting.id, new Map());
+      }
+      for (const benchmark of benchmarks) {
+        const bucketKey = key(setting.id, benchmark);
+        if (!this.map.has(bucketKey)) {
+          this.map.set(bucketKey, createAccumulator());
+        }
+      }
+    }
   }
 
   private trackIntent(settingId: string, benchmark: BenchmarkId, result: BenchmarkTradeResult): void {

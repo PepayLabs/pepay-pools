@@ -34,4 +34,5 @@
 - Pager/Alert Routing: See `docs/OPERATIONS.md`
 
 ## Change Log
-- Update this section whenever significant architectural or dependency changes land.
+- 2025-10-04: Added latency propagation and metadata parity across DNMM/CPMM/StableSwap adapters so Prometheus latency histograms and CSV output align with live behaviour.
+- 2025-10-04: Hooked benchmark adapters into risk scenarios (latency overrides) and sigma-aware oracle sampling.

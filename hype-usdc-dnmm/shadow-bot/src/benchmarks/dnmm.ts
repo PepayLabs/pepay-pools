@@ -7,6 +7,13 @@ import {
   OracleReaderAdapter,
   OracleSnapshot,
   PoolClientAdapter,
+  PoolConfig,
+  PoolState,
+  RegimeFlag,
+  RegimeFlags,
+  RunSettingDefinition,
+  ShadowBotConfig,
+  ShadowBotParameters,
   TradeIntent
 } from '../types.js';
 
@@ -14,10 +21,26 @@ const ORACLE_MODE_SPOT = 0;
 const WAD = 10n ** 18n;
 const BPS = 10_000n;
 
+interface QuoteComputation {
+  readonly side: 'base_in' | 'quote_in';
+  readonly amountIn: bigint;
+  readonly executedAmountIn: bigint;
+  readonly amountOut: bigint;
+  readonly feeBps: number;
+  readonly midWad: bigint;
+  readonly regimeFlags: RegimeFlags;
+  readonly minOutBps: number;
+  readonly reason: string;
+  readonly usedFallback: boolean;
+  readonly aomqUsed: boolean;
+}
+
 export interface DnmmAdapterParams {
   readonly chain: ChainRuntimeConfig;
   readonly poolClient: PoolClientAdapter;
   readonly oracleReader: OracleReaderAdapter;
+  readonly setting: RunSettingDefinition;
+  readonly baseConfig: ShadowBotConfig;
 }
 
 export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
@@ -28,16 +51,47 @@ export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
   private baseScale!: bigint;
   private quoteScale!: bigint;
   private lastOracle?: OracleSnapshot;
-  private lastSpreadBps = 0;
+  private lastPoolState?: PoolState;
+  private lastRegimeFlags?: RegimeFlags;
+  private currentMidWad: bigint = 0n;
+  private currentSpreadBps = 0;
+  private currentConfBps?: number;
+  private poolConfig?: PoolConfig;
+  private readonly parameters: ShadowBotParameters;
+  private readonly setting: RunSettingDefinition;
+  private readonly makerTtlMs: number;
+  private readonly feeLvrBps: number;
+  private readonly rebateBps: number;
+  private readonly enableAomq: boolean;
+  private readonly enableRebates: boolean;
+  private readonly enableLvrFee: boolean;
 
-  constructor(private readonly params: DnmmAdapterParams) {}
+  constructor(private readonly params: DnmmAdapterParams) {
+    this.setting = params.setting;
+    this.parameters = params.baseConfig.parameters;
+    this.enableAomq = this.setting.featureFlags.enableAOMQ;
+    this.enableRebates = this.setting.featureFlags.enableRebates;
+    this.enableLvrFee = this.setting.featureFlags.enableLvrFee;
+    const baseKappa = this.parameters.fee.kappaLvrBps ?? 0;
+    const overrideKappa = this.setting.fee?.kappaLvrBps;
+    const kappaCandidate = overrideKappa ?? baseKappa;
+    this.feeLvrBps = this.enableLvrFee ? kappaCandidate : 0;
+    const baseRebateBps = 3;
+    const overrideRebate = this.setting.rebates?.bps;
+    this.rebateBps = this.enableRebates ? overrideRebate ?? baseRebateBps : 0;
+    this.makerTtlMs = this.setting.makerParams.ttlMs ?? this.parameters.maker.ttlMs;
+  }
 
   async init(): Promise<void> {
+    const tokens = await this.params.poolClient.getTokens();
+    this.baseScale = tokens.baseScale;
+    this.quoteScale = tokens.quoteScale;
+    this.poolConfig = await this.params.poolClient.getConfig();
     const state = await this.params.poolClient.getState();
     this.inventoryBase = state.baseReserves;
     this.inventoryQuote = state.quoteReserves;
-    this.baseScale = 10n ** BigInt(this.params.chain.baseDecimals);
-    this.quoteScale = 10n ** BigInt(this.params.chain.quoteDecimals);
+    this.lastPoolState = state;
+    this.currentMidWad = state.lastMidWad ?? 0n;
   }
 
   async close(): Promise<void> {
@@ -46,84 +100,104 @@ export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
 
   async prepareTick(context: BenchmarkTickContext): Promise<void> {
     this.lastOracle = context.oracle;
-    this.lastSpreadBps = context.oracle.hc.spreadBps ?? this.lastSpreadBps;
+    this.lastPoolState = context.poolState;
     this.inventoryBase = context.poolState.baseReserves;
     this.inventoryQuote = context.poolState.quoteReserves;
+    if (context.oracle.hc.midWad && context.oracle.hc.midWad > 0n) {
+      this.currentMidWad = context.oracle.hc.midWad;
+    }
+    this.currentSpreadBps = context.oracle.hc.spreadBps ?? this.currentSpreadBps;
+    this.currentConfBps = context.oracle.pyth?.confBps;
   }
 
   async sampleQuote(side: 'base_in' | 'quote_in', sizeBaseWad: bigint): Promise<BenchmarkQuoteSample> {
-    const amount = side === 'base_in'
-      ? sizeBaseWad
-      : toQuoteWadFromBase(sizeBaseWad, this.currentMid(), this.baseScale, this.quoteScale);
-    const raw = await this.params.poolClient.quoteExactIn(amount, side === 'base_in', ORACLE_MODE_SPOT, '0x');
-    const mid = this.lastOracle?.hc.midWad ?? raw.midUsed ?? 0n;
+    const preview = await this.evaluateQuote(side, sizeBaseWad);
     return {
       timestampMs: Date.now(),
       side,
       sizeBaseWad,
-      feeBps: raw.feeBpsUsed ?? 0,
-      mid,
-      spreadBps: this.lastOracle?.hc.spreadBps ?? this.lastSpreadBps,
-      confBps: this.lastOracle?.pyth?.confBps,
-      aomqActive: raw.reason === 'AOMQClamp'
+      feeBps: preview.feeBps,
+      feeLvrBps: this.feeLvrBps,
+      rebateBps: this.rebateBps,
+      floorBps: this.poolConfig?.inventory.floorBps,
+      ttlMs: this.makerTtlMs,
+      minOut: BigInt(preview.minOutBps),
+      aomqFlags: preview.aomqUsed ? 'AOMQ' : undefined,
+      mid: preview.midWad,
+      spreadBps: this.currentSpreadBps,
+      confBps: this.currentConfBps,
+      aomqActive: preview.aomqUsed
     };
   }
 
   async simulateTrade(intent: TradeIntent): Promise<BenchmarkTradeResult> {
-    const amountIn = intent.side === 'base_in'
+    const amountInWad = intent.side === 'base_in'
       ? toScaled(intent.amountIn, this.baseScale)
       : toScaled(intent.amountIn, this.quoteScale);
-
-    const response = await this.params.poolClient.quoteExactIn(amountIn, intent.side === 'base_in', ORACLE_MODE_SPOT, '0x');
-    const amountOut = response.amountOut ?? 0n;
-    const success = amountOut > 0n;
-    const oracleMid = this.lastOracle?.hc.midWad ?? response.midUsed ?? 0n;
-    const execPrice = computeExecPrice(intent.side, amountIn, amountOut, this.baseScale, this.quoteScale);
-    const midDecimal = oracleMid === 0n ? Number(execPrice) : Number(oracleMid) / Number(WAD);
-    const slippage = computeSlippageBps(midDecimal, execPrice);
-
-    if (intent.minOut) {
-      const minOutWad = intent.side === 'base_in'
-        ? toScaled(intent.minOut, this.quoteScale)
-        : toScaled(intent.minOut, this.baseScale);
-      if (amountOut < minOutWad) {
-        return this.buildRejection(intent, oracleMid);
-      }
-    }
+    const baseSizeWad = intent.side === 'base_in'
+      ? amountInWad
+      : toBaseWadFromQuote(amountInWad, this.currentMid(), this.baseScale, this.quoteScale);
+    const preview = await this.evaluateQuote(intent.side, baseSizeWad, amountInWad);
+    const amountIn = preview.amountIn;
+    const executedIn = preview.executedAmountIn;
+    const amountOut = preview.amountOut;
+    const success = amountOut > 0n && preview.reason.toLowerCase() !== 'rejected';
 
     if (success) {
       if (intent.side === 'base_in') {
-        this.inventoryBase += amountIn;
+        this.inventoryBase += executedIn;
         this.inventoryQuote = this.inventoryQuote > amountOut ? this.inventoryQuote - amountOut : 0n;
       } else {
-        this.inventoryQuote += amountIn;
+        this.inventoryQuote += executedIn;
         this.inventoryBase = this.inventoryBase > amountOut ? this.inventoryBase - amountOut : 0n;
       }
     }
 
+    const execPrice = computeExecPrice(intent.side, executedIn, amountOut, this.baseScale, this.quoteScale);
+    const midDecimal = preview.midWad === 0n ? execPrice : Number(preview.midWad) / Number(WAD);
+    const slippage = computeSlippageBps(midDecimal, execPrice);
     const pnlQuote = computePnlQuote(intent.side, intent.amountIn, amountOut, execPrice, this.baseScale, this.quoteScale);
+
+    const feePaid = (executedIn * BigInt(preview.feeBps)) / BPS;
+    const feeLvrPaid = this.feeLvrBps > 0 ? (executedIn * BigInt(this.feeLvrBps)) / BPS : 0n;
+    const rebatePaid = this.rebateBps > 0 ? (executedIn * BigInt(this.rebateBps)) / BPS : 0n;
+    const isPartial = executedIn < amountIn;
+    const executedBaseWad = intent.side === 'base_in'
+      ? executedIn
+      : toBaseWadFromQuote(executedIn, this.currentMid(), this.baseScale, this.quoteScale);
+
+    this.lastRegimeFlags = preview.regimeFlags;
+    this.currentMidWad = preview.midWad;
 
     return {
       intent,
       success,
       amountIn,
       amountOut,
-      midUsed: oracleMid,
-      feeBpsUsed: response.feeBpsUsed ?? 0,
-      floorBps: 0,
+      midUsed: preview.midWad,
+      feeBpsUsed: preview.feeBps,
+      feeLvrBps: this.feeLvrBps,
+      rebateBps: this.rebateBps,
+      feePaid,
+      feeLvrPaid,
+      rebatePaid,
+      floorBps: this.poolConfig?.inventory.floorBps,
       tiltBps: 0,
-      aomqClamped: response.reason === 'AOMQClamp',
-      minOut: intent.minOut
-        ? (intent.side === 'base_in'
-            ? toScaled(intent.minOut, this.quoteScale)
-            : toScaled(intent.minOut, this.baseScale))
-        : undefined,
+      aomqClamped: preview.regimeFlags.asArray.includes('AOMQ'),
+      floorEnforced: preview.regimeFlags.asArray.includes('NearFloor'),
+      aomqUsed: preview.aomqUsed,
+      minOut: BigInt(preview.minOutBps),
       slippageBpsVsMid: slippage,
       pnlQuote,
       inventoryBase: this.inventoryBase,
       inventoryQuote: this.inventoryQuote,
       latencyMs: 25,
-      rejectReason: success ? undefined : response.reason
+      rejectReason: success ? undefined : preview.reason,
+      isPartial,
+      appliedAmountIn: executedIn,
+      timestampMs: intent.timestampMs,
+      intentBaseSizeWad: baseSizeWad,
+      executedBaseSizeWad: executedBaseWad
     };
   }
 
@@ -149,6 +223,9 @@ export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
   }
 
   private currentMid(): number {
+    if (this.currentMidWad > 0n) {
+      return Number(this.currentMidWad) / Number(WAD);
+    }
     if (this.lastOracle?.hc.midWad !== undefined && this.lastOracle.hc.midWad > 0n) {
       return Number(this.lastOracle.hc.midWad) / Number(WAD);
     }
@@ -156,6 +233,50 @@ export class DnmmBenchmarkAdapter implements BenchmarkAdapter {
     const quote = Number(this.inventoryQuote) / Number(this.quoteScale);
     if (base === 0) return 1;
     return quote / base;
+  }
+
+  private async evaluateQuote(
+    side: 'base_in' | 'quote_in',
+    sizeBaseWad: bigint,
+    amountInOverride?: bigint
+  ): Promise<QuoteComputation> {
+    const mid = this.currentMid();
+    const amountIn = amountInOverride ?? (side === 'base_in'
+      ? sizeBaseWad
+      : toQuoteWadFromBase(sizeBaseWad, mid, this.baseScale, this.quoteScale));
+
+    const response = await this.params.poolClient.quoteExactIn(amountIn, side === 'base_in', ORACLE_MODE_SPOT, '0x');
+    const executedIn = response.partialFillAmountIn && BigInt(response.partialFillAmountIn) > 0n
+      ? BigInt(response.partialFillAmountIn)
+      : BigInt(amountIn);
+    const poolState = this.lastPoolState ?? (await this.params.poolClient.getState());
+    const poolConfig = this.poolConfig ?? (await this.params.poolClient.getConfig());
+    const clampFlags: RegimeFlag[] = [];
+    if (response.reason === 'AOMQClamp' && this.enableAomq) {
+      clampFlags.push('AOMQ');
+    }
+    const regimeFlags = this.params.poolClient.computeRegimeFlags({
+      poolState,
+      config: poolConfig,
+      usedFallback: Boolean(response.usedFallback),
+      clampFlags
+    });
+    const minOutBps = this.params.poolClient.computeGuaranteedMinOutBps(regimeFlags);
+    const midWad = response.midUsed && response.midUsed > 0n ? BigInt(response.midUsed) : this.currentMidWad;
+
+    return {
+      side,
+      amountIn: BigInt(amountIn),
+      executedAmountIn: executedIn,
+      amountOut: BigInt(response.amountOut ?? 0n),
+      feeBps: Number(response.feeBpsUsed ?? 0),
+      midWad,
+      regimeFlags,
+      minOutBps,
+      reason: String(response.reason ?? 'OK'),
+      usedFallback: Boolean(response.usedFallback),
+      aomqUsed: this.enableAomq && regimeFlags.asArray.includes('AOMQ')
+    };
   }
 }
 
@@ -211,4 +332,16 @@ function toQuoteWadFromBase(
   const baseAmount = Number(sizeBaseWad) / Number(baseScale);
   const quoteAmount = baseAmount * mid;
   return toScaled(quoteAmount, quoteScale);
+}
+
+function toBaseWadFromQuote(
+  quoteWad: bigint,
+  mid: number,
+  baseScale: bigint,
+  quoteScale: bigint
+): bigint {
+  if (mid <= 0) return 0n;
+  const quoteAmount = Number(quoteWad) / Number(quoteScale);
+  const baseAmount = quoteAmount / mid;
+  return toScaled(baseAmount, baseScale);
 }

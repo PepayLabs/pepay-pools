@@ -14,6 +14,8 @@ import {
   RunFeatureFlags,
   RunInventoryParams,
   RunMakerParams,
+  RunComparatorParams,
+  RunRebateParams,
   RunSettingDefinition,
   RunnerPaths,
   SettingsFileSchema,
@@ -24,7 +26,10 @@ import {
   ChainRuntimeConfig,
   MockRuntimeConfig,
   ChainBackedConfig,
-  MockShadowBotConfig
+  MockShadowBotConfig,
+  SettingSweepDefinition,
+  RiskScenarioDefinition,
+  TradeFlowDefinition
 } from './types.js';
 import { loadConfig } from './config.js';
 
@@ -58,8 +63,16 @@ export async function loadMultiRunConfig(
     cli.settingsPath ?? env.SETTINGS_FILE ?? DEFAULT_SETTINGS_PATH
   );
   const settings = await loadSettingsFile(settingsPath);
-  const runs = settings.runs.map((run, index) => normalizeRunSetting(run, index));
+  const sweeps = (settings.settings ?? []).map((entry, index) => normalizeSettingSweep(entry, index));
+  const baseRuns = (settings.runs ?? []).map((run, index) => normalizeRunSetting(run, index));
+  if (baseRuns.length === 0) {
+    throw new Error('settings file must define at least one run template in `runs`');
+  }
+  const runs = expandRunsWithSweeps(baseRuns, sweeps);
   ensureUniqueRunIds(runs);
+  if (runs.length === 0) {
+    throw new Error('no runs generated after applying settings sweeps');
+  }
 
   const benchmarks = resolveBenchmarks(
     cli.benchmarks ?? parseBenchmarksEnv(env.BENCHMARKS),
@@ -85,6 +98,14 @@ export async function loadMultiRunConfig(
     cli.runRoot ?? env.METRICS_ROOT ?? DEFAULT_METRICS_ROOT
   );
   const paths = buildRunnerPaths(metricsRoot, runId);
+  const checkpointMinutes = parseOptionalInt(env.CHECKPOINT_MINUTES) ?? 30;
+
+  const riskScenarios = (settings.riskScenarios ?? []).map((scenario, index) =>
+    normalizeRiskScenario(scenario, index)
+  );
+  const tradeFlows = (settings.tradeFlows ?? []).map((flow, index) =>
+    normalizeTradeFlowDefinition(flow, index)
+  );
 
   const runtime = extractRuntime(baseConfig);
 
@@ -100,9 +121,13 @@ export async function loadMultiRunConfig(
     promPort,
     seedBase,
     durationOverrideSec,
+    checkpointMinutes,
     pairLabels: baseConfig.labels,
     settings,
     runs,
+    settingsConfig: sweeps,
+    riskScenarios,
+    tradeFlows,
     paths,
     runtime,
     addressBookPath: isChainBackedConfig(baseConfig) ? baseConfig.addressBookSource : undefined
@@ -233,9 +258,14 @@ function normalizeRunSetting(raw: unknown, index: number): RunSettingDefinition 
   const flow = normalizeFlow(record.flow, index);
   const latency = normalizeLatency(record.latency, index);
   const router = normalizeRouter(record.router, index);
+  const sweepIds = normalizeOptionalStringArray(
+    record.settingIds ?? record.settings ?? record.sweeps,
+    `runs[${index}].settings`
+  );
   return {
     id,
     label,
+    settingSweepIds: sweepIds,
     featureFlags,
     makerParams,
     inventoryParams,
@@ -243,6 +273,292 @@ function normalizeRunSetting(raw: unknown, index: number): RunSettingDefinition 
     flow,
     latency,
     router
+  };
+}
+
+function normalizeOptionalStringArray(raw: unknown, pointer: string): string[] | undefined {
+  if (raw === undefined || raw === null) {
+    return undefined;
+  }
+  if (!Array.isArray(raw)) {
+    throw new Error(`${pointer} must be an array of strings when provided`);
+  }
+  return raw.map((entry, idx) => requireString(entry, `${pointer}[${idx}]`));
+}
+
+function normalizeSettingSweep(raw: unknown, index: number): SettingSweepDefinition {
+  const record = expectRecord(raw, `settings[${index}]`);
+  const id = requireString(record.id, `settings[${index}].id`);
+  const label = record.label ? requireString(record.label, `settings[${index}].label`) : undefined;
+  const enableLvrFee = record.enableLvrFee === undefined ? undefined : parseBoolean(record.enableLvrFee);
+  const enableAOMQ = record.enableAOMQ === undefined ? undefined : parseBoolean(record.enableAOMQ);
+  const enableRebates =
+    record.enableRebates === undefined ? undefined : parseBoolean(record.enableRebates);
+  const kappaLvrBps = record.kappaLvrBps === undefined
+    ? undefined
+    : toNumber(record.kappaLvrBps, `settings[${index}].kappaLvrBps`);
+  const maker = record.maker ? normalizeSweepMaker(record.maker, index) : undefined;
+  const comparator = record.comparator ? normalizeSweepComparator(record.comparator, index) : undefined;
+  const rebates = record.rebates ? normalizeSweepRebates(record.rebates, index) : undefined;
+  return {
+    id,
+    label,
+    enableLvrFee,
+    enableAOMQ,
+    enableRebates,
+    kappaLvrBps,
+    maker,
+    comparator,
+    rebates
+  };
+}
+
+function normalizeSweepMaker(raw: unknown, index: number): Partial<RunMakerParams> {
+  const record = expectRecord(raw, `settings[${index}].maker`);
+  const ttlMs =
+    record.ttlMs !== undefined || record.ttl_ms !== undefined
+      ? toNumber(record.ttlMs ?? record.ttl_ms, `settings[${index}].maker.ttlMs`)
+      : undefined;
+  const alphaBboBps =
+    record.alphaBboBps !== undefined
+      ? toNumber(record.alphaBboBps, `settings[${index}].maker.alphaBboBps`)
+      : undefined;
+  const betaFloorBps =
+    record.betaFloorBps !== undefined
+      ? toNumber(record.betaFloorBps, `settings[${index}].maker.betaFloorBps`)
+      : undefined;
+  const s0Notional =
+    record.S0Notional !== undefined || record.s0Notional !== undefined
+      ? toNumber(record.S0Notional ?? record.s0Notional, `settings[${index}].maker.S0Notional`)
+      : undefined;
+  return {
+    ...(ttlMs !== undefined ? { ttlMs } : {}),
+    ...(alphaBboBps !== undefined ? { alphaBboBps } : {}),
+    ...(betaFloorBps !== undefined ? { betaFloorBps } : {}),
+    ...(s0Notional !== undefined ? { S0Notional: s0Notional } : {})
+  };
+}
+
+function normalizeSweepComparator(raw: unknown, index: number): RunComparatorParams {
+  const record = expectRecord(raw, `settings[${index}].comparator`);
+  const cpmm = record.cpmm
+    ? (() => {
+        const cpmmRecord = expectRecord(record.cpmm, `settings[${index}].comparator.cpmm`);
+        return {
+          feeBps: toNumber(
+            cpmmRecord.feeBps ?? cpmmRecord.fee_bps,
+            `settings[${index}].comparator.cpmm.feeBps`
+          )
+        };
+      })()
+    : undefined;
+  const stableswap = record.stableswap
+    ? (() => {
+        const ssRecord = expectRecord(record.stableswap, `settings[${index}].comparator.stableswap`);
+        return {
+          feeBps: toNumber(
+            ssRecord.feeBps ?? ssRecord.fee_bps,
+            `settings[${index}].comparator.stableswap.feeBps`
+          ),
+          amplification: toNumber(
+            ssRecord.amplification ?? ssRecord.A ?? ssRecord.a,
+            `settings[${index}].comparator.stableswap.amplification`
+          )
+        };
+      })()
+    : undefined;
+  return {
+    ...(cpmm ? { cpmm } : {}),
+    ...(stableswap ? { stableswap } : {})
+  };
+}
+
+function normalizeSweepRebates(raw: unknown, index: number): RunRebateParams {
+  const record = expectRecord(raw, `settings[${index}].rebates`);
+  const allowlist = normalizeOptionalStringArray(record.allowlist, `settings[${index}].rebates.allowlist`);
+  const bps = record.bps === undefined ? 0 : toNumber(record.bps, `settings[${index}].rebates.bps`);
+  return {
+    allowlist: allowlist ?? [],
+    bps
+  };
+}
+
+function expandRunsWithSweeps(
+  baseRuns: readonly RunSettingDefinition[],
+  sweeps: readonly SettingSweepDefinition[]
+): RunSettingDefinition[] {
+  if (sweeps.length === 0) {
+    return [...baseRuns];
+  }
+  const sweepMap = new Map<string, SettingSweepDefinition>();
+  for (const sweep of sweeps) {
+    if (sweepMap.has(sweep.id)) {
+      throw new Error(`Duplicate settings sweep id detected: ${sweep.id}`);
+    }
+    sweepMap.set(sweep.id, sweep);
+  }
+  const results: RunSettingDefinition[] = [];
+  for (const run of baseRuns) {
+    const targetSweeps = run.settingSweepIds && run.settingSweepIds.length > 0
+      ? run.settingSweepIds
+      : sweeps.map((s) => s.id);
+    if (targetSweeps.length === 0) {
+      results.push(run);
+      continue;
+    }
+    for (const sweepId of targetSweeps) {
+      const sweep = sweepMap.get(sweepId);
+      if (!sweep) {
+        throw new Error(`Run ${run.id} references unknown setting sweep '${sweepId}'`);
+      }
+      const featureFlags: RunFeatureFlags = {
+        ...run.featureFlags,
+        ...(sweep.enableAOMQ !== undefined ? { enableAOMQ: sweep.enableAOMQ } : {}),
+        ...(sweep.enableRebates !== undefined ? { enableRebates: sweep.enableRebates } : {}),
+        ...(sweep.enableLvrFee !== undefined ? { enableLvrFee: sweep.enableLvrFee } : {})
+      };
+      const makerParams: RunMakerParams = {
+        ...run.makerParams,
+        ...(sweep.maker?.ttlMs !== undefined ? { ttlMs: sweep.maker.ttlMs } : {}),
+        ...(sweep.maker?.alphaBboBps !== undefined ? { alphaBboBps: sweep.maker.alphaBboBps } : {}),
+        ...(sweep.maker?.betaFloorBps !== undefined ? { betaFloorBps: sweep.maker.betaFloorBps } : {}),
+        ...(sweep.maker?.S0Notional !== undefined ? { S0Notional: sweep.maker.S0Notional } : {})
+      };
+      const fee = {
+        ...(run.fee ?? {}),
+        ...(sweep.kappaLvrBps !== undefined ? { kappaLvrBps: sweep.kappaLvrBps } : {})
+      };
+      const rebates: RunRebateParams | undefined = (() => {
+        if (!sweep.rebates && !run.rebates) {
+          return undefined;
+        }
+        const allowlist = sweep.rebates?.allowlist ?? run.rebates?.allowlist ?? [];
+        const bps = sweep.rebates?.bps ?? run.rebates?.bps ?? 0;
+        return { allowlist, bps };
+      })();
+      const comparator: RunComparatorParams | undefined = (() => {
+        if (!sweep.comparator && !run.comparator) return run.comparator;
+        return {
+          ...(run.comparator ?? {}),
+          ...(sweep.comparator ?? {})
+        };
+      })();
+      const expanded: RunSettingDefinition = {
+        ...run,
+        id: `${run.id}__${sweep.id}`,
+        label: `${run.label} :: ${sweep.label ?? sweep.id}`,
+        sweepId: sweep.id,
+        featureFlags,
+        makerParams,
+        fee,
+        rebates,
+        comparator,
+        settingSweepIds: undefined
+      };
+      results.push(expanded);
+    }
+  }
+  return results;
+}
+
+function normalizeRiskScenario(raw: unknown, index: number): RiskScenarioDefinition {
+  const record = expectRecord(raw, `riskScenarios[${index}]`);
+  const id = requireString(record.id, `riskScenarios[${index}].id`);
+  const bboSpread = record.bbo_spread_bps
+    ? normalizeRange(record.bbo_spread_bps, `riskScenarios[${index}].bbo_spread_bps`)
+    : undefined;
+  const sigma = record.sigma_bps
+    ? normalizeRange(record.sigma_bps, `riskScenarios[${index}].sigma_bps`)
+    : undefined;
+  const outage = record.pyth_outages
+    ? (() => {
+        const outageRecord = expectRecord(record.pyth_outages, `riskScenarios[${index}].pyth_outages`);
+        return {
+          bursts: toNumber(outageRecord.bursts, `riskScenarios[${index}].pyth_outages.bursts`),
+          secsEach: toNumber(
+            outageRecord.secs_each ?? outageRecord.secsEach,
+            `riskScenarios[${index}].pyth_outages.secs_each`
+          )
+        };
+      })()
+    : undefined;
+  const pythDropRate = record.pyth_drop_rate !== undefined ? Number(record.pyth_drop_rate) : undefined;
+  const durationMin = record.duration_min !== undefined ? Number(record.duration_min) : undefined;
+  const autopauseExpected =
+    record.autopause_expected !== undefined ? parseBoolean(record.autopause_expected) : undefined;
+  const quoteLatency =
+    record.quote_latency_ms !== undefined
+      ? toNumber(record.quote_latency_ms, `riskScenarios[${index}].quote_latency_ms`)
+      : undefined;
+  const ttlExpiryRate =
+    record.ttl_expiry_rate_target !== undefined ? Number(record.ttl_expiry_rate_target) : undefined;
+  const spreadShift =
+    record.bbo_spread_bps_shift !== undefined
+      ? requireString(record.bbo_spread_bps_shift, `riskScenarios[${index}].bbo_spread_bps_shift`)
+      : undefined;
+  return {
+    id,
+    ...(bboSpread ? { bboSpreadBps: bboSpread } : {}),
+    ...(sigma ? { sigmaBps: sigma } : {}),
+    ...(outage ? { pythOutages: outage } : {}),
+    ...(pythDropRate !== undefined ? { pythDropRate } : {}),
+    ...(durationMin !== undefined ? { durationMin } : {}),
+    ...(autopauseExpected !== undefined ? { autopauseExpected } : {}),
+    ...(quoteLatency !== undefined ? { quoteLatencyMs: quoteLatency } : {}),
+    ...(ttlExpiryRate !== undefined ? { ttlExpiryRateTarget: ttlExpiryRate } : {}),
+    ...(spreadShift ? { bboSpreadBpsShift: spreadShift } : {})
+  };
+}
+
+function normalizeRange(raw: unknown, pointer: string): [number, number] {
+  if (!Array.isArray(raw) || raw.length !== 2) {
+    throw new Error(`${pointer} must be a two-element array`);
+  }
+  return [toNumber(raw[0], `${pointer}[0]`), toNumber(raw[1], `${pointer}[1]`)];
+}
+
+function normalizeTradeFlowDefinition(raw: unknown, index: number): TradeFlowDefinition {
+  const record = expectRecord(raw, `tradeFlows[${index}]`);
+  const id = requireString(record.id, `tradeFlows[${index}].id`);
+  const sizeDist = requireString(record.size_dist ?? record.sizeDist, `tradeFlows[${index}].size_dist`);
+  const medianBase = record.median_base
+    ? requireString(record.median_base, `tradeFlows[${index}].median_base`)
+    : undefined;
+  const heavyTail = record.heavytail !== undefined ? parseBoolean(record.heavytail) : undefined;
+  const modes = record.modes ? normalizeOptionalStringArray(record.modes, `tradeFlows[${index}].modes`) : undefined;
+  const share = record.share
+    ? Object.fromEntries(
+        Object.entries(expectRecord(record.share, `tradeFlows[${index}].share`)).map(([key, value]) => [
+          key,
+          Number(value)
+        ])
+      )
+    : undefined;
+  const spikeSizes = record.spike_sizes
+    ? normalizeOptionalStringArray(record.spike_sizes, `tradeFlows[${index}].spike_sizes`)
+    : undefined;
+  const intervalMin = record.interval_min !== undefined ? Number(record.interval_min) : undefined;
+  const sizeParams = record.size_params ? (record.size_params as Record<string, unknown>) : undefined;
+  const pattern = record.pattern
+    ? (() => {
+        const candidate = requireString(record.pattern, `tradeFlows[${index}].pattern`).toLowerCase();
+        if (!isFlowPattern(candidate)) {
+          throw new Error(`tradeFlows[${index}].pattern must be a supported flow pattern`);
+        }
+        return candidate as FlowPatternId;
+      })()
+    : undefined;
+  return {
+    id,
+    sizeDist,
+    ...(medianBase ? { medianBase } : {}),
+    ...(heavyTail !== undefined ? { heavyTail } : {}),
+    ...(modes ? { modes } : {}),
+    ...(share ? { share } : {}),
+    ...(spikeSizes ? { spikeSizes } : {}),
+    ...(intervalMin !== undefined ? { intervalMin } : {}),
+    ...(sizeParams ? { sizeParams } : {}),
+    ...(pattern ? { pattern } : {})
   };
 }
 
@@ -254,7 +570,8 @@ function normalizeFeatureFlags(raw: unknown, index: number): RunFeatureFlags {
     enableBboFloor: parseBoolean(record.enableBboFloor ?? true),
     enableInvTilt: parseBoolean(record.enableInvTilt ?? true),
     enableAOMQ: parseBoolean(record.enableAOMQ ?? false),
-    enableRebates: parseBoolean(record.enableRebates ?? false)
+    enableRebates: parseBoolean(record.enableRebates ?? false),
+    enableLvrFee: parseBoolean(record.enableLvrFee ?? false)
   };
 }
 
@@ -266,7 +583,8 @@ function normalizeMakerParams(raw: unknown, index: number): RunMakerParams {
     S0Notional: toNumber(
       record.S0Notional ?? record.s0Notional,
       `runs[${index}].makerParams.S0Notional`
-    )
+    ),
+    ttlMs: toNumber(record.ttlMs ?? record.ttl_ms ?? 1_000, `runs[${index}].makerParams.ttlMs`)
   };
 }
 

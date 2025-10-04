@@ -90,7 +90,8 @@ function defaultFeeConfig(): FeeConfigState {
     decayPctPerBlock: 1,
     gammaSizeLinBps: 12,
     gammaSizeQuadBps: 3,
-    sizeFeeCapBps: 80
+    sizeFeeCapBps: 80,
+    kappaLvrBps: 0
   };
 }
 

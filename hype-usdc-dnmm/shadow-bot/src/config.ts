@@ -2,6 +2,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parseUnits } from 'ethers';
+import { createRequire } from 'module';
+import { z } from 'zod';
 import {
   AddressBookEntry,
   AddressBookFile,
@@ -10,11 +12,15 @@ import {
   MockShadowBotConfig,
   ShadowBotConfig,
   ShadowBotLabels,
-  ShadowBotMode
+  ShadowBotMode,
+  ShadowBotParameters
 } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const require = createRequire(import.meta.url);
+
+const parametersDefaultsJson = require('../config/parameters_default.json');
 
 const DEFAULT_PAIR = 'HYPE/USDC';
 const DEFAULT_BASE_SYMBOL = 'HYPE';
@@ -42,6 +48,95 @@ const DEFAULT_FORK_OUTPUT_PATH = path.resolve(
   __dirname,
   '../metrics/hype-metrics/output/deploy-mocks.json'
 );
+
+const PARAMETERS_SCHEMA = z
+  .object({
+    enableLvrFee: z.boolean().default(false),
+    oracle: z.object({
+      hypercore: z.object({
+        confCapBpsSpot: z.number(),
+        confCapBpsStrict: z.number(),
+        maxAgeSec: z.number(),
+        stallWindowSec: z.number(),
+        allowEmaFallback: z.boolean(),
+        divergenceBps: z.number(),
+        divergenceAcceptBps: z.number(),
+        divergenceSoftBps: z.number(),
+        divergenceHardBps: z.number(),
+        haircutMinBps: z.number(),
+        haircutSlopeBps: z.number(),
+        confWeightSpreadBps: z.number(),
+        confWeightSigmaBps: z.number(),
+        confWeightPythBps: z.number(),
+        sigmaEwmaLambdaBps: z.number()
+      }),
+      pyth: z.object({
+        maxAgeSec: z.number(),
+        maxAgeSecStrict: z.number(),
+        confCapBps: z.number()
+      })
+    }),
+    fee: z.object({
+      baseBps: z.number(),
+      alphaConfNumerator: z.number(),
+      alphaConfDenominator: z.number(),
+      betaInvDevNumerator: z.number(),
+      betaInvDevDenominator: z.number(),
+      capBps: z.number(),
+      decayPctPerBlock: z.number(),
+      gammaSizeLinBps: z.number(),
+      gammaSizeQuadBps: z.number(),
+      sizeFeeCapBps: z.number(),
+      kappaLvrBps: z.number()
+    }),
+    inventory: z.object({
+      floorBps: z.number(),
+      recenterThresholdPct: z.number(),
+      initialTargetBaseXstar: z.union([z.literal('auto'), z.string()]),
+      invTiltBpsPer1pct: z.number(),
+      invTiltMaxBps: z.number(),
+      tiltConfWeightBps: z.number(),
+      tiltSpreadWeightBps: z.number()
+    }),
+    maker: z.object({
+      S0Notional: z.number(),
+      ttlMs: z.number(),
+      alphaBboBps: z.number(),
+      betaFloorBps: z.number()
+    }),
+    preview: z.object({
+      maxAgeSec: z.number(),
+      snapshotCooldownSec: z.number(),
+      revertOnStalePreview: z.boolean(),
+      enablePreviewFresh: z.boolean()
+    }),
+    featureFlags: z.object({
+      blendOn: z.boolean(),
+      parityCiOn: z.boolean(),
+      debugEmit: z.boolean(),
+      enableSoftDivergence: z.boolean(),
+      enableSizeFee: z.boolean(),
+      enableBboFloor: z.boolean(),
+      enableInvTilt: z.boolean(),
+      enableAOMQ: z.boolean(),
+      enableRebates: z.boolean(),
+      enableAutoRecenter: z.boolean(),
+      enableLvrFee: z.boolean()
+    }),
+    aomq: z.object({
+      minQuoteNotional: z.number(),
+      emergencySpreadBps: z.number(),
+      floorEpsilonBps: z.number()
+    }),
+    rebates: z.object({
+      allowlist: z.array(z.string())
+    })
+  })
+  .passthrough();
+
+type ParametersSchema = z.infer<typeof PARAMETERS_SCHEMA>;
+
+const PARAMETERS_DEFAULTS = PARAMETERS_SCHEMA.parse(parametersDefaultsJson);
 
 function must(envName: string): string {
   const value = process.env[envName];
@@ -105,6 +200,102 @@ function parseFloatEnv(envName: string): number | undefined {
   return parsed;
 }
 
+function parseBoolEnv(envName: string, fallback: boolean): boolean {
+  const value = getOptional(envName);
+  if (!value) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  throw new Error(`Environment variable ${envName} must be boolean`);
+}
+
+function parseListEnv(envName: string, fallback: readonly string[]): string[] {
+  const value = getOptional(envName);
+  if (!value) return [...fallback];
+  return value
+    .split(/[,;\n]+/)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+function buildParameters(): ShadowBotParameters {
+  const defaults: ParametersSchema = PARAMETERS_DEFAULTS;
+  return {
+    enableLvrFee: parseBoolEnv('ENABLE_LVR_FEE', defaults.enableLvrFee ?? false),
+    oracle: {
+      hypercore: { ...defaults.oracle.hypercore },
+      pyth: {
+        maxAgeSec: parseIntEnv('PYTH_MAX_AGE_SEC', defaults.oracle.pyth.maxAgeSec),
+        maxAgeSecStrict: parseIntEnv(
+          'PYTH_MAX_AGE_SEC_STRICT',
+          defaults.oracle.pyth.maxAgeSecStrict
+        ),
+        confCapBps: parseIntEnv('PYTH_CONF_CAP_BPS', defaults.oracle.pyth.confCapBps)
+      }
+    },
+    fee: {
+      baseBps: defaults.fee.baseBps,
+      alphaConfNumerator: defaults.fee.alphaConfNumerator,
+      alphaConfDenominator: defaults.fee.alphaConfDenominator,
+      betaInvDevNumerator: defaults.fee.betaInvDevNumerator,
+      betaInvDevDenominator: defaults.fee.betaInvDevDenominator,
+      capBps: defaults.fee.capBps,
+      decayPctPerBlock: defaults.fee.decayPctPerBlock,
+      gammaSizeLinBps: defaults.fee.gammaSizeLinBps,
+      gammaSizeQuadBps: defaults.fee.gammaSizeQuadBps,
+      sizeFeeCapBps: defaults.fee.sizeFeeCapBps,
+      kappaLvrBps: parseIntEnv('FEE_KAPPA_LVR_BPS', defaults.fee.kappaLvrBps)
+    },
+    inventory: {
+      floorBps: defaults.inventory.floorBps,
+      recenterThresholdPct: defaults.inventory.recenterThresholdPct,
+      initialTargetBaseXstar: defaults.inventory.initialTargetBaseXstar,
+      invTiltBpsPer1pct: defaults.inventory.invTiltBpsPer1pct,
+      invTiltMaxBps: defaults.inventory.invTiltMaxBps,
+      tiltConfWeightBps: defaults.inventory.tiltConfWeightBps,
+      tiltSpreadWeightBps: defaults.inventory.tiltSpreadWeightBps
+    },
+    maker: {
+      S0Notional: defaults.maker.S0Notional,
+      ttlMs: parseIntEnv('MAKER_TTL_MS', defaults.maker.ttlMs),
+      alphaBboBps: defaults.maker.alphaBboBps,
+      betaFloorBps: defaults.maker.betaFloorBps
+    },
+    preview: {
+      maxAgeSec: parseIntEnv('PREVIEW_MAX_AGE_SEC', defaults.preview.maxAgeSec),
+      snapshotCooldownSec: defaults.preview.snapshotCooldownSec,
+      revertOnStalePreview: parseBoolEnv(
+        'PREVIEW_REVERT_ON_STALE',
+        defaults.preview.revertOnStalePreview
+      ),
+      enablePreviewFresh: defaults.preview.enablePreviewFresh
+    },
+    featureFlags: {
+      blendOn: defaults.featureFlags.blendOn,
+      parityCiOn: defaults.featureFlags.parityCiOn,
+      debugEmit: defaults.featureFlags.debugEmit,
+      enableSoftDivergence: defaults.featureFlags.enableSoftDivergence,
+      enableSizeFee: defaults.featureFlags.enableSizeFee,
+      enableBboFloor: defaults.featureFlags.enableBboFloor,
+      enableInvTilt: defaults.featureFlags.enableInvTilt,
+      enableAOMQ: parseBoolEnv('FEATURE_ENABLE_AOMQ', defaults.featureFlags.enableAOMQ),
+      enableRebates: parseBoolEnv('FEATURE_ENABLE_REBATES', defaults.featureFlags.enableRebates),
+      enableAutoRecenter: defaults.featureFlags.enableAutoRecenter,
+      enableLvrFee: parseBoolEnv('FEATURE_ENABLE_LVR_FEE', defaults.featureFlags.enableLvrFee)
+    },
+    aomq: {
+      minQuoteNotional: parseIntEnv('AOMQ_MIN_QUOTE_NOTIONAL', defaults.aomq.minQuoteNotional),
+      emergencySpreadBps: parseIntEnv(
+        'AOMQ_EMERGENCY_SPREAD_BPS',
+        defaults.aomq.emergencySpreadBps
+      ),
+      floorEpsilonBps: parseIntEnv('AOMQ_FLOOR_EPSILON_BPS', defaults.aomq.floorEpsilonBps)
+    },
+    rebates: {
+      allowlist: parseListEnv('REBATES_ALLOWLIST', defaults.rebates.allowlist)
+    }
+  };
+}
 function parseLogLevel(): 'info' | 'debug' {
   const level = getOptional('LOG_LEVEL');
   if (!level) return 'info';
@@ -294,6 +485,7 @@ export async function loadConfig(): Promise<ShadowBotConfig> {
   const samplingTimeout = parseIntEnv('SAMPLING_TIMEOUT_MS', DEFAULT_TIMEOUT_MS);
   const samplingBackoff = parseIntEnv('SAMPLING_BACKOFF_MS', DEFAULT_BACKOFF_MS);
   const samplingAttempts = parseIntEnv('SAMPLING_RETRY_ATTEMPTS', DEFAULT_RETRIES);
+  const parameters = buildParameters();
   const guaranteedMinOut = {
     calmBps: parseIntEnv('MIN_OUT_CALM_BPS', 10),
     fallbackBps: parseIntEnv('MIN_OUT_FALLBACK_BPS', 20),
@@ -322,7 +514,8 @@ export async function loadConfig(): Promise<ShadowBotConfig> {
     jsonSummaryPath,
     sizesSource,
     guaranteedMinOut,
-    sampling
+    sampling,
+    parameters
   } as const;
 
   if (mode === 'mock') {

@@ -53,6 +53,109 @@ interface SamplingConfig {
   readonly retryAttempts: number;
 }
 
+export interface ShadowBotPreviewConfig {
+  readonly maxAgeSec: number;
+  readonly snapshotCooldownSec: number;
+  readonly revertOnStalePreview: boolean;
+  readonly enablePreviewFresh: boolean;
+}
+
+export interface ShadowBotFeeConfig {
+  readonly baseBps: number;
+  readonly alphaConfNumerator: number;
+  readonly alphaConfDenominator: number;
+  readonly betaInvDevNumerator: number;
+  readonly betaInvDevDenominator: number;
+  readonly capBps: number;
+  readonly decayPctPerBlock: number;
+  readonly gammaSizeLinBps: number;
+  readonly gammaSizeQuadBps: number;
+  readonly sizeFeeCapBps: number;
+  readonly kappaLvrBps: number;
+}
+
+export interface ShadowBotMakerConfig {
+  readonly S0Notional: number;
+  readonly ttlMs: number;
+  readonly alphaBboBps: number;
+  readonly betaFloorBps: number;
+}
+
+export interface ShadowBotInventoryConfig {
+  readonly floorBps: number;
+  readonly recenterThresholdPct: number;
+  readonly initialTargetBaseXstar: string | 'auto';
+  readonly invTiltBpsPer1pct: number;
+  readonly invTiltMaxBps: number;
+  readonly tiltConfWeightBps: number;
+  readonly tiltSpreadWeightBps: number;
+}
+
+export interface ShadowBotFeatureFlagsConfig {
+  readonly blendOn: boolean;
+  readonly parityCiOn: boolean;
+  readonly debugEmit: boolean;
+  readonly enableSoftDivergence: boolean;
+  readonly enableSizeFee: boolean;
+  readonly enableBboFloor: boolean;
+  readonly enableInvTilt: boolean;
+  readonly enableAOMQ: boolean;
+  readonly enableRebates: boolean;
+  readonly enableAutoRecenter: boolean;
+  readonly enableLvrFee: boolean;
+}
+
+export interface ShadowBotAomqConfig {
+  readonly minQuoteNotional: number;
+  readonly emergencySpreadBps: number;
+  readonly floorEpsilonBps: number;
+}
+
+export interface ShadowBotRebateConfig {
+  readonly allowlist: string[];
+}
+
+export interface ShadowBotOracleHyperCoreConfig {
+  readonly confCapBpsSpot: number;
+  readonly confCapBpsStrict: number;
+  readonly maxAgeSec: number;
+  readonly stallWindowSec: number;
+  readonly allowEmaFallback: boolean;
+  readonly divergenceBps: number;
+  readonly divergenceAcceptBps: number;
+  readonly divergenceSoftBps: number;
+  readonly divergenceHardBps: number;
+  readonly haircutMinBps: number;
+  readonly haircutSlopeBps: number;
+  readonly confWeightSpreadBps: number;
+  readonly confWeightSigmaBps: number;
+  readonly confWeightPythBps: number;
+  readonly sigmaEwmaLambdaBps: number;
+}
+
+export interface ShadowBotOraclePythConfig {
+  readonly maxAgeSec: number;
+  readonly maxAgeSecStrict: number;
+  readonly confCapBps: number;
+}
+
+export interface ShadowBotOracleConfig {
+  readonly hypercore: ShadowBotOracleHyperCoreConfig;
+  readonly pyth: ShadowBotOraclePythConfig;
+}
+
+export interface ShadowBotParameters {
+  readonly enableLvrFee: boolean;
+  readonly oracle: ShadowBotOracleConfig;
+  readonly fee: ShadowBotFeeConfig;
+  readonly inventory: ShadowBotInventoryConfig;
+  readonly maker: ShadowBotMakerConfig;
+  readonly preview: ShadowBotPreviewConfig;
+  readonly featureFlags: ShadowBotFeatureFlagsConfig;
+  readonly aomq: ShadowBotAomqConfig;
+  readonly rebates: ShadowBotRebateConfig;
+}
+
 export interface BaseShadowBotConfig {
   readonly mode: ShadowBotMode;
   readonly labels: ShadowBotLabels;
@@ -69,6 +172,7 @@ export interface BaseShadowBotConfig {
   readonly sampling: SamplingConfig;
   readonly baseDecimals: number;
   readonly quoteDecimals: number;
+  readonly parameters: ShadowBotParameters;
 }
 
 export interface ChainBackedConfig extends BaseShadowBotConfig {
@@ -218,6 +322,7 @@ export interface FeeConfigState {
   readonly gammaSizeLinBps: number;
   readonly gammaSizeQuadBps: number;
   readonly sizeFeeCapBps: number;
+  readonly kappaLvrBps: number;
 }
 
 export interface MakerConfigState {
@@ -484,12 +589,14 @@ export interface RunFeatureFlags {
   readonly enableInvTilt: boolean;
   readonly enableAOMQ: boolean;
   readonly enableRebates: boolean;
+  readonly enableLvrFee: boolean;
 }
 
 export interface RunMakerParams {
   readonly betaFloorBps: number;
   readonly alphaBboBps: number;
   readonly S0Notional: number;
+  readonly ttlMs: number;
 }
 
 export interface RunInventoryParams {
@@ -505,9 +612,36 @@ export interface RunAomqParams {
   readonly floorEpsilonBps: number;
 }
 
+export interface RunFeeParams {
+  readonly kappaLvrBps?: number;
+}
+
+export interface RunRebateParams {
+  readonly allowlist: readonly string[];
+  readonly bps: number;
+}
+
+export interface RunComparatorCpmmParams {
+  readonly feeBps: number;
+}
+
+export interface RunComparatorStableSwapParams {
+  readonly feeBps: number;
+  readonly amplification: number;
+}
+
+export interface RunComparatorParams {
+  readonly cpmm?: RunComparatorCpmmParams;
+  readonly stableswap?: RunComparatorStableSwapParams;
+}
+
 export interface RunSettingDefinition {
   readonly id: string;
   readonly label: string;
+  readonly sweepId?: string;
+  readonly riskScenarioId?: string;
+  readonly tradeFlowId?: string;
+  readonly settingSweepIds?: readonly string[];
   readonly featureFlags: RunFeatureFlags;
   readonly makerParams: RunMakerParams;
   readonly inventoryParams: RunInventoryParams;
@@ -515,11 +649,52 @@ export interface RunSettingDefinition {
   readonly flow: FlowPatternConfig;
   readonly latency: LatencyProfile;
   readonly router: RouterConfig;
+  readonly fee?: RunFeeParams;
+  readonly rebates?: RunRebateParams;
+  readonly comparator?: RunComparatorParams;
 }
 
 export interface SettingsOracles {
   readonly hypercore?: string;
   readonly pyth?: string;
+}
+
+export interface SettingSweepDefinition {
+  readonly id: string;
+  readonly label?: string;
+  readonly enableLvrFee?: boolean;
+  readonly kappaLvrBps?: number;
+  readonly enableAOMQ?: boolean;
+  readonly enableRebates?: boolean;
+  readonly maker?: Partial<RunMakerParams>;
+  readonly comparator?: RunComparatorParams;
+  readonly rebates?: Partial<RunRebateParams>;
+}
+
+export interface RiskScenarioDefinition {
+  readonly id: string;
+  readonly bboSpreadBps?: readonly [number, number];
+  readonly sigmaBps?: readonly [number, number];
+  readonly pythOutages?: { readonly bursts: number; readonly secsEach: number };
+  readonly pythDropRate?: number;
+  readonly durationMin?: number;
+  readonly autopauseExpected?: boolean;
+  readonly quoteLatencyMs?: number;
+  readonly ttlExpiryRateTarget?: number;
+  readonly bboSpreadBpsShift?: string;
+}
+
+export interface TradeFlowDefinition {
+  readonly id: string;
+  readonly sizeDist: string;
+  readonly medianBase?: string;
+  readonly heavyTail?: boolean;
+  readonly modes?: readonly string[];
+  readonly share?: Record<string, number>;
+  readonly spikeSizes?: readonly string[];
+  readonly intervalMin?: number;
+  readonly sizeParams?: Record<string, unknown>;
+  readonly pattern?: FlowPatternId;
 }
 
 export interface SettingsFileSchema {
@@ -529,7 +704,10 @@ export interface SettingsFileSchema {
   readonly quote?: string;
   readonly baseSymbol?: string;
   readonly quoteSymbol?: string;
-  readonly runs: readonly RunSettingDefinition[];
+  readonly runs?: readonly RunSettingDefinition[];
+  readonly settings?: readonly SettingSweepDefinition[];
+  readonly riskScenarios?: readonly RiskScenarioDefinition[];
+  readonly tradeFlows?: readonly TradeFlowDefinition[];
   readonly oracles?: SettingsOracles;
   readonly benchmarks?: readonly BenchmarkId[];
 }
@@ -583,9 +761,13 @@ export interface MultiRunRuntimeConfig {
   readonly promPort: number;
   readonly seedBase: number;
   readonly durationOverrideSec?: number;
+  readonly checkpointMinutes: number;
   readonly pairLabels: ShadowBotLabels;
   readonly settings: SettingsFileSchema;
   readonly runs: readonly RunSettingDefinition[];
+  readonly settingsConfig?: readonly SettingSweepDefinition[];
+  readonly riskScenarios?: readonly RiskScenarioDefinition[];
+  readonly tradeFlows?: readonly TradeFlowDefinition[];
   readonly paths: RunnerPaths;
   readonly runtime: RuntimeChainConfig;
   readonly addressBookPath?: string;
@@ -615,7 +797,14 @@ export interface QuoteCsvRecord {
   readonly benchmark: BenchmarkId;
   readonly side: ProbeSide;
   readonly sizeBaseWad: string;
+  readonly intentSizeBaseWad?: string;
   readonly feeBps: number;
+  readonly feeLvrBps?: number;
+  readonly rebateBps?: number;
+  readonly floorBps?: number;
+  readonly ttlMs?: number;
+  readonly minOut?: string;
+  readonly aomqFlags?: string;
   readonly mid: string;
   readonly spreadBps: number;
   readonly confBps?: number;
@@ -627,13 +816,24 @@ export interface TradeCsvRecord {
   readonly settingId: string;
   readonly benchmark: BenchmarkId;
   readonly side: ProbeSide;
+  readonly intentSize?: string;
+  readonly appliedSize?: string;
+  readonly isPartial?: boolean;
   readonly amountIn: string;
   readonly amountOut: string;
   readonly midUsed: string;
   readonly feeBpsUsed: number;
+  readonly feeLvrBps?: number;
+  readonly rebateBps?: number;
+  readonly feePaid?: string;
+  readonly feeLvrPaid?: string;
+  readonly rebatePaid?: string;
   readonly floorBps?: number;
   readonly tiltBps?: number;
   readonly aomqClamped: boolean;
+  readonly floorEnforced?: boolean;
+  readonly aomqUsed?: boolean;
+  readonly success?: boolean;
   readonly minOut?: string;
   readonly slippageBpsVsMid: number;
   readonly pnlQuote: number;
@@ -688,9 +888,16 @@ export interface BenchmarkTradeResult {
   readonly amountOut: bigint;
   readonly midUsed: bigint;
   readonly feeBpsUsed: number;
+  readonly feeLvrBps?: number;
+  readonly rebateBps?: number;
+  readonly feePaid?: bigint;
+  readonly feeLvrPaid?: bigint;
+  readonly rebatePaid?: bigint;
   readonly floorBps?: number;
   readonly tiltBps?: number;
   readonly aomqClamped: boolean;
+  readonly floorEnforced?: boolean;
+  readonly aomqUsed?: boolean;
   readonly minOut?: bigint;
   readonly slippageBpsVsMid: number;
   readonly pnlQuote: number;
@@ -698,6 +905,11 @@ export interface BenchmarkTradeResult {
   readonly inventoryQuote: bigint;
   readonly latencyMs: number;
   readonly rejectReason?: string;
+  readonly isPartial?: boolean;
+  readonly appliedAmountIn?: bigint;
+  readonly timestampMs?: number;
+  readonly intentBaseSizeWad?: bigint;
+  readonly executedBaseSizeWad?: bigint;
 }
 
 export interface BenchmarkQuoteSample {
@@ -705,6 +917,12 @@ export interface BenchmarkQuoteSample {
   readonly side: ProbeSide;
   readonly sizeBaseWad: bigint;
   readonly feeBps: number;
+  readonly feeLvrBps?: number;
+  readonly rebateBps?: number;
+  readonly floorBps?: number;
+  readonly ttlMs?: number;
+  readonly minOut?: bigint;
+  readonly aomqFlags?: string;
   readonly mid: bigint;
   readonly spreadBps: number;
   readonly confBps?: number;

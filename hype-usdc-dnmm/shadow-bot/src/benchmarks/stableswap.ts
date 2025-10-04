@@ -1,4 +1,11 @@
-import { BenchmarkAdapter, BenchmarkQuoteSample, BenchmarkTradeResult, TradeIntent } from '../types.js';
+import {
+  BenchmarkAdapter,
+  BenchmarkQuoteSample,
+  BenchmarkTickContext,
+  BenchmarkTradeResult,
+  OracleSnapshot,
+  TradeIntent
+} from '../types.js';
 
 const BPS = 10_000;
 const WAD = 10n ** 18n;
@@ -21,6 +28,10 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
   private readonly quoteScale: bigint;
   private readonly amplification: number;
   private readonly feeBps: number;
+  private currentMidWad: bigint;
+  private currentSpreadBps = 0;
+  private currentConfBps: number | undefined;
+  private lastOracle?: OracleSnapshot;
 
   constructor(private readonly params: StableSwapParams) {
     this.baseScale = 10n ** BigInt(params.baseDecimals);
@@ -29,6 +40,7 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
     this.quoteReserves = toDecimal(params.quoteReserves, this.quoteScale);
     this.amplification = params.amplification ?? 100;
     this.feeBps = params.feeBps ?? 4;
+    this.currentMidWad = toMidWad(this.currentMid());
   }
 
   async init(): Promise<void> {
@@ -39,6 +51,19 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
     // no-op
   }
 
+  async prepareTick(context: BenchmarkTickContext): Promise<void> {
+    this.lastOracle = context.oracle;
+    if (context.oracle.hc.midWad && context.oracle.hc.midWad > 0n) {
+      const mid = Number(context.oracle.hc.midWad) / Number(WAD);
+      this.adjustReservesToMid(mid);
+      this.currentMidWad = context.oracle.hc.midWad;
+    } else {
+      this.currentMidWad = toMidWad(this.currentMid());
+    }
+    this.currentSpreadBps = context.oracle.hc.spreadBps ?? this.currentSpreadBps;
+    this.currentConfBps = context.oracle.pyth?.confBps;
+  }
+
   async sampleQuote(side: 'base_in' | 'quote_in', sizeBaseWad: bigint): Promise<BenchmarkQuoteSample> {
     const size = Number(sizeBaseWad) / Number(this.baseScale);
     const preview = this.preview(side, size, false);
@@ -47,9 +72,9 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
       side,
       sizeBaseWad,
       feeBps: this.feeBps,
-      mid: preview.midWad,
-      spreadBps: preview.spreadBps,
-      confBps: 0,
+      mid: this.currentMidWad,
+      spreadBps: this.currentSpreadBps,
+      confBps: this.currentConfBps,
       aomqActive: false
     };
   }
@@ -97,7 +122,7 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
       success: true,
       amountIn: amountInWad,
       amountOut: amountOutWad,
-      midUsed: preview.midWad,
+      midUsed: this.currentMidWad,
       feeBpsUsed: this.feeBps,
       floorBps: 0,
       tiltBps: 0,
@@ -117,7 +142,7 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
       success: false,
       amountIn: 0n,
       amountOut: 0n,
-      midUsed: toMidWad(this.currentMid()),
+      midUsed: this.currentMidWad,
       feeBpsUsed: this.feeBps,
       floorBps: 0,
       tiltBps: 0,
@@ -145,8 +170,8 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
         success: false,
         amountOut: 0,
         mid: this.currentMid(),
-        midWad: toMidWad(this.currentMid()),
-        spreadBps: 0,
+        midWad: this.currentMidWad,
+        spreadBps: this.currentSpreadBps,
         slippageBps: 0,
         nextBaseReserves: x,
         nextQuoteReserves: y,
@@ -167,8 +192,8 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
         success: amountOut > 0,
         amountOut,
         mid: midBefore,
-        midWad: toMidWad(midBefore),
-        spreadBps: 0,
+        midWad: this.currentMidWad,
+        spreadBps: this.currentSpreadBps,
         slippageBps: computeSlippageBps(midBefore, midAfter),
         nextBaseReserves: nextBase,
         nextQuoteReserves: nextQuote,
@@ -188,8 +213,8 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
       success: amountOut > 0,
       amountOut,
       mid: midBefore,
-      midWad: toMidWad(midBefore),
-      spreadBps: 0,
+      midWad: this.currentMidWad,
+      spreadBps: this.currentSpreadBps,
       slippageBps: computeSlippageBps(midBefore, midAfter),
       nextBaseReserves: nextBase,
       nextQuoteReserves: nextQuote,
@@ -200,6 +225,21 @@ export class StableSwapBenchmarkAdapter implements BenchmarkAdapter {
   private currentMid(): number {
     if (this.baseReserves === 0) return 0;
     return this.quoteReserves / this.baseReserves;
+  }
+
+  private adjustReservesToMid(targetMid: number): void {
+    if (!Number.isFinite(targetMid) || targetMid <= 0) {
+      this.currentMidWad = toMidWad(this.currentMid());
+      return;
+    }
+    const liquidity = Math.sqrt(this.baseReserves * this.quoteReserves);
+    const newBase = liquidity / Math.sqrt(targetMid);
+    const newQuote = liquidity * Math.sqrt(targetMid);
+    if (Number.isFinite(newBase) && Number.isFinite(newQuote) && newBase > 0 && newQuote > 0) {
+      this.baseReserves = newBase;
+      this.quoteReserves = newQuote;
+    }
+    this.currentMidWad = toMidWad(this.currentMid());
   }
 }
 

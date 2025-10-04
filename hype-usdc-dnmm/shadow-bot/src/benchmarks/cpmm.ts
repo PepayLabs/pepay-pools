@@ -1,4 +1,11 @@
-import { BenchmarkAdapter, BenchmarkQuoteSample, BenchmarkTradeResult, TradeIntent } from '../types.js';
+import {
+  BenchmarkAdapter,
+  BenchmarkQuoteSample,
+  BenchmarkTickContext,
+  BenchmarkTradeResult,
+  OracleSnapshot,
+  TradeIntent
+} from '../types.js';
 
 const BPS = 10_000n;
 const WAD = 10n ** 18n;
@@ -19,6 +26,10 @@ export class CpmmBenchmarkAdapter implements BenchmarkAdapter {
   private readonly baseScale: bigint;
   private readonly quoteScale: bigint;
   private readonly feeBps: bigint;
+  private currentMidWad: bigint;
+  private currentSpreadBps = 0;
+  private currentConfBps: number | undefined;
+  private lastOracle?: OracleSnapshot;
 
   constructor(private readonly params: CpmmAdapterParams) {
     this.baseReserves = params.baseReserves;
@@ -26,6 +37,11 @@ export class CpmmBenchmarkAdapter implements BenchmarkAdapter {
     this.baseScale = 10n ** BigInt(params.baseDecimals);
     this.quoteScale = 10n ** BigInt(params.quoteDecimals);
     this.feeBps = BigInt(params.feeBps ?? 30);
+    this.currentMidWad = this.computeMidWad();
+  }
+
+  async init(): Promise<void> {
+    // deterministic emulator – no external resources
   }
 
   async init(): Promise<void> {
@@ -36,6 +52,16 @@ export class CpmmBenchmarkAdapter implements BenchmarkAdapter {
     // no-op
   }
 
+  async prepareTick(context: BenchmarkTickContext): Promise<void> {
+    this.lastOracle = context.oracle;
+    const mid = context.oracle.hc.midWad;
+    if (mid && mid > 0n) {
+      this.currentMidWad = mid;
+    }
+    this.currentSpreadBps = context.oracle.hc.spreadBps ?? this.currentSpreadBps;
+    this.currentConfBps = context.oracle.pyth?.confBps;
+  }
+
   async sampleQuote(side: 'base_in' | 'quote_in', sizeBaseWad: bigint): Promise<BenchmarkQuoteSample> {
     const snapshot = this.preview(side, sizeBaseWad, false);
     return {
@@ -43,9 +69,9 @@ export class CpmmBenchmarkAdapter implements BenchmarkAdapter {
       side,
       sizeBaseWad,
       feeBps: Number(this.feeBps),
-      mid: snapshot.midWad,
-      spreadBps: snapshot.spreadBps,
-      confBps: 0,
+      mid: this.currentMidWad,
+      spreadBps: this.currentSpreadBps,
+      confBps: this.currentConfBps,
       aomqActive: false
     };
   }
@@ -76,7 +102,7 @@ export class CpmmBenchmarkAdapter implements BenchmarkAdapter {
     this.baseReserves = preview.nextBaseReserves;
     this.quoteReserves = preview.nextQuoteReserves;
 
-    const midPrice = toNumber(preview.midWad);
+    const midPrice = this.currentMidWad === 0n ? Number(preview.midWad) / Number(WAD) : Number(this.currentMidWad) / Number(WAD);
     const amountInQuote = intent.side === 'base_in'
       ? intent.amountIn * midPrice
       : intent.amountIn;
@@ -96,7 +122,7 @@ export class CpmmBenchmarkAdapter implements BenchmarkAdapter {
       success: true,
       amountIn: sizeWad,
       amountOut: preview.amountOutWad,
-      midUsed: preview.midWad,
+      midUsed: this.currentMidWad,
       feeBpsUsed: Number(this.feeBps),
       floorBps: 0,
       tiltBps: 0,
@@ -116,7 +142,7 @@ export class CpmmBenchmarkAdapter implements BenchmarkAdapter {
       success: false,
       amountIn: 0n,
       amountOut: 0n,
-      midUsed: this.computeMidWad(),
+      midUsed: this.currentMidWad,
       feeBpsUsed: Number(this.feeBps),
       floorBps: 0,
       tiltBps: 0,
@@ -137,8 +163,8 @@ export class CpmmBenchmarkAdapter implements BenchmarkAdapter {
       return {
         success: false,
         amountOutWad: 0n,
-        midWad: this.computeMidWad(),
-        spreadBps: 0,
+        midWad: this.currentMidWad,
+        spreadBps: this.currentSpreadBps,
         slippageBps: 0,
         latencyMs: 5,
         nextBaseReserves: this.baseReserves,
@@ -162,8 +188,8 @@ export class CpmmBenchmarkAdapter implements BenchmarkAdapter {
       return {
         success: amountOut > 0n,
         amountOutWad: amountOut,
-        midWad: priceBefore,
-        spreadBps: 0,
+        midWad: this.currentMidWad,
+        spreadBps: this.currentSpreadBps,
         slippageBps: slippage,
         latencyMs: 15,
         nextBaseReserves: nextBase,
@@ -187,14 +213,18 @@ export class CpmmBenchmarkAdapter implements BenchmarkAdapter {
     return {
       success: amountOut > 0n,
       amountOutWad: amountOut,
-      midWad: priceBefore,
-      spreadBps: 0,
+      midWad: this.currentMidWad,
+      spreadBps: this.currentSpreadBps,
       slippageBps: slippage,
       latencyMs: 15,
       nextBaseReserves: nextBase,
       nextQuoteReserves: nextQuote,
       reason: amountOut > 0n ? undefined : 'zero_output'
     } as const;
+  }
+
+  async close(): Promise<void> {
+    // no external connections to release
   }
 
   private computeMidWad(base?: bigint, quote?: bigint): bigint {
@@ -218,10 +248,6 @@ function toQuoteWad(amount: number, scale: bigint): bigint {
 function toDecimal(value: bigint, scale: bigint): number {
   if (scale === 0n) return Number(value);
   return Number(value) / Number(scale);
-}
-
-function toNumber(midWad: bigint): number {
-  return Number(midWad) / Number(WAD);
 }
 
 function computeSlippageBps(midBefore: bigint, midAfter: bigint): number {

@@ -404,7 +404,12 @@ export interface OracleReaderAdapter {
   sample(): Promise<OracleSnapshot>;
 }
 
+// -----------------------------------------------------------------------------
+// Multi-run benchmarking types
+// -----------------------------------------------------------------------------
+
 export type BenchmarkId = 'dnmm' | 'cpmm' | 'stableswap';
+
 export const BENCHMARK_IDS: readonly BenchmarkId[] = ['dnmm', 'cpmm', 'stableswap'] as const;
 
 export type FlowPatternId =
@@ -484,7 +489,7 @@ export interface RunFeatureFlags {
 export interface RunMakerParams {
   readonly betaFloorBps: number;
   readonly alphaBboBps: number;
-  readonly s0Notional: number;
+  readonly S0Notional: number;
 }
 
 export interface RunInventoryParams {
@@ -568,7 +573,7 @@ export type RuntimeChainConfig = ChainRuntimeConfig | MockRuntimeConfig;
 
 export interface MultiRunRuntimeConfig {
   readonly runId: string;
-  readonly mode: ShadowBotMode;
+  readonly baseConfig: ShadowBotConfig;
   readonly logLevel: 'info' | 'debug';
   readonly benchmarks: readonly BenchmarkId[];
   readonly maxParallel: number;
@@ -580,8 +585,7 @@ export interface MultiRunRuntimeConfig {
   readonly settings: SettingsFileSchema;
   readonly runs: readonly RunSettingDefinition[];
   readonly paths: RunnerPaths;
-  readonly chain?: ChainRuntimeConfig;
-  readonly mock?: MockRuntimeConfig;
+  readonly runtime: RuntimeChainConfig;
   readonly addressBookPath?: string;
 }
 
@@ -595,6 +599,12 @@ export interface TradeIntent {
   readonly minOut?: number;
   readonly ttlMs: number;
   readonly slippageBps: number;
+}
+
+export interface BenchmarkTickContext {
+  readonly timestampMs: number;
+  readonly oracle: OracleSnapshot;
+  readonly poolState: PoolState;
 }
 
 export interface QuoteCsvRecord {
@@ -702,35 +712,8 @@ export interface BenchmarkQuoteSample {
 export interface BenchmarkAdapter {
   readonly id: BenchmarkId;
   init(): Promise<void>;
-  close(): Promise<void>;
+  prepareTick(context: BenchmarkTickContext): Promise<void>;
   sampleQuote(side: ProbeSide, sizeBaseWad: bigint): Promise<BenchmarkQuoteSample>;
   simulateTrade(intent: TradeIntent): Promise<BenchmarkTradeResult>;
+  close(): Promise<void>;
 }
-
-export interface BenchmarkFactoryContext {
-  readonly labels: ShadowBotLabels;
-  readonly chain?: ChainRuntimeConfig;
-  readonly logger: {
-    debug(message: string, meta?: Record<string, unknown>): void;
-    info(message: string, meta?: Record<string, unknown>): void;
-    error(message: string, meta?: Record<string, unknown>): void;
-  };
-  readonly oracleReader: OracleReaderAdapter;
-  readonly poolClient?: PoolClientAdapter;
-}
-
-export type BenchmarkFactory = (context: BenchmarkFactoryContext) => Promise<BenchmarkAdapter>;
-
-export interface CsvWriterContext {
-  readonly tradesHeader: readonly string[];
-  readonly quotesHeader: readonly string[];
-  readonly scoreboardHeader: readonly string[];
-}
-
-export interface CsvWriterAdapter {
-  init(): Promise<void>;
-  appendTrades(records: readonly TradeCsvRecord[]): Promise<void>;
-  appendQuotes(records: readonly QuoteCsvRecord[]): Promise<void>;
-  writeScoreboard(rows: readonly ScoreboardRow[]): Promise<void>;
-}
-

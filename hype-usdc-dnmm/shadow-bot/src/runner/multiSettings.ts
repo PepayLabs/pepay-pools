@@ -4,8 +4,11 @@ import {
   BenchmarkId,
   BenchmarkQuoteSample,
   BenchmarkTradeResult,
+  BenchmarkTickContext,
   ChainRuntimeConfig,
   MultiRunRuntimeConfig,
+  OracleReaderAdapter,
+  PoolClientAdapter,
   QuoteCsvRecord,
   RunSettingDefinition,
   ScoreboardRow,
@@ -89,13 +92,25 @@ async function runSetting(
   const engine = buildFlowEngine(setting, startMs, durationMs, deps.buildFlowEngine);
 
   const benchmarkIds = config.benchmarks.length > 0 ? config.benchmarks : BENCHMARK_IDS;
-  const { adapters, cleanup } = await deps.prepareAdapters(config.chain, setting, benchmarkIds);
+  const { adapters, cleanup, poolClient, oracleReader } = await deps.prepareAdapters(
+    config.chain,
+    setting,
+    benchmarkIds
+  );
 
   try {
     let timestampMs = startMs;
     while (!engine.isComplete(timestampMs)) {
       const intents = engine.next(timestampMs);
-      await processTick(ctx, setting, adapters, intents, timestampMs);
+      await processTick(
+        ctx,
+        setting,
+        adapters,
+        poolClient,
+        oracleReader,
+        intents,
+        timestampMs
+      );
       timestampMs += tickMs;
     }
   } finally {
@@ -108,15 +123,27 @@ async function processTick(
   ctx: RunnerContext,
   setting: RunSettingDefinition,
   adapters: readonly BenchmarkAdapter[],
+  poolClient: PoolClientAdapter,
+  oracleReader: OracleReaderAdapter,
   intents: readonly TradeIntent[],
   timestampMs: number
 ): Promise<void> {
   const { metrics, csv, scoreboard } = ctx;
 
+  const oracle = await oracleReader.sample();
+  const poolState = await poolClient.getState();
+  const tickContext: BenchmarkTickContext = {
+    timestampMs,
+    oracle,
+    poolState
+  };
+
   await Promise.all(
     adapters.map(async (adapter) => {
+      await adapter.prepareTick(tickContext);
       const quotes = await sampleQuotes(adapter, setting, timestampMs);
       const metricsContext = metrics.context(setting.id, adapter.id);
+      metricsContext.recordOracle(oracle);
       const twoSided = await recordQuotes(metricsContext, csv, setting, adapter.id, quotes, timestampMs);
       scoreboard.recordTwoSided(setting.id, adapter.id, twoSided);
 
@@ -202,6 +229,8 @@ function buildFlowEngine(
 
 interface PreparedAdapters {
   readonly adapters: BenchmarkAdapter[];
+  readonly poolClient: PoolClientAdapter;
+  readonly oracleReader: OracleReaderAdapter;
   readonly cleanup: () => Promise<void>;
 }
 
@@ -246,6 +275,8 @@ async function defaultPrepareAdapters(
   }
   return {
     adapters,
+    poolClient,
+    oracleReader,
     cleanup: () => chainClient.close()
   };
 }

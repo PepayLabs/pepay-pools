@@ -10,14 +10,12 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "lib": ["ES2022"],
-    "types": ["node"]
+    "types": ["node", "vitest"],
+    "rootDir": "src",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
-  "include": ["**/*.ts"],
-  "exclude": [
-    "node_modules",
-    "metrics-exporter.ts",
-    "monitor.ts",
-    "analysis.ts",
-    "analysis.js"
-  ]
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules"]
 }

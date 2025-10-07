@@ -1,5 +1,10 @@
 # Change Log
 
+## 2025-10-07
+
+- scripts: add `shadow-bot/script/fork/dnmm-a2z.sh` end-to-end fork runner and supporting CLAUDE guides.
+- docs: add `shadow-bot/docs/RUNBOOK.md` fork rehearsal runbook, update `shadow-bot/docs/CLAUDE.md`, and extend `docs/DOCS_INDEX.md` for SRE quick-start alignment.
+
 ## 2025-10-04
 
 - feat(pool): add LVR-aware surcharge (`fee.kappaLvrBps`, `enableLvrFee`), toxicity-biased clamps, ladder telemetry event (`PreviewLadderServed`), and `setAggregatorRouter` governance flow replacing per-executor discount setters.
@@ -15,7 +20,7 @@
 - fix(rfq): mark inline assembly blocks memory-safe to restore 0.8.24 builds, extend tests for domain caching and ERC1271 fast-path parity.
 - test: add gating scenarios ensuring Pyth adapters are skipped when HyperCore is fresh, preview freshness stays pure, and debug emission obeys flags.
 - docs: document new oracle gating metrics/alerts in `OBSERVABILITY.md` and note flag bitmask optimisation.
-- docs: regenerate architecture/config/rebalancing/inventory/oracle/router/RFQ/observability/governance/testing guides; add `ALGORITHMS.md`, `METRICS_GLOSSARY.md`, `GAS_OPTIMIZATION_GUIDE.md`, and `DOCS_INDEX.md` with zero-default posture and F01–F12 linkages.
+- docs: regenerate architecture/config/rebalancing/inventory/oracle/router/RFQ/observability/governance/testing guides; add `ALGORITHMS.md`, `METRICS_GLOSSARY.md`, `GAS_OPTIMIZATION_GUIDE.md`, and `DOCS_INDEX.md` with zero-default posture and F01-F12 linkages.
 
 ## 2025-10-02
 

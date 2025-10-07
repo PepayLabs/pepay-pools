@@ -10,6 +10,7 @@
 
 ## Quick Start
 - Review `ARCHITECTURE.md` for the high-level component map.
+- Follow `RUNBOOK.md` for the fork compile -> deploy -> run rehearsal.
 - Consult `CONFIG_GUIDE.md` before editing `.dnmmenv` or settings JSON files.
 - Use `RISK_SCENARIOS.md` to align simulation knobs with experiment design.
 - Mirror updates in documentation whenever code paths or metrics change.
@@ -35,4 +36,5 @@
 - Pager/Alert Routing: See `docs/RUNBOOK.md`
 
 ## Change Log
+- 2025-10-07: Added fork rehearsal runbook and wired docs quick-start to it.
 - 2025-10-04: Expanded documentation set with risk scenario playbook and telemetry updates.

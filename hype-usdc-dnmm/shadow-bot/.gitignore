@@ -1,6 +1,7 @@
 /dist/
 /node_modules/
-/metrics/
+/metrics/*
+!/metrics/CLAUDE.md
 /reports/
 !/src/reports/
 .DS_Store

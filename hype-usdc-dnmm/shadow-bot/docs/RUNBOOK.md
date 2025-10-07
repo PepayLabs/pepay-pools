@@ -37,7 +37,9 @@ Command | Purpose
 `jq --version` | Ensures JSON parsing utilities are available for template fills.
 
 ## Execution Flow
-Follow the steps in order. Commands are copy-pastable; substitute environment values as required.
+Shortcut: run `./shadow-bot/script/fork/dnmm-a2z.sh` from the repo root for an automated end-to-end rehearsal (mirrors the steps below).
+
+Follow the steps in order. Commands are copy-pastable; substitute environment values as required when running manually.
 
 1. **Compile Contracts**
    ```bash
@@ -88,6 +90,7 @@ Follow the steps in order. Commands are copy-pastable; substitute environment va
    JSON
    ```
    - HyperCore precompile addresses align with governance defaults; update only if infra changes.
+   - If `jq` returns empty strings, fall back to the deploy-time env vars (`DNMM_BASE_TOKEN`, `DNMM_QUOTE_TOKEN`, `DNMM_PYTH_CONTRACT`).
 
 6. **Create `.dnmmenv` for Fork Mode**
    ```bash

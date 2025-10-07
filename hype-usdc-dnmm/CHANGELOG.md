@@ -2,6 +2,7 @@
 
 ## 2025-10-07
 
+- scripts: add `shadow-bot/script/fork/dnmm-a2z.sh` end-to-end fork runner and supporting CLAUDE guides.
 - docs: add `shadow-bot/docs/RUNBOOK.md` fork rehearsal runbook, update `shadow-bot/docs/CLAUDE.md`, and extend `docs/DOCS_INDEX.md` for SRE quick-start alignment.
 
 ## 2025-10-04

@@ -1,7 +1,7 @@
 ---
 title: "Docs Index"
-version: "8e6f14e"
-last_updated: "2025-10-04"
+version: "8e6f14e+shadow-runbook"
+last_updated: "2025-10-07"
 ---
 
 # Docs Index
@@ -18,10 +18,10 @@ Central index for DNMM documentation. All docs live under `docs/` unless noted.
 ## What to Read First
 Audience | Sequence
 --- | ---
-Protocol Engineers | `ARCHITECTURE.md` → `ALGORITHMS.md` → `FEES_AND_INVENTORY.md`
-SRE / On-call | `RUNBOOK.md` → `OBSERVABILITY.md` → `OPERATIONS.md`
-QA & Tooling | `TESTING.md` → `CONFIG.md` → `GOVERNANCE_AND_TIMELOCK.md`
-Integrators | `ROUTER_INTEGRATION.md` → `RFQ.md` → `INVENTORY_FLOOR.md`
+Protocol Engineers | `ARCHITECTURE.md` -> `ALGORITHMS.md` -> `FEES_AND_INVENTORY.md`
+SRE / On-call | `shadow-bot/docs/RUNBOOK.md` -> `RUNBOOK.md` -> `OBSERVABILITY.md` -> `OPERATIONS.md`
+QA & Tooling | `TESTING.md` -> `CONFIG.md` -> `GOVERNANCE_AND_TIMELOCK.md`
+Integrators | `ROUTER_INTEGRATION.md` -> `RFQ.md` -> `INVENTORY_FLOOR.md`
 
 ## Document Map
 Category | Document | Description
@@ -39,6 +39,7 @@ Observability | `OBSERVABILITY.md` | Metric glossary, dashboards, alert rules (i
 Observers | `ARCHITECTURE.md#observer--autopause-layer`, `docs/OPERATIONS.md` | Autopause watcher + handler overview, runbook tie-in.
 Metrics Glossary | `METRICS_GLOSSARY.md` | Contract/bot metric details, KPIs.
 Operations | `OPERATIONS.md` | Deployment checklist, feature toggles, runbooks.
+Operations | `shadow-bot/docs/RUNBOOK.md` | Fork rehearsal for compile -> deploy -> shadow bot single/multi runs.
 Governance | `GOVERNANCE_AND_TIMELOCK.md` | Timelock process, guard rails.
 Configuration | `CONFIG.md` | Schema, zero-default posture, safety checks.
 Testing | `TESTING.md` | Test matrix, commands, preview parity and LVR coverage.

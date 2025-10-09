@@ -36,14 +36,20 @@ cd "$PROJECT_ROOT"
 ANVIL_PORT=${ANVIL_PORT:-8545}
 CHAIN_ID=${CHAIN_ID:-1337}
 PROM_PORT=${PROM_PORT:-9464}
-RUN_ID=${RUN_ID:-$(date -u +%Y-%m-%dT%H-%M-%SZ)}
-RUN_ID=${RUN_ID//:/-}
+RUN_ID_DEFAULT=$(date -u +%Y%m%dT%H%M%SZ)
+RUN_ID=${RUN_ID:-$RUN_ID_DEFAULT}
+RUN_ID=${RUN_ID//[^A-Za-z0-9_.-]/-}
 CSV_ROOT=${CSV_ROOT:-metrics/hype-metrics}
 BOT_DIR=${BOT_DIR:-shadow-bot}
 DEPLOY_OUT=${DEPLOY_OUT:-deployments/fork.deploy.json}
 ADDRESS_BOOK=${ADDRESS_BOOK:-shadow-bot/address-book.json}
 DNMM_POOL_LABEL=${DNMM_POOL_LABEL:-DnmPool}
 QUOTE_RFQ_LABEL=${QUOTE_RFQ_LABEL:-QuoteRFQ}
+SETTINGS_FILE=${SETTINGS_FILE:-settings/hype_settings.json}
+LOG_LEVEL=${LOG_LEVEL:-info}
+ANVIL_START_TIMEOUT=${ANVIL_START_TIMEOUT:-30}
+SINGLE_RUN_TIMEOUT=${SINGLE_RUN_TIMEOUT:-90}
+MULTI_RUN_TIMEOUT=${MULTI_RUN_TIMEOUT:-180}
 
 # Required deploy inputs
 : "${DNMM_BASE_TOKEN:?DNMM_BASE_TOKEN must be exported for Deploy.s.sol}"
@@ -61,24 +67,33 @@ BOT_PATH="${PROJECT_ROOT}/${BOT_DIR}"
 ADDRESS_BOOK_PATH="${PROJECT_ROOT}/${ADDRESS_BOOK}"
 CSV_PATH="${BOT_PATH}/${CSV_ROOT}"
 FORK_DEPLOY_PATH="${BOT_PATH}/fork.deploy.json"
-ANVIL_LOG=$(mktemp)
-METRICS_SNAPSHOT="/tmp/metrics.out"
+ANVIL_LOG=${ANVIL_LOG:-/tmp/anvil.log}
+ANVIL_PID_FILE=${ANVIL_PID_FILE:-/tmp/anvil.pid}
+METRICS_SNAPSHOT=${METRICS_SNAPSHOT:-/tmp/metrics.out}
+
+: > "$ANVIL_LOG"
 
 mkdir -p "$DEPLOY_OUT_DIR"
+mkdir -p "$(dirname "$ADDRESS_BOOK_PATH")"
 [[ -d "$BOT_PATH" ]] || fail "BOT_DIR path not found: $BOT_PATH"
 mkdir -p "$CSV_PATH"
 
 cleanup() {
   local status=$?
-  if [[ -n "${ANVIL_PID:-}" ]]; then
-    if kill -0 "$ANVIL_PID" >/dev/null 2>&1; then
-      warn "Stopping Anvil (pid ${ANVIL_PID})"
-      kill "$ANVIL_PID" >/dev/null 2>&1 || true
-      wait "$ANVIL_PID" 2>/dev/null || true
+  local pid=""
+  if [[ -f "$ANVIL_PID_FILE" ]]; then
+    pid=$(cat "$ANVIL_PID_FILE" 2>/dev/null || true)
+  elif [[ -n "${ANVIL_PID:-}" ]]; then
+    pid=$ANVIL_PID
+  fi
+  if [[ -n "$pid" ]]; then
+    if kill -0 "$pid" >/dev/null 2>&1; then
+      warn "Stopping Anvil (pid ${pid})"
+      kill "$pid" >/dev/null 2>&1 || true
+      wait "$pid" 2>/dev/null || true
     fi
   fi
-  rm -f "$ANVIL_LOG"
-  rm -f "$METRICS_SNAPSHOT"
+  rm -f "$ANVIL_LOG" "$METRICS_SNAPSHOT" "$ANVIL_PID_FILE"
   if [[ $status -eq 0 ]]; then
     log "Completed successfully"
   else
@@ -87,12 +102,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
-command -v forge >/dev/null || fail "forge not found on PATH"
-command -v node >/dev/null || fail "node not found on PATH"
-command -v npm >/dev/null || fail "npm not found on PATH"
-command -v jq >/dev/null || fail "jq not found on PATH"
-command -v curl >/dev/null || fail "curl not found on PATH"
-command -v anvil >/dev/null || fail "anvil not found on PATH"
+ANVIL_PID=""
+
+log "(0/12) Preflight toolchain"
+for tool in forge anvil node npm jq curl; do
+  command -v "$tool" >/dev/null || fail "$tool not found on PATH"
+done
+if ! command -v timeout >/dev/null; then
+  warn "timeout not found on PATH; runs will not be forcibly stopped at ${SINGLE_RUN_TIMEOUT}/${MULTI_RUN_TIMEOUT}s"
+fi
 
 log "Preflight: forge --version"
 forge --version
@@ -105,13 +123,14 @@ log "(1/12) forge build"
 forge build
 
 log "(2/12) Start Anvil fork on port ${ANVIL_PORT}"
-anvil --fork-url "$FORK_RPC_URL" \
+nohup anvil --fork-url "$FORK_RPC_URL" \
   --port "$ANVIL_PORT" \
   --chain-id "$CHAIN_ID" \
   >"$ANVIL_LOG" 2>&1 &
 ANVIL_PID=$!
+echo "$ANVIL_PID" > "$ANVIL_PID_FILE"
 
-for _ in {1..30}; do
+for ((i=1; i<=ANVIL_START_TIMEOUT; i++)); do
   if grep -q "Listening on 127.0.0.1" "$ANVIL_LOG"; then
     log "Anvil ready (pid ${ANVIL_PID})"
     break
@@ -119,8 +138,9 @@ for _ in {1..30}; do
   sleep 1
 done
 if ! grep -q "Listening on 127.0.0.1" "$ANVIL_LOG"; then
-  warn "Anvil log:\n$(cat "$ANVIL_LOG")"
-  fail "Timed out waiting for Anvil to start"
+  warn "Anvil log tail (last 40 lines):"
+  tail -n 40 "$ANVIL_LOG" || true
+  fail "Timed out waiting for Anvil to start within ${ANVIL_START_TIMEOUT}s"
 fi
 
 log "(3/12) Deploy contracts to fork"
@@ -179,9 +199,9 @@ cat > "${BOT_PATH}/.dnmmenv" <<ENV
 MODE=fork
 RPC_URL=http://127.0.0.1:${ANVIL_PORT}
 PROM_PORT=${PROM_PORT}
-SETTINGS_FILE=settings/hype_settings.json
+SETTINGS_FILE=${SETTINGS_FILE}
 FORK_DEPLOY_JSON=fork.deploy.json
-LOG_LEVEL=info
+LOG_LEVEL=${LOG_LEVEL}
 INTERVAL_MS=5000
 ENV
 
@@ -195,7 +215,14 @@ run_with_timeout() {
   local duration=$1
   shift
   if command -v timeout >/dev/null; then
-    timeout "$duration" "$@"
+    if ! timeout "$duration" "$@"; then
+      local ec=$?
+      if [[ $ec -eq 124 ]]; then
+        warn "Command '$*' timed out after ${duration}; continuing for artifact checks"
+      else
+        fail "Command '$*' exited with status ${ec}"
+      fi
+    fi
   else
     warn "timeout command not found; running without limit for $duration"
     "$@"
@@ -203,10 +230,10 @@ run_with_timeout() {
 }
 
 log "(9/12) Run legacy single-mode bot"
-run_with_timeout 90s bash -c "cd '$BOT_PATH' && node dist/shadow-bot.js"
+run_with_timeout "${SINGLE_RUN_TIMEOUT}s" bash -lc "cd '$BOT_PATH' && node dist/shadow-bot.js"
 
 log "(10/12) Run multi-setting harness"
-run_with_timeout 180s bash -c "cd '$BOT_PATH' && node dist/multi-run.js --settings settings/hype_settings.json --run-id '${RUN_ID}' --benchmarks dnmm,cpmm,stableswap --max-parallel 3 --duration-sec 15 --prom-port ${PROM_PORT}"
+run_with_timeout "${MULTI_RUN_TIMEOUT}s" bash -lc "cd '$BOT_PATH' && node dist/multi-run.js --settings ${SETTINGS_FILE} --run-id '${RUN_ID}' --benchmarks dnmm,cpmm,stableswap --max-parallel 3 --duration-sec 15 --prom-port ${PROM_PORT}"
 
 log "(11/12) Assert CSV artifacts"
 SCOREBOARD_PATH="${BOT_PATH}/${CSV_ROOT}/run_${RUN_ID}/scoreboard.csv"

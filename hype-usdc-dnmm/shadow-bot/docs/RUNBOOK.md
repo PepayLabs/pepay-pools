@@ -19,13 +19,14 @@ Name | Default / Example | Notes
 `ANVIL_PORT` | `8545` | Override if port is busy; keep consistent with `.dnmmenv`.
 `CHAIN_ID` | `1337` | Local fork chain id; mirrors Foundry default.
 `PROM_PORT` | `9464` | Prometheus exporter for both runs.
-`RUN_ID` | `${ISO_UTC_NOW}` | Timestamp slug for metrics (`run_<RUN_ID>`).
+`RUN_ID` | `${UTC_ISO_COMPACT}` | Timestamp slug for metrics (`run_<RUN_ID>`).
 `CSV_ROOT` | `metrics/hype-metrics` | Root folder for exported CSVs.
 `BOT_DIR` | `shadow-bot` | Relative path to the TypeScript harness.
 `DEPLOY_OUT` | `deployments/fork.deploy.json` | Captures full `forge script` output.
 `ADDRESS_BOOK` | `shadow-bot/address-book.json` | Downstream consumers look up pool + token metadata here.
 `DNMM_POOL_LABEL` | `DnmPool` | Contract label emitted by the deploy script.
 `QUOTE_RFQ_LABEL` | `QuoteRFQ` | Secondary contract label emitted by the deploy script.
+`LOG_LEVEL` | `info` | Shadow-bot logging level; adjust for verbose troubleshooting.
 
 > Tip: export variables in your shell session before starting (`export FORK_RPC_URL=...`).
 
@@ -89,22 +90,23 @@ Follow the steps in order. Commands are copy-pastable; substitute environment va
    }
    JSON
    ```
-   - HyperCore precompile addresses align with governance defaults; update only if infra changes.
-   - If `jq` returns empty strings, fall back to the deploy-time env vars (`DNMM_BASE_TOKEN`, `DNMM_QUOTE_TOKEN`, `DNMM_PYTH_CONTRACT`).
+  - HyperCore precompile addresses align with governance defaults; update only if infra changes.
+  - If `jq` returns empty strings, fall back to the deploy-time env vars (`DNMM_BASE_TOKEN`, `DNMM_QUOTE_TOKEN`, `DNMM_PYTH_CONTRACT`).
 
 6. **Create `.dnmmenv` for Fork Mode**
    ```bash
-   cat <<'ENV' > "${BOT_DIR:-shadow-bot}/.dnmmenv"
-   MODE=fork
-   RPC_URL=http://127.0.0.1:${ANVIL_PORT:-8545}
-   PROM_PORT=${PROM_PORT:-9464}
-   SETTINGS_FILE=settings/hype_settings.json
-   FORK_DEPLOY_JSON=fork.deploy.json
-   LOG_LEVEL=info
-   INTERVAL_MS=5000
-   ENV
-   ```
-   - Precedence follows `CONFIG_GUIDE.md`: `.dnmmenv.local` > `.dnmmenv` > exported vars.
+  cat <<'ENV' > "${BOT_DIR:-shadow-bot}/.dnmmenv"
+  MODE=fork
+  RPC_URL=http://127.0.0.1:${ANVIL_PORT:-8545}
+  PROM_PORT=${PROM_PORT:-9464}
+  SETTINGS_FILE=settings/hype_settings.json
+  FORK_DEPLOY_JSON=fork.deploy.json
+  LOG_LEVEL=info
+  INTERVAL_MS=5000
+  ENV
+  ```
+  - Precedence follows `CONFIG_GUIDE.md`: `.dnmmenv.local` > `.dnmmenv` > exported vars.
+  - Override `SETTINGS_FILE` or `LOG_LEVEL` by editing this file or exporting OS vars before running the bot.
 
 7. **Install Dependencies**
    ```bash
